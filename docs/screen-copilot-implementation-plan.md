@@ -3,6 +3,8 @@
 > **A local, privacy-first screen copilot that helps you understand what's on your screen.**
 > 1.5-day hackathon · 5 people · 3 streams · Phase-gated milestones
 
+> ⚠️ **This plan reflects the team/parallel-stream view of the work. The authoritative API contract, file structure, and pseudocode live in [`docs/SPEC.md`](docs/SPEC.md) and the phase docs (`docs/phase-*.md`). Where this document conflicts with those, the SPEC wins.**
+
 ---
 
 ## How to Read This Document
@@ -145,17 +147,18 @@ Before anyone goes to sleep Friday night, confirm in the team chat:
 
 | # | Task | Owner | Time | Depends On | Deliverable |
 |---|------|-------|------|------------|-------------|
-| C1.1 | Finalize `server.py`: FastAPI app with lifespan model loading, CORS middleware, health endpoint | C1 | 30 min | Phase 0 validation | `GET /health` returns `{ status: "ok", model_loaded: true }` |
-| C1.2 | Implement `POST /analyze` (non-streaming): accept `AnalyzeRequest`, decode image, run inference, return text | C1 | 40 min | C1.1 | Endpoint accepts base64 image + question, returns answer |
-| C1.3 | Implement `POST /analyze/stream` (SSE): same input, but yield token-by-token via `text/event-stream` | C1 | 40 min | C1.2 | SSE stream works when tested with `curl` |
-| C1.4 | Image preprocessing helper: decode base64, resize to max 1024px wide, save as JPEG temp file | C1 | 20 min | — | `_save_temp_image()` works correctly |
+| C1.1 | Finalize `server.py`: FastAPI app with lifespan model loading, `/health` HTTP endpoint, `/ws` WebSocket endpoint | C1 | 30 min | Phase 0 validation | `GET /health` returns `{ status: "ok", model_loaded: true }` |
+| C1.2 | Implement WebSocket `handle_turn`: accept `{text, image, preset_id}` JSON, run inference via tool call, send `structured` or `token` + `done` messages | C1 | 50 min | C1.1 | WebSocket turn works when tested with `wscat` |
+| C1.3 | Image preprocessing helper: `resize_image_blob(b64_str) -> str` — in-memory base64→PIL→resize→JPEG, no temp files | C1 | 20 min | — | `preprocess.py` works correctly |
+| C1.4 | Add JSON extraction fallback (`_extract_structured_from_text`) for when tool calling fails | C1 | 15 min | C1.2 | Fallback extracts Summary/Answer/Key points from raw text |
 | C1.5 | Write lecture-slide system prompt, test with 3+ real slide screenshots | C1 | 30 min | C1.2 | Prompt produces useful summaries of test slides |
 | C1.6 | Write `setup_model.py` for teammates to download the model | C1 | 15 min | — | `python setup_model.py` downloads model if not present |
 
 **Stream C notes:**
 - C1 is solo on the critical path. Protect their focus time — no interruptions from other streams.
-- Test the non-streaming `/analyze` endpoint first. Only move to SSE streaming once basic inference works.
-- If LiteRT-LM's conversation API differs from what's in the plan doc, adapt `server.py` to match the real API. The HTTP contract to Electron stays the same.
+- Test the WebSocket turn first with `wscat` before wiring to Electron. See test commands below.
+- The sidecar uses WebSocket (not HTTP POST/SSE). Image blobs are confirmed to work via `{"type": "image", "blob": b64_str}` — no temp files needed.
+- Use the single-consumer Queue pattern from `docs/phase-1-sidecar.md` §1.4 — do not use two concurrent `iter_text()` consumers.
 
 **How to test the sidecar independently:**
 
@@ -166,16 +169,16 @@ cd sidecar && uvicorn server:app --host 0.0.0.0 --port 8321
 # Test health
 curl http://localhost:8321/health
 
-# Test non-streaming (replace with real base64)
-curl -X POST http://localhost:8321/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"image_base64": "<base64>", "question": "Summarize this slide", "system_prompt": "You are a lecture slide explainer.", "history": []}'
+# Test WebSocket turn (install wscat: npm i -g wscat)
+wscat -c ws://localhost:8321/ws
+# Then type:
+{"text": "Summarize this slide", "preset_id": "lecture-slide"}
+# Expect: {"type": "structured", "data": {...}} then {"type": "done"}
 
-# Test streaming
-curl -X POST http://localhost:8321/analyze/stream \
-  -H "Content-Type: application/json" \
-  -d '{"image_base64": "<base64>", "question": "Summarize this slide", "system_prompt": "You are a lecture slide explainer.", "history": []}' \
-  --no-buffer
+# Test with image (replace <base64> with real JPEG base64):
+{"text": "What is on this slide?", "preset_id": "lecture-slide", "image": "<base64>"}
+
+# Test interrupt: send {"type":"interrupt"} while a long response is streaming
 ```
 
 ---
@@ -186,7 +189,7 @@ curl -X POST http://localhost:8321/analyze/stream \
 
 - [ ] **Stream A:** Clicking Capture in the sidebar takes a screenshot of the window behind the overlay and shows it in `CapturePreview`
 - [ ] **Stream B:** Sidebar renders with layout, capture preview, chat panel (mock data), and input box
-- [ ] **Stream C:** Sidecar `/analyze/stream` returns a sensible SSE response when given a slide image via `curl`
+- [ ] **Stream C:** Sidecar `/ws` WebSocket returns a structured response when given a slide image via `wscat`
 
 > **If Stream C is behind:** This is the highest risk. If vision inference is unreliable, spend the lunch break troubleshooting. If LiteRT-LM is fundamentally broken, pivot to Ollama now — do not wait until the afternoon.
 
@@ -204,12 +207,12 @@ curl -X POST http://localhost:8321/analyze/stream \
 
 | # | Task | Owner | Time | Depends On | Deliverable |
 |---|------|-------|------|------------|-------------|
-| A2.1 | Wire main process to call sidecar HTTP: when renderer sends a question + frame, main POSTs to `/analyze/stream` | A1 | 45 min | Phase 1 complete | Main process calls sidecar, gets SSE response |
-| A2.2 | Forward SSE chunks from sidecar response to renderer via IPC: each chunk → `ipc.send('stream:chunk', { text, done })` | A1 | 30 min | A2.1 | Renderer receives token-by-token updates |
-| A2.3 | Add IPC channel for submitting questions: renderer sends `{ question, systemPrompt, imageBase64, history }`, main orchestrates the sidecar call | A2 | 30 min | A2.1 | Clean IPC contract for question submission |
-| A2.4 | Health check on startup: main process pings `/health` every 5s until sidecar is reachable, sends status to renderer | A2 | 20 min | C1.1 | Renderer knows if sidecar is up or down |
-| A2.5 | Error handling: sidecar unreachable, request timeout (30s), malformed response — surface errors to renderer | A1 | 30 min | A2.1 | Error messages appear in chat panel instead of silent failure |
-| A2.6 | **End-to-end integration test:** Open slides → Capture → click "Summarize" → streaming answer appears in chat | A1 + B1 + C1 | 30 min | A2.2 + B2.3 + C1.3 | The demo flow works |
+| A2.1 | Implement `wsClient.ts`: persistent WebSocket to `ws://localhost:8321/ws` with auto-reconnect (2s backoff), `onSidecarMessage` / `onSidecarStatus` callbacks | A1 | 45 min | Phase 1 complete | Main process maintains WebSocket connection to sidecar |
+| A2.2 | Route sidecar messages to renderer via IPC: `token` → `sidecar:token`, `structured` → `sidecar:structured`, `done` → `sidecar:done`, `error` → `sidecar:error` | A1 | 30 min | A2.1 | Renderer receives typed messages from sidecar |
+| A2.3 | Add IPC handler `sidecar:send`: renderer sends `{text, preset_id, image}`, main forwards to WebSocket; add `sidecar:interrupt` handler | A2 | 30 min | A2.1 | Clean IPC contract for message submission and interruption |
+| A2.4 | Health check on startup: main process GETs `/health` once on connect, then polls every 5s while `model_loaded: false`, sends status to renderer | A2 | 20 min | C1.1 | Renderer knows if sidecar is up and model is loaded |
+| A2.5 | Error handling: sidecar unreachable, WebSocket close, malformed JSON — surface errors to renderer via `sidecar:error` IPC | A1 | 30 min | A2.1 | Error messages appear in chat panel instead of silent failure |
+| A2.6 | **End-to-end integration test:** Open slides → Capture → click "Summarize" → structured card or streaming answer appears in chat | A1 + B1 + C1 | 30 min | A2.2 + B2.3 + C1.2 | The demo flow works |
 
 ---
 
@@ -219,7 +222,7 @@ curl -X POST http://localhost:8321/analyze/stream \
 |---|------|-------|------|------------|-------------|
 | B2.1 | `QuickActions` component: 2×2 grid of preset starter questions ("Summarize", "Explain", "Quiz Me", "Key Terms") | B2 | 30 min | B1.6 | Buttons render, clicking one sets the input text and auto-submits |
 | B2.2 | `PresetPicker` component: dropdown to switch between "Lecture Slides" and "Screen Assistant" — changing preset swaps the quick action labels and system prompt | B1 | 30 min | B2.1 | Dropdown works, quick actions update |
-| B2.3 | Streaming text display: wire ChatPanel to receive `stream:chunk` IPC events, append text character-by-character to the current assistant message, auto-scroll | B1 | 45 min | B1.5, A2.2 | Text appears word-by-word in the chat |
+| B2.3 | Streaming text + structured display: wire ChatPanel to receive `sidecar:token` (append text) and `sidecar:structured` (render StructuredCard) IPC events, auto-scroll | B1 | 45 min | B1.5, A2.2 | Text appears word-by-word; structured cards render on tool call |
 | B2.4 | Zustand session store: `currentFrame`, `messages[]`, `isStreaming`, `presetId` — all components read from this store | B1 | 30 min | — | Single source of truth for session state |
 | B2.5 | Zustand settings store: `sidecarUrl`, `modelName`, `autoRefreshEnabled`, `autoRefreshInterval` | B2 | 20 min | — | Settings persisted in store |
 | B2.6 | `StatusIndicator` component: shows connection status (🟢 connected / 🔴 disconnected), model name, last response latency | B2 | 20 min | A2.4, B2.5 | Status bar at bottom of sidebar |
@@ -369,7 +372,7 @@ curl -X POST http://localhost:8321/analyze/stream \
 **For judges asking technical questions:**
 - "We use LiteRT-LM, Google's edge inference engine, running Gemma 4 on CPU."
 - "Capture uses Electron's desktopCapturer with automatic foreground window detection."
-- "Streaming responses come via Server-Sent Events from a local FastAPI sidecar."
+- "Streaming responses come via WebSocket from a local FastAPI sidecar — structured tool-call responses when the model cooperates, raw token streaming as a fallback."
 - "The sidebar is a frameless always-on-top Electron window that excludes itself from capture."
 
 **Fallback talking points (if something breaks during demo):**
@@ -498,32 +501,42 @@ These are ordered by impact-to-effort ratio:
 Renderer → Main:
   capture:now                     → triggers screenshot
   capture:auto-refresh            → { enabled: boolean, intervalMs: number }
-  analyze:submit                  → { question, systemPrompt, imageBase64, history }
+  sidecar:send                    → { text, preset_id, image? }   (WsOutboundMessage)
+  sidecar:interrupt               → sends {"type":"interrupt"} over WebSocket
 
 Main → Renderer:
   frame:captured                  → CaptureFrame payload
-  frame:error                     → error string
-  stream:chunk                    → { text: string, done: boolean }
-  sidecar:status                  → { connected: boolean, modelLoaded: boolean }
+  sidecar:token                   → { text: string }
+  sidecar:structured              → StructuredResponse { summary, answer, key_points }
+  sidecar:done                    → (no payload)
+  sidecar:error                   → { message: string }
+  sidecar:status                  → { connected: boolean }
+  sidecar:audio_start             → (no payload)
+  sidecar:audio_chunk             → { audio: string (base64 PCM), index: number }
+  sidecar:audio_end               → (no payload)
 ```
 
-### Sidecar HTTP API (Electron Main → Python)
+### Sidecar API (Electron Main ↔ Python — WebSocket)
+
+The sidecar uses WebSocket, **not** HTTP POST/SSE. All inference I/O flows over `ws://localhost:8321/ws`.
 
 ```
-GET  /health
-     → { status: "ok", model_loaded: true }
+GET  /health  (HTTP)
+     → { status: "ok", model_loaded: true, backend: "GPU"|"CPU", model: string }
 
-GET  /presets
-     → [{ id, label, icon, starter_questions }]
+WebSocket /ws
+  Inbound (Electron → Sidecar):
+    { type: "interrupt" }
+    { text: string, preset_id: string, image?: string }   ← base64 JPEG
 
-POST /analyze
-     Body: { image_base64, question, system_prompt, history }
-     → { text: "..." }
-
-POST /analyze/stream
-     Body: { image_base64, question, system_prompt, history }
-     → SSE: data: {"text": "chunk", "done": false}
-            data: {"text": "", "done": true}
+  Outbound (Sidecar → Electron):
+    { type: "structured", data: { summary, answer, key_points } }
+    { type: "token",      text: string }
+    { type: "done" }
+    { type: "error",      message: string }
+    { type: "audio_start" }
+    { type: "audio_chunk", audio: string, index: number }
+    { type: "audio_end" }
 ```
 
 ---
