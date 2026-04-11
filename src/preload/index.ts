@@ -16,6 +16,9 @@ const api: ElectronAPI = {
   // Defaults to true so voice is on when the env var is absent.
   voiceEnabled: process.env.VOICE_ENABLED !== 'false',
 
+  // Evaluated once at preload time. Defaults to false so speech output is opt-in.
+  ttsEnabled: process.env.TTS_ENABLED === 'true',
+
   captureNow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.CAPTURE_NOW),
 
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) =>

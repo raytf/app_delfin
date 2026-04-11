@@ -122,6 +122,8 @@ export interface OverlayState {
 export interface ElectronAPI {
   /** True when VOICE_ENABLED=true in .env. Read synchronously by renderer. */
   voiceEnabled: boolean
+  /** True when TTS_ENABLED=true in .env. Used by renderer fallback logic. */
+  ttsEnabled: boolean
   captureNow: () => Promise<void>
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) => void
   sidecarSend: (msg: WsOutboundMessage) => void

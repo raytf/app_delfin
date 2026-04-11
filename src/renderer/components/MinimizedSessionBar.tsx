@@ -3,6 +3,7 @@ import MinimizedPromptPanel from './MinimizedPromptPanel'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null
+  isAudioPlaying: boolean
   isSubmitting: boolean
   isMicListening: boolean
   isMicMuted: boolean
@@ -60,6 +61,7 @@ function EndIcon() {
 
 export default function MinimizedSessionBar({
   errorMessage,
+  isAudioPlaying,
   isSubmitting,
   isMicListening,
   isMicMuted,
@@ -92,12 +94,12 @@ export default function MinimizedSessionBar({
           />
         ) : null}
 
-        {/* ── [TEST] compact mic indicator ── */}
-        <div className="mb-1 flex items-center justify-center gap-1 text-[10px] text-yellow-400">
+        <div className="mb-1 flex items-center justify-center gap-2 text-[10px] text-yellow-400">
           <span>{isMicListening ? (isMicMuted ? '🔇' : '🎙️') : '⏳'}</span>
           <button className="no-drag underline opacity-70 hover:opacity-100" onClick={onToggleMute} type="button">
             {isMicMuted ? 'unmute' : 'mute'}
           </button>
+          {isAudioPlaying ? <span className="animate-pulse text-cyan-300">🔊 speaking</span> : null}
         </div>
 
         <div className={isPromptOpen ? 'drag-region mt-3 flex items-center justify-center gap-2' : 'drag-region flex items-center justify-center gap-2'}>

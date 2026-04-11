@@ -7,6 +7,7 @@ import SessionPromptComposer from './SessionPromptComposer'
 interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
   errorMessage: string | null
+  isAudioPlaying: boolean
   isSubmitting: boolean
   /** True once MicVAD is running and listening (VAD initialised). */
   isMicListening: boolean
@@ -24,6 +25,7 @@ interface ExpandedSessionViewProps {
 export default function ExpandedSessionView({
   captureSourceLabel,
   errorMessage,
+  isAudioPlaying,
   isSubmitting,
   isMicListening,
   isMicMuted,
@@ -44,7 +46,6 @@ export default function ExpandedSessionView({
 
         {/* ── [TEST] VAD mic status indicator ── */}
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-300">
-          <span className="font-semibold uppercase tracking-widest text-yellow-500">[TEST]</span>
           {isMicListening ? (
             isMicMuted ? (
               <span>🔇 Mic muted</span>
@@ -63,6 +64,13 @@ export default function ExpandedSessionView({
           </button>
         </div>
 
+        {isAudioPlaying ? (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200">
+            <span className="animate-pulse">🔊</span>
+            <span>Speaking response audio…</span>
+          </div>
+        ) : null}
+
         <div className="mt-6 grid flex-1 gap-6 lg:grid-cols-[minmax(0,1.45fr)_20rem]">
           <section className="flex min-h-0 flex-col rounded-[2rem] border border-slate-800 bg-slate-950/72 p-6 shadow-2xl shadow-black/20">
             <div className="flex items-center justify-between gap-4">
@@ -79,6 +87,7 @@ export default function ExpandedSessionView({
               <SessionConversation
                 className="min-h-[28rem] flex-1"
                 emptyMessage="Ask about the current screen to start the session conversation."
+                isAudioPlaying={isAudioPlaying}
                 isSubmitting={isSubmitting}
                 messages={messages}
               />

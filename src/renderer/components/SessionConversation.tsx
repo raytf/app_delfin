@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../shared/types'
 interface SessionConversationProps {
   className?: string
   emptyMessage: string
+  isAudioPlaying: boolean
   isSubmitting: boolean
   messages: ChatMessage[]
 }
@@ -11,10 +12,20 @@ interface SessionConversationProps {
 export default function SessionConversation({
   className,
   emptyMessage,
+  isAudioPlaying,
   isSubmitting,
   messages,
 }: SessionConversationProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const latestAssistantIndex = (() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === 'assistant') {
+        return index
+      }
+    }
+
+    return -1
+  })()
 
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -45,6 +56,7 @@ export default function SessionConversation({
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" ref={scrollContainerRef}>
           {messages.map((message) => {
             const isUser = message.role === 'user'
+            const showSpeakingBadge = !isUser && isAudioPlaying && latestAssistantIndex >= 0 && messages[latestAssistantIndex]?.id === message.id
 
             return (
               <article
@@ -52,15 +64,17 @@ export default function SessionConversation({
                 key={message.id}
               >
                 <div
-                  className={`max-w-[85%] rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-lg ${
-                    isUser
+                  className={`max-w-[85%] rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-lg ${isUser
                       ? 'bg-cyan-400 text-slate-950'
                       : 'border border-slate-800 bg-slate-900/85 text-slate-100'
-                  }`}
+                    }`}
                 >
                   <p className={`text-[11px] uppercase tracking-[0.22em] ${isUser ? 'text-slate-800/70' : 'text-slate-500'}`}>
                     {isUser ? 'You' : 'Copilot'}
                   </p>
+                  {showSpeakingBadge ? (
+                    <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-cyan-300">🔊 Speaking</p>
+                  ) : null}
                   <p className="mt-2 whitespace-pre-wrap">
                     {message.content.length > 0 ? message.content : 'Thinking…'}
                   </p>

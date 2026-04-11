@@ -1,8 +1,13 @@
-import { MAIN_TO_RENDERER_CHANNELS } from "../../shared/types";
+import { ipcMain } from "electron";
+import {
+  MAIN_TO_RENDERER_CHANNELS,
+  RENDERER_TO_MAIN_CHANNELS,
+} from "../../shared/types";
 import {
   connectToSidecar,
   onSidecarMessage,
   onSidecarStatus,
+  sendToSidecar,
 } from "../sidecar/wsClient";
 import type { RegisterIpcHandlersOptions } from "./types";
 
@@ -10,6 +15,38 @@ export function registerSidecarBridge(
   options: RegisterIpcHandlersOptions,
 ): void {
   connectToSidecar(options.sidecarWsUrl);
+
+  ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, (_event, message) => {
+    try {
+      sendToSidecar(message);
+    } catch (error) {
+      const mainWindow = options.getMainWindow();
+      if (mainWindow !== null && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to send message to sidecar.",
+        });
+      }
+    }
+  });
+
+  ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, () => {
+    try {
+      sendToSidecar({ type: "interrupt" });
+    } catch (error) {
+      const mainWindow = options.getMainWindow();
+      if (mainWindow !== null && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to interrupt sidecar.",
+        });
+      }
+    }
+  });
 
   onSidecarMessage(async (message) => {
     const mainWindow = options.getMainWindow();
