@@ -1,17 +1,20 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type {
   ConversationMessageRecord,
+  PersistCaptureImageInput,
   SessionRecord,
   SessionStorage,
 } from "./types";
 
 export class FileSessionStorage implements SessionStorage {
+  private readonly capturesDir: string;
   private readonly sessionsDir: string;
   private readonly indexPath: string;
   private pendingWrite: Promise<void> = Promise.resolve();
 
   constructor(readonly baseDir: string) {
+    this.capturesDir = join(baseDir, "captures");
     this.sessionsDir = join(baseDir, "sessions");
     this.indexPath = join(this.sessionsDir, "index.json");
   }
@@ -91,7 +94,29 @@ export class FileSessionStorage implements SessionStorage {
 
   async listSessions(): Promise<SessionRecord[]> {
     const sessions = await this.readSessionIndex();
-    return [...sessions].sort((left, right) => right.startedAt - left.startedAt);
+    return [...sessions].sort(
+      (left, right) => right.startedAt - left.startedAt,
+    );
+  }
+
+  async persistCaptureImage(input: PersistCaptureImageInput): Promise<string> {
+    const relativePath = join(
+      this.capturesDir,
+      input.sessionId,
+      `${input.messageId}.jpg`,
+    );
+    const absolutePath = this.resolveStoragePath(relativePath);
+
+    await mkdir(dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, Buffer.from(input.imageBase64, "base64"));
+
+    return relativePath;
+  }
+
+  async getCaptureImageDataUrl(relativePath: string): Promise<string> {
+    const absolutePath = this.resolveStoragePath(relativePath);
+    const image = await readFile(absolutePath);
+    return `data:image/jpeg;base64,${image.toString("base64")}`;
   }
 
   private enqueueWrite(operation: () => Promise<void>): Promise<void> {
@@ -126,6 +151,16 @@ export class FileSessionStorage implements SessionStorage {
 
   private getConversationPath(sessionId: string): string {
     return join(this.sessionsDir, `${sessionId}.json`);
+  }
+
+  private resolveStoragePath(relativePath: string): string {
+    const absolutePath = resolve(this.baseDir, relativePath);
+
+    if (!absolutePath.startsWith(resolve(this.baseDir))) {
+      throw new Error(`Invalid storage path: ${relativePath}`);
+    }
+
+    return absolutePath;
   }
 
   private async readJsonFile<T>(filePath: string, fallback: T): Promise<T> {

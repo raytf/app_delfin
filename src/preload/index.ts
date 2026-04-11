@@ -6,7 +6,9 @@ import type {
   SidecarStatus,
   ElectronAPI,
   OverlayState,
+  SessionMessageImageRequest,
   SessionPromptRequest,
+  SessionPromptResponse,
   MinimizedOverlayVariant,
   SessionListItem,
 } from '../shared/types'
@@ -30,10 +32,13 @@ const api: ElectronAPI = {
   stopSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP),
 
   submitSessionPrompt: (request: SessionPromptRequest) =>
-    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request),
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request) as Promise<SessionPromptResponse>,
 
   listSessions: () =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST) as Promise<SessionListItem[]>,
+
+  getSessionMessageImage: (request: SessionMessageImageRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, request) as Promise<string>,
 
   minimizeOverlay: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_MINIMIZE),
 

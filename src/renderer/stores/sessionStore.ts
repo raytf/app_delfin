@@ -8,12 +8,17 @@ interface SessionStoreState {
   messages: ChatMessage[]
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
+  minimizedResponseMessageId: string | null
+  sessionStartTime: number | null
   clearConversation: () => void
-  beginPromptSubmission: (prompt: string) => void
+  clearLatestResponse: () => void
+  startSession: () => void
+  beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
+  setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
 }
 
 function createMessageId(): string {
@@ -28,6 +33,8 @@ export const useSessionStore = create<SessionStoreState>()(
       messages: [],
       sessionHistory: [],
       activeAssistantMessageId: null,
+      minimizedResponseMessageId: null,
+      sessionStartTime: null,
 
       clearConversation: () =>
         set((state) => ({
@@ -36,14 +43,27 @@ export const useSessionStore = create<SessionStoreState>()(
           messages: [],
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
+          minimizedResponseMessageId: null,
+          sessionStartTime: null,
         })),
 
-      beginPromptSubmission: (prompt: string) =>
+      clearLatestResponse: () =>
+        set({
+          minimizedResponseMessageId: null,
+        }),
+
+      startSession: () =>
+        set((state) => ({
+          ...state,
+          sessionStartTime: state.sessionStartTime ?? Date.now(),
+        })),
+
+      beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {
           const userMessage: ChatMessage = {
-            id: createMessageId(),
+            id: input.messageId,
             role: 'user',
-            content: prompt,
+            content: input.prompt,
             timestamp: Date.now(),
           }
 
@@ -60,6 +80,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: true,
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
+            minimizedResponseMessageId: assistantMessageId,
           }
         }),
 
@@ -103,6 +124,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: false,
             messages,
             activeAssistantMessageId: null,
+            minimizedResponseMessageId: state.activeAssistantMessageId,
           }
         }),
 
@@ -110,6 +132,18 @@ export const useSessionStore = create<SessionStoreState>()(
         set({
           sessionHistory: sessions,
         }),
+
+      setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === input.messageId
+              ? {
+                  ...message,
+                  imagePath: input.imagePath,
+                }
+              : message,
+          ),
+        })),
     }),
     {
       name: 'screen-copilot-active-session',
@@ -120,6 +154,8 @@ export const useSessionStore = create<SessionStoreState>()(
         messages: state.messages,
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
+        minimizedResponseMessageId: state.minimizedResponseMessageId,
+        sessionStartTime: state.sessionStartTime,
       }),
     },
   ),

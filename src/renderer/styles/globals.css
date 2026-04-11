@@ -1,4 +1,83 @@
+/* Fonts: Bricolage Grotesque for display, Plus Jakarta Sans for body */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
+
+:root {
+  /* Ocean Color Palette */
+  --ocean-deep: #0a4d68;
+  --ocean-primary: #088395;
+  --ocean-bright: #05bfdb;
+  --ocean-light: #00cfde;
+  --ocean-foam: #e0f7fa;
+  --ocean-mist: #f0fbfc;
+
+  /* Semantic Colors */
+  --bg-app: #f8fcfd;
+  --bg-app-soft: #eef8fa;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #e8f4f6;
+  --bg-overlay: rgba(255, 255, 255, 0.88);
+
+  /* Text */
+  --text-primary: #0a4d68;
+  --text-secondary: #3d7a8c;
+  --text-muted: #7ca3af;
+
+  /* Borders */
+  --border-soft: #c8e3ea;
+  --border-strong: #9dd1de;
+
+  /* Primary (Ocean Blue) */
+  --primary: #088395;
+  --primary-hover: #066e7d;
+  --primary-active: #055a66;
+  --primary-soft: #d4f1f4;
+
+  /* Accent (Teal/Cyan) */
+  --accent: #05bfdb;
+  --accent-soft: #ccf5fa;
+
+  /* Status */
+  --success: #2a9d8f;
+  --success-soft: #d4f0ed;
+  --danger: #d64545;
+  --danger-soft: #fde8e8;
+  --warning: #e9a820;
+  --warning-soft: #fef6e0;
+
+  /* Shadows */
+  --shadow-soft: rgba(8, 131, 149, 0.08);
+  --shadow-medium: rgba(8, 131, 149, 0.14);
+  --shadow-strong: rgba(8, 131, 149, 0.22);
+
+  /* Typography */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  font-family: var(--font-body);
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
 
 .drag-region {
   -webkit-app-region: drag;
@@ -6,4 +85,78 @@
 
 .no-drag {
   -webkit-app-region: no-drag;
+}
+
+/* Ocean wave background pattern */
+.ocean-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(5, 191, 219, 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 10%, rgba(8, 131, 149, 0.1), transparent),
+    radial-gradient(ellipse 70% 50% at 20% 5%, rgba(0, 207, 222, 0.08), transparent),
+    linear-gradient(180deg, var(--bg-app) 0%, var(--bg-app-soft) 100%);
+}
+
+/* Primary button */
+.btn-ocean {
+  background: var(--primary);
+  transition: all 0.2s ease;
+}
+
+.btn-ocean:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 8px 24px var(--shadow-medium);
+}
+
+.btn-ocean:active {
+  background: var(--primary-active);
+}
+
+/* Overlay scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Session card hover effect */
+.session-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.session-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px var(--shadow-medium);
+}
+
+/* Status badge styles */
+.status-completed {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.status-active {
+  background: var(--accent-soft);
+  color: var(--ocean-primary);
+}
+
+.status-failed {
+  background: var(--danger-soft);
+  color: var(--danger);
 }

@@ -4,8 +4,8 @@ import type { MinimizedOverlayVariant, OverlayMode } from "../../shared/types";
 
 const EXPANDED_WINDOW_WIDTH = 1100;
 const EXPANDED_WINDOW_HEIGHT = 760;
-const MINIMIZED_WINDOW_WIDTH = 320;
-const MINIMIZED_WINDOW_HEIGHT = 88;
+const MINIMIZED_WINDOW_WIDTH = 290;
+const MINIMIZED_WINDOW_HEIGHT = 75;
 const MINIMIZED_PROMPT_INPUT_WINDOW_WIDTH = 420;
 const MINIMIZED_PROMPT_INPUT_WINDOW_HEIGHT = 120;
 const MINIMIZED_PROMPT_RESPONSE_WINDOW_WIDTH = 420;
@@ -106,8 +106,9 @@ export function createOverlayWindow(
     skipTaskbar: isMinimizedMode,
     show: false,
     transparent: isMinimizedMode,
-    backgroundColor: isMinimizedMode ? "#00000000" : "#111827",
-    title: "Screen Copilot",
+    hasShadow: !isMinimizedMode,
+    backgroundColor: isMinimizedMode ? "#00000000" : "#f8fcfd",
+    title: "Delfin",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

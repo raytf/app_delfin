@@ -14,6 +14,7 @@ export interface ChatMessage {
   content: string
   timestamp: number
   latencyMs?: number
+  imagePath?: string
 }
 
 // WebSocket outbound (Electron → Sidecar)
@@ -24,8 +25,18 @@ export interface WsOutboundMessage {
 }
 
 export interface SessionPromptRequest {
+  messageId: string
   text: string
   presetId: PresetId
+}
+
+export interface SessionPromptResponse {
+  imagePath: string
+  messageId: string
+}
+
+export interface SessionMessageImageRequest {
+  imagePath: string
 }
 
 export interface WsInterruptMessage {
@@ -62,6 +73,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
   SESSION_LIST: 'session:list',
+  SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
 } as const
 
 export const MAIN_TO_RENDERER_CHANNELS = {
@@ -124,8 +136,9 @@ export interface ElectronAPI {
   getOverlayState: () => Promise<OverlayState>
   startSession: () => Promise<void>
   stopSession: () => Promise<void>
-  submitSessionPrompt: (request: SessionPromptRequest) => Promise<void>
+  submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>
+  getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
   minimizeOverlay: () => Promise<void>
   restoreOverlay: () => Promise<void>
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>

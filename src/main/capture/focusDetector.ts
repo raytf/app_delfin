@@ -6,7 +6,7 @@ const CAPTURE_THUMBNAIL_SIZE = {
 } as const
 
 function isCapturableSource(source: DesktopCapturerSource): boolean {
-  return source.name.trim().length > 0 && !source.name.includes('Screen Copilot')
+  return source.name.trim().length > 0 && !source.name.includes('Delfin')
 }
 
 export async function getActiveWindowSource(): Promise<DesktopCapturerSource> {
