@@ -34,7 +34,7 @@ export default function SessionConversation({
   if (messages.length === 0) {
     return (
       <div className={`min-h-0 ${className ?? ''}`}>
-        <div className="flex h-full min-h-0 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-800 bg-slate-950/40 px-5 text-center text-sm leading-6 text-slate-500">
+        <div className="flex h-full min-h-0 items-center justify-center rounded-[1.5rem] border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface-2)] px-5 text-center text-sm leading-6 text-[var(--text-muted)]">
           {emptyMessage}
         </div>
       </div>
@@ -43,7 +43,7 @@ export default function SessionConversation({
 
   return (
     <div className={`min-h-0 ${className ?? ''}`}>
-      <div className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-slate-800 bg-slate-950/40 p-3">
+      <div className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.72)] p-3">
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" ref={scrollContainerRef}>
           {messages.map((message) => {
             const isUser = message.role === 'user'
@@ -56,19 +56,19 @@ export default function SessionConversation({
                 <div
                   className={`max-w-[85%] rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-lg ${
                     isUser
-                      ? 'bg-cyan-400 text-slate-950'
-                      : 'border border-slate-800 bg-slate-900/85 text-slate-100'
+                      ? 'bg-[var(--primary)] text-white'
+                      : 'border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(20,129,186,0.08)]'
                   }`}
                 >
-                  <p className={`text-[11px] uppercase tracking-[0.22em] ${isUser ? 'text-slate-800/70' : 'text-slate-500'}`}>
-                    {isUser ? 'You' : 'Copilot'}
+                  <p className={`text-[11px] uppercase tracking-[0.22em] ${isUser ? 'text-white/70' : 'text-[var(--text-muted)]'}`}>
+                    {isUser ? 'You' : 'Delfin'}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap">
                     {message.content.length > 0 ? message.content : 'Thinking…'}
                   </p>
                   {isUser && message.imagePath !== undefined ? (
                     <button
-                      className="mt-3 rounded-full border border-slate-700 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-800/80 transition hover:border-slate-900 hover:text-slate-950"
+                      className="mt-3 rounded-full border border-white/35 bg-white/12 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white transition hover:border-white/60 hover:bg-white/18"
                       disabled={loadingImageMessageId === message.id}
                       onClick={() => {
                         void handleViewCapture(message)
@@ -85,15 +85,15 @@ export default function SessionConversation({
         </div>
       </div>
       {selectedImage !== null ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-6 py-10">
-          <div className="relative max-h-full w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(22,53,71,0.36)] px-6 py-10 backdrop-blur-sm">
+          <div className="relative max-h-full w-full max-w-5xl overflow-hidden rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-[0_28px_80px_rgba(22,53,71,0.22)]">
+            <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Captured Context</p>
-                <p className="mt-2 text-sm text-slate-300">{selectedImage.text}</p>
+                <p className="text-xs uppercase tracking-[0.28em] text-[var(--text-muted)]">Captured Context</p>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{selectedImage.text}</p>
               </div>
               <button
-                className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500 hover:text-white"
+                className="rounded-full border border-[var(--border-soft)] px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                 onClick={() => {
                   setSelectedImage(null)
                 }}
@@ -102,10 +102,10 @@ export default function SessionConversation({
                 Close
               </button>
             </div>
-            <div className="max-h-[80vh] overflow-auto bg-slate-900/50 p-6">
+            <div className="max-h-[80vh] overflow-auto bg-[var(--bg-surface-2)] p-6">
               <img
                 alt="Captured screenshot for the selected prompt"
-                className="mx-auto h-auto max-w-full rounded-2xl border border-slate-800"
+                className="mx-auto h-auto max-w-full rounded-2xl border border-[var(--border-soft)]"
                 src={selectedImage.src}
               />
             </div>

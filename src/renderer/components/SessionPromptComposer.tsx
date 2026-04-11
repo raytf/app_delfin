@@ -40,7 +40,7 @@ export default function SessionPromptComposer({
         {multiline ? (
           <textarea
             autoFocus={autoFocus}
-            className="h-28 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+            className="h-28 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
             onChange={(event) => {
               setPromptValue(event.target.value)
             }}
@@ -50,7 +50,7 @@ export default function SessionPromptComposer({
         ) : (
           <input
             autoFocus={autoFocus}
-            className="h-11 flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+            className="h-11 flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
             onChange={(event) => {
               setPromptValue(event.target.value)
             }}
@@ -61,7 +61,7 @@ export default function SessionPromptComposer({
         )}
 
         <button
-          className="no-drag rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="no-drag rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isSubmitting}
           type="submit"
         >

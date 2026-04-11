@@ -107,7 +107,7 @@ export function createOverlayWindow(
     show: false,
     transparent: isMinimizedMode,
     backgroundColor: isMinimizedMode ? "#00000000" : "#111827",
-    title: "Screen Copilot",
+    title: "Delfin",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

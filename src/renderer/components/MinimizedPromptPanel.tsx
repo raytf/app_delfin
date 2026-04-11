@@ -53,9 +53,9 @@ export default function MinimizedPromptPanel({
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:0ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:150ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:300ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent-teal)] [animation-delay:150ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:300ms]" />
         </div>
       </div>
     )
@@ -73,7 +73,7 @@ export default function MinimizedPromptPanel({
       {!isSubmitting || hasResponseText ? (
         <div className="no-drag flex items-center gap-2">
           <button
-            className="flex-1 rounded-2xl border border-slate-700 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400 hover:text-white"
+            className="flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
             onClick={() => {
               onAskAnother()
             }}
@@ -82,7 +82,7 @@ export default function MinimizedPromptPanel({
             Ask Another
           </button>
           <button
-            className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            className="rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
             onClick={onExpand}
             type="button"
           >
@@ -121,20 +121,20 @@ function StreamingResponseBody({
   }, [latestResponseText, scrollContainer])
 
   return (
-    <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-slate-800 bg-slate-950/45 p-4">
+    <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[0_14px_32px_rgba(20,129,186,0.08)]">
       {errorMessage !== null ? (
-        <p className="text-sm leading-6 text-red-300">{errorMessage}</p>
+        <p className="text-sm leading-6 text-[var(--danger)]">{errorMessage}</p>
       ) : latestResponseText !== null && latestResponseText.length > 0 ? (
         <div className="no-drag flex h-full min-h-0 flex-col">
           <div
-            className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200"
+            className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-[var(--text-primary)]"
             ref={setScrollContainer}
           >
             <p className="whitespace-pre-wrap">{latestResponseText}</p>
           </div>
         </div>
       ) : (
-        <p className="text-sm leading-6 text-slate-400">
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">
           Ask about the current screen to get a response here.
         </p>
       )}

@@ -69,9 +69,9 @@ export default function MinimizedSessionBar({
   const isPromptOpen = minimizedVariant !== 'compact'
 
   return (
-    <div className=" drag-region flex h-screen overflow-hidden items-center justify-center text-white">
+    <div className=" drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
       <div
-        className={`flex h-full w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${
+        className={`flex h-full w-full flex-col overflow-hidden border border-[var(--border-soft)] bg-[var(--bg-overlay)] shadow-[0_24px_60px_var(--shadow-tint)] backdrop-blur-xl ${
           isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
         }`}
       >
@@ -90,7 +90,7 @@ export default function MinimizedSessionBar({
         <div className={isPromptOpen ? 'drag-region mt-3 flex items-center justify-center gap-2' : 'drag-region flex items-center justify-center gap-2'}>
           <button
             aria-label="Start prompt"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300"
+            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
             onClick={() => {
               onSetPromptOpen(!isPromptOpen)
             }}
@@ -100,7 +100,7 @@ export default function MinimizedSessionBar({
           </button>
           <button
             aria-label="Expand session"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 text-slate-200 transition hover:border-slate-500 hover:text-white"
+            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
             onClick={onOpen}
             type="button"
           >
@@ -108,7 +108,7 @@ export default function MinimizedSessionBar({
           </button>
           <button
             aria-label="End session"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white transition hover:bg-red-400"
+            className="no-drag flex h-11 w-11 items-center justify-center rounded-full bg-[var(--danger)] text-white transition hover:bg-[#b14d4d]"
             onClick={onStop}
             type="button"
           >
