@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { ChatMessage, StructuredResponse } from '../../shared/types'
 
 interface SessionStoreState {
@@ -18,104 +19,118 @@ function createMessageId(): string {
   return crypto.randomUUID()
 }
 
-export const useSessionStore = create<SessionStoreState>((set) => ({
-  errorMessage: null,
-  isSubmitting: false,
-  messages: [],
-  activeAssistantMessageId: null,
-
-  clearConversation: () =>
-    set({
+export const useSessionStore = create<SessionStoreState>()(
+  persist(
+    (set) => ({
       errorMessage: null,
       isSubmitting: false,
       messages: [],
       activeAssistantMessageId: null,
-    }),
 
-  beginPromptSubmission: (prompt: string) =>
-    set((state) => {
-      const userMessage: ChatMessage = {
-        id: createMessageId(),
-        role: 'user',
-        content: prompt,
-        timestamp: Date.now(),
-      }
+      clearConversation: () =>
+        set({
+          errorMessage: null,
+          isSubmitting: false,
+          messages: [],
+          activeAssistantMessageId: null,
+        }),
 
-      const assistantMessageId = createMessageId()
-      const assistantMessage: ChatMessage = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-      }
+      beginPromptSubmission: (prompt: string) =>
+        set((state) => {
+          const userMessage: ChatMessage = {
+            id: createMessageId(),
+            role: 'user',
+            content: prompt,
+            timestamp: Date.now(),
+          }
 
-      return {
-        errorMessage: null,
-        isSubmitting: true,
-        messages: [...state.messages, userMessage, assistantMessage],
-        activeAssistantMessageId: assistantMessageId,
-      }
-    }),
+          const assistantMessageId = createMessageId()
+          const assistantMessage: ChatMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+          }
 
-  appendAssistantText: (text: string) =>
-    set((state) => {
-      if (state.activeAssistantMessageId === null) {
-        return state
-      }
+          return {
+            errorMessage: null,
+            isSubmitting: true,
+            messages: [...state.messages, userMessage, assistantMessage],
+            activeAssistantMessageId: assistantMessageId,
+          }
+        }),
 
-      return {
-        messages: state.messages.map((message) =>
-          message.id === state.activeAssistantMessageId
-            ? { ...message, content: message.content + text }
-            : message,
-        ),
-      }
-    }),
+      appendAssistantText: (text: string) =>
+        set((state) => {
+          if (state.activeAssistantMessageId === null) {
+            return state
+          }
 
-  setAssistantStructured: (response: StructuredResponse) =>
-    set((state) => {
-      if (state.activeAssistantMessageId === null) {
-        return state
-      }
+          return {
+            messages: state.messages.map((message) =>
+              message.id === state.activeAssistantMessageId
+                ? { ...message, content: message.content + text }
+                : message,
+            ),
+          }
+        }),
 
-      return {
-        messages: state.messages.map((message) =>
-          message.id === state.activeAssistantMessageId
-            ? {
-                ...message,
-                content: response.answer,
-                structuredData: response,
-              }
-            : message,
-        ),
-      }
-    }),
+      setAssistantStructured: (response: StructuredResponse) =>
+        set((state) => {
+          if (state.activeAssistantMessageId === null) {
+            return state
+          }
 
-  finishAssistantResponse: () =>
-    set({
-      isSubmitting: false,
-      activeAssistantMessageId: null,
-    }),
-
-  failAssistantResponse: (message: string) =>
-    set((state) => {
-      const messages =
-        state.activeAssistantMessageId === null
-          ? state.messages
-          : state.messages.map((entry) =>
-              entry.id === state.activeAssistantMessageId
+          return {
+            messages: state.messages.map((message) =>
+              message.id === state.activeAssistantMessageId
                 ? {
-                    ...entry,
-                    content: message,
+                    ...message,
+                    content: response.answer,
+                    structuredData: response,
                   }
-                : entry,
-            )
+                : message,
+            ),
+          }
+        }),
 
-      return {
-        errorMessage: message,
-        isSubmitting: false,
-        messages,
-        activeAssistantMessageId: null,
-      }
+      finishAssistantResponse: () =>
+        set({
+          isSubmitting: false,
+          activeAssistantMessageId: null,
+        }),
+
+      failAssistantResponse: (message: string) =>
+        set((state) => {
+          const messages =
+            state.activeAssistantMessageId === null
+              ? state.messages
+              : state.messages.map((entry) =>
+                  entry.id === state.activeAssistantMessageId
+                    ? {
+                        ...entry,
+                        content: message,
+                      }
+                    : entry,
+                )
+
+          return {
+            errorMessage: message,
+            isSubmitting: false,
+            messages,
+            activeAssistantMessageId: null,
+          }
+        }),
     }),
-}))
+    {
+      name: 'screen-copilot-active-session',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        errorMessage: state.errorMessage,
+        isSubmitting: state.isSubmitting,
+        messages: state.messages,
+        activeAssistantMessageId: state.activeAssistantMessageId,
+      }),
+    },
+  ),
+)
