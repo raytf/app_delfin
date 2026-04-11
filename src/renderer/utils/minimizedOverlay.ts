@@ -12,6 +12,13 @@ interface AutoAdvanceMinimizedVariantContext extends MinimizedOverlayContext {
   latestResponseText: string | null
 }
 
+interface VoiceTurnCollapseContext extends MinimizedOverlayContext {
+  errorMessage: string | null
+  hasResponseText: boolean
+  isAudioPlaying: boolean
+  isSubmitting: boolean
+}
+
 export function getVoiceTurnRevealVariant({
   minimizedVariant,
   overlayMode,
@@ -41,4 +48,28 @@ export function getAutoAdvanceMinimizedVariant({
   const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
 
   return nextVariant === minimizedVariant ? null : nextVariant
+}
+
+export function getVoiceTurnCompleteVariant({
+  errorMessage,
+  hasResponseText,
+  isAudioPlaying,
+  isSubmitting,
+  minimizedVariant,
+  overlayMode,
+  sessionMode,
+}: VoiceTurnCollapseContext): MinimizedOverlayVariant | null {
+  if (
+    sessionMode !== 'active' ||
+    overlayMode !== 'minimized' ||
+    minimizedVariant !== 'prompt-response' ||
+    isSubmitting ||
+    isAudioPlaying ||
+    errorMessage !== null ||
+    !hasResponseText
+  ) {
+    return null
+  }
+
+  return 'compact'
 }

@@ -16,7 +16,11 @@ import MinimizedSessionBar from './components/MinimizedSessionBar'
 import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import { decodeAudioChunk } from './utils/audioUtils'
-import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
+import {
+  getAutoAdvanceMinimizedVariant,
+  getVoiceTurnCompleteVariant,
+  getVoiceTurnRevealVariant,
+} from './utils/minimizedOverlay'
 import {
   createWaveformBars,
   getWaveformActivityLevel,
@@ -29,6 +33,8 @@ import {
 // Serialises audio-chunk processing so concurrent IPC callbacks cannot race on
 // ensureAudioContext(), audioNextStartTimeRef, or audioSourceNodesRef.
 let lastAudioChunkPromise: Promise<void> = Promise.resolve()
+
+const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -81,6 +87,8 @@ export default function App() {
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
   const audioStreamActiveRef = useRef(false)
+  const audioSampleRateRef = useRef(24_000)
+  const ignoreIncomingSidecarAudioRef = useRef(false)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
@@ -88,6 +96,7 @@ export default function App() {
   const assistantWaveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const minimizedVoiceCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingVoiceWavRef = useRef<string | null>(null)
   const lowerThresholdRef = useRef<(() => void) | null>(null)
 
@@ -167,6 +176,13 @@ export default function App() {
     }
   }, [])
 
+  const clearMinimizedVoiceCollapseTimer = useCallback(() => {
+    if (minimizedVoiceCollapseTimerRef.current !== null) {
+      clearTimeout(minimizedVoiceCollapseTimerRef.current)
+      minimizedVoiceCollapseTimerRef.current = null
+    }
+  }, [])
+
   const cancelSpeechSynthesis = useCallback(() => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
@@ -194,7 +210,7 @@ export default function App() {
     try {
       let audioContext = audioContextRef.current
       if (audioContext === null || audioContext.state === 'closed') {
-        audioContext = new AudioContext({ sampleRate: 24_000 })
+        audioContext = new AudioContext({ sampleRate: audioSampleRateRef.current })
         audioContextRef.current = audioContext
         const gainNode = audioContext.createGain()
         const analyser = audioContext.createAnalyser()
@@ -223,6 +239,21 @@ export default function App() {
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
 
+  const syncOverlayStateFromMain = useCallback(async (): Promise<void> => {
+    try {
+      const state = await window.api.getOverlayState()
+      clearMinimizedVoiceCollapseTimer()
+      setSessionMode(state.sessionMode)
+      setOverlayMode(state.overlayMode)
+      setMinimizedVariant(state.minimizedVariant)
+      setIsMinimizedPromptComposing(
+        state.overlayMode === 'minimized' && state.minimizedVariant === 'prompt-input',
+      )
+    } catch (error) {
+      console.error('[App] Failed to sync overlay state after IPC error:', error)
+    }
+  }, [clearMinimizedVoiceCollapseTimer])
+
   const revealMinimizedVoiceResponse = useCallback(() => {
     const nextVariant = getVoiceTurnRevealVariant({
       minimizedVariant,
@@ -249,6 +280,7 @@ export default function App() {
 
       aiStreamingStartedRef.current = false
       audioStartedForTurnRef.current = false
+      clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
       revealMinimizedVoiceResponse()
       beginVoiceTurn({ messageId })
@@ -270,7 +302,7 @@ export default function App() {
           failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
         })
     },
-    [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
+    [beginVoiceTurn, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
   )
 
   const submitPendingVoiceTurn = useCallback(() => {
@@ -312,8 +344,10 @@ export default function App() {
       submitVoiceTurn(wavBase64)
     },
     onSpeechStart: () => {
-      const isAssistantThinking = useSessionStore.getState().isSubmitting && !aiStreamingStartedRef.current
+      const isSubmitting = useSessionStore.getState().isSubmitting
+      const isAssistantThinking = isSubmitting && !aiStreamingStartedRef.current
       if (isAssistantThinking) {
+        console.debug('[barge-in] blocked: assistant is thinking (isSubmitting=%s, aiStreamingStarted=%s)', isSubmitting, aiStreamingStartedRef.current)
         return
       }
 
@@ -322,13 +356,24 @@ export default function App() {
         audioStreamActiveRef.current ||
         fallbackSpeechTimerRef.current !== null
 
-      if (!isAssistantSpeaking) {
+      // Also allow barge-in while the assistant is streaming text (before audio starts).
+      // Without this, the user can't interrupt during the window between first token
+      // and first audio chunk.
+      const isAssistantStreaming = aiStreamingStartedRef.current && isSubmitting
+
+      if (!isAssistantSpeaking && !isAssistantStreaming) {
+        console.debug('[barge-in] blocked: assistant not active (isAudioPlaying=%s, audioStreamActive=%s, fallbackTimer=%s, aiStreaming=%s, isSubmitting=%s)',
+          isAudioPlayingRef.current, audioStreamActiveRef.current, fallbackSpeechTimerRef.current !== null, aiStreamingStartedRef.current, isSubmitting)
         return
       }
+
+      console.info('[barge-in] INTERRUPTING assistant (isAudioPlaying=%s, audioStreamActive=%s, aiStreaming=%s)',
+        isAudioPlayingRef.current, audioStreamActiveRef.current, aiStreamingStartedRef.current)
 
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
+      ignoreIncomingSidecarAudioRef.current = true
       aiStreamingStartedRef.current = false
       audioStreamActiveRef.current = false
       setAudioPlayingState(false)
@@ -424,6 +469,62 @@ export default function App() {
     setMinimizedVariant(nextVariant)
   }, [errorMessage, isMinimizedPromptComposing, latestResponseText, minimizedVariant, overlayMode, sessionMode])
 
+  const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
+    clearMinimizedVoiceCollapseTimer()
+
+    try {
+      await window.api.setMinimizedOverlayVariant(variant)
+
+      if (variant !== 'prompt-response') {
+        clearLatestResponse()
+      }
+
+      setOverlayMode('minimized')
+      setMinimizedVariant(variant)
+      setIsMinimizedPromptComposing(variant === 'prompt-input')
+    } catch (error) {
+      console.error('[App] Failed to set minimized overlay variant:', error)
+      void syncOverlayStateFromMain()
+    }
+  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer, syncOverlayStateFromMain])
+
+  useEffect(() => {
+    const nextVariant = getVoiceTurnCompleteVariant({
+      errorMessage,
+      hasResponseText: latestResponseText !== null && latestResponseText.trim().length > 0,
+      isAudioPlaying,
+      isSubmitting,
+      minimizedVariant,
+      overlayMode,
+      sessionMode,
+    })
+
+    clearMinimizedVoiceCollapseTimer()
+
+    if (nextVariant === null) {
+      return
+    }
+
+    minimizedVoiceCollapseTimerRef.current = window.setTimeout(() => {
+      minimizedVoiceCollapseTimerRef.current = null
+      void handleSetMinimizedVariant(nextVariant)
+    }, MINIMIZED_VOICE_COLLAPSE_DELAY_MS)
+
+    return () => {
+      clearMinimizedVoiceCollapseTimer()
+    }
+  }, [
+    clearMinimizedVoiceCollapseTimer,
+    errorMessage,
+    handleSetMinimizedVariant,
+    isAudioPlaying,
+    isSubmitting,
+    latestResponseText,
+    minimizedVariant,
+    overlayMode,
+    sessionMode,
+  ])
+
   useEffect(() => {
     let cancelled = false
 
@@ -455,12 +556,18 @@ export default function App() {
       setCaptureSourceLabel(frame.sourceLabel)
     })
 
+    window.api.onOverlayError((data) => {
+      console.error('[App] Overlay IPC error:', data.message)
+      void syncOverlayStateFromMain()
+    })
+
     window.api.onSidecarToken((data) => {
       aiStreamingStartedRef.current = true
       appendAssistantText(data.text)
     })
 
-    window.api.onSidecarAudioStart(() => {
+    window.api.onSidecarAudioStart((data) => {
+      ignoreIncomingSidecarAudioRef.current = false
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
@@ -468,6 +575,7 @@ export default function App() {
       aiStreamingStartedRef.current = true
       audioStartedForTurnRef.current = true
       audioStreamActiveRef.current = true
+      audioSampleRateRef.current = data.sampleRate
       setAudioPlayingState(true)
       raiseThreshold()
       void ensureAudioContext().then(() => {
@@ -476,6 +584,10 @@ export default function App() {
     })
 
     window.api.onSidecarAudioChunk((data) => {
+      if (ignoreIncomingSidecarAudioRef.current) {
+        return
+      }
+
       lastAudioChunkPromise = lastAudioChunkPromise
         .then(async () => {
           const audioContext = await ensureAudioContext()
@@ -483,7 +595,7 @@ export default function App() {
             return
           }
 
-          const audioBuffer = decodeAudioChunk(data.audio, audioContext)
+          const audioBuffer = decodeAudioChunk(data.audio, audioContext, audioSampleRateRef.current)
           const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
           const sourceNode = audioContext.createBufferSource()
           sourceNode.buffer = audioBuffer
@@ -503,11 +615,19 @@ export default function App() {
           sourceNode.start(startAt)
           audioNextStartTimeRef.current = startAt + audioBuffer.duration
         })
-        .catch(() => {})
+        .catch(() => { })
     })
 
-    window.api.onSidecarAudioEnd(() => {
+    window.api.onSidecarAudioEnd((data) => {
+      if (ignoreIncomingSidecarAudioRef.current) {
+        audioStreamActiveRef.current = false
+        return
+      }
+
       audioStreamActiveRef.current = false
+      if (data.ttsTime > 0) {
+        console.debug(`[App] TTS synthesis took ${data.ttsTime}s`)
+      }
       if (audioSourceNodesRef.current.size === 0) {
         finishAudioPlayback()
       }
@@ -543,6 +663,7 @@ export default function App() {
 
     return () => {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK)
@@ -551,10 +672,11 @@ export default function App() {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
-  }, [appendAssistantText, cancelSpeechSynthesis, clearFallbackSpeechTimer, ensureAudioContext, failAssistantResponse, finishAudioPlayback, finishAssistantResponse, raiseThreshold, setAudioPlayingState, speakWithWebSpeech, stopScheduledAudioSources, submitPendingVoiceTurn])
+  }, [appendAssistantText, cancelSpeechSynthesis, clearFallbackSpeechTimer, ensureAudioContext, failAssistantResponse, finishAudioPlayback, finishAssistantResponse, raiseThreshold, setAudioPlayingState, speakWithWebSpeech, stopScheduledAudioSources, submitPendingVoiceTurn, syncOverlayStateFromMain])
 
   useEffect(() => {
     return () => {
+      clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
@@ -569,11 +691,12 @@ export default function App() {
       assistantGainNodeRef.current = null
       assistantAnalyserRef.current = null
     }
-  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
+  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
     aiStreamingStartedRef.current = false
+    clearMinimizedVoiceCollapseTimer()
     stopAssistantWaveformLoop()
     resetAssistantWaveform()
     setSessionHistory([])
@@ -587,18 +710,21 @@ export default function App() {
   }
 
   async function handleRestoreOverlay(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     setOverlayMode('expanded')
     clearLatestResponse()
     await window.api.restoreOverlay()
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     await window.api.minimizeOverlay()
     setOverlayMode('minimized')
     setMinimizedVariant('compact')
   }
 
   async function handleStopSession(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     clearFallbackSpeechTimer()
@@ -632,17 +758,6 @@ export default function App() {
     setMinimizedVariant('compact')
   }
 
-  async function handleSetMinimizedVariant(variant: MinimizedOverlayVariant): Promise<void> {
-    if (variant !== 'prompt-response') {
-      clearLatestResponse()
-    }
-
-    await window.api.setMinimizedOverlayVariant(variant)
-    setOverlayMode('minimized')
-    setMinimizedVariant(variant)
-    setIsMinimizedPromptComposing(variant === 'prompt-input')
-  }
-
   async function handleSubmitPrompt(text: string): Promise<void> {
     const trimmedText = text.trim()
 
@@ -655,6 +770,7 @@ export default function App() {
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
+    clearMinimizedVoiceCollapseTimer()
     clearFallbackSpeechTimer()
 
     if (isAudioPlayingRef.current || audioStreamActiveRef.current) {

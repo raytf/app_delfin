@@ -35,7 +35,7 @@ describe('MinimizedSessionBar', () => {
     expect(markup).toContain('Ask')
   })
 
-  it('keeps prompt-open mode focused on the prompt panel', () => {
+  it('keeps the waveform visible in prompt-open input mode', () => {
     const markup = renderToStaticMarkup(
       createElement(MinimizedSessionBar, {
         ...baseProps,
@@ -43,7 +43,20 @@ describe('MinimizedSessionBar', () => {
       }),
     )
 
-    expect(markup).not.toContain('Compact speech waveform in idle mode')
+    expect(markup).toContain('Expanded speech waveform in idle mode')
     expect(markup).toContain('Collapse')
+  })
+
+  it('keeps the waveform visible in prompt-response mode while showing voice actions', () => {
+    const markup = renderToStaticMarkup(
+      createElement(MinimizedSessionBar, {
+        ...baseProps,
+        latestResponseText: 'Here is the latest response',
+        minimizedVariant: 'prompt-response',
+      }),
+    )
+
+    expect(markup).toContain('Expanded speech waveform in idle mode')
+    expect(markup).toContain('Ask another')
   })
 })

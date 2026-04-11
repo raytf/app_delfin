@@ -60,6 +60,14 @@ export interface WsInboundMessage {
   text?: string
   audio?: string
   message?: string
+  /** Present on audio_start — sample rate of the PCM stream (e.g. 24000). */
+  sample_rate?: number
+  /** Present on audio_start — number of sentences being synthesised. */
+  sentence_count?: number
+  /** Present on audio_chunk — zero-based sentence index. */
+  index?: number
+  /** Present on audio_end — total TTS synthesis time in seconds. */
+  tts_time?: number
 }
 
 // IPC channel names (as const for type safety)
@@ -81,6 +89,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
 
 export const MAIN_TO_RENDERER_CHANNELS = {
   FRAME_CAPTURED: 'frame:captured',
+  OVERLAY_ERROR: 'overlay:error',
   SIDECAR_TOKEN: 'sidecar:token',
   SIDECAR_AUDIO_START: 'sidecar:audio_start',
   SIDECAR_AUDIO_CHUNK: 'sidecar:audio_chunk',
@@ -150,10 +159,11 @@ export interface ElectronAPI {
   restoreOverlay: () => Promise<void>
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
+  onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
-  onSidecarAudioStart: (cb: () => void) => void
-  onSidecarAudioChunk: (cb: (data: { audio: string }) => void) => void
-  onSidecarAudioEnd: (cb: () => void) => void
+  onSidecarAudioStart: (cb: (data: { sampleRate: number; sentenceCount: number }) => void) => void
+  onSidecarAudioChunk: (cb: (data: { audio: string; index?: number }) => void) => void
+  onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) => void
   onSidecarDone: (cb: () => void) => void
   onSidecarError: (cb: (data: { message: string }) => void) => void
   onSidecarStatus: (cb: (data: SidecarStatus) => void) => void

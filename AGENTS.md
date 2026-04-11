@@ -175,6 +175,7 @@ These are confirmed facts — do not revisit without good reason:
 | **Voice turn text field** | For pure voice turns, `text` is set to the constant `VOICE_TURN_TEXT = "Please respond to what the user just asked."`. Empty string is not used because `sessionHandlers.ts` has an empty-text guard; the fixed instruction also gives the model explicit context about its role. |
 | **Audio backend** | `audio_backend` in `litert_lm.Engine` is always CPU (GPU audio not supported). Exposed as `LITERT_AUDIO_BACKEND` env var but defaults to `CPU`. The engine already has `audio_backend=litert_lm.Backend.CPU` in both GPU-attempt and CPU-fallback paths. |
 | **Barge-in protection** | Two-layer: (1) raise Silero `positiveSpeechThreshold` from 0.50 → 0.92 while AI is speaking; (2) 800 ms grace period after `audio_start` during which `onSpeechStart` is silently ignored, preventing the mic from picking up the AI's own voice. |
+| **WSL2 espeak-ng fix** | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`. |
 
 ---
 
@@ -196,5 +197,4 @@ Full rules are in `docs/SPEC.md` §Cross-Cutting Rules. Key points:
 ## Nice-to-Haves (implement only if time allows)
 
 - Conversation history trimming (see `docs/phases/phase-1-sidecar.md` §1.5)
-- mlx-audio TTS backend for macOS (stub currently raises `NotImplementedError`)
 - Wayland support on Linux native (desktopCapturer may require additional Electron flags)

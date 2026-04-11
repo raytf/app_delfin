@@ -183,9 +183,9 @@ These IPC events (forwarded from the sidecar by `sidecarBridge.ts`) drive playba
 
 | Event | What the renderer does |
 |---|---|
-| `sidecar:audio_start` | Creates an `AudioContext` (sample rate 24 kHz for kokoro), resets playback state |
+| `sidecar:audio_start` | Creates an `AudioContext` using the server-provided sample rate, resets playback state, and records sentence-count metadata |
 | `sidecar:audio_chunk` | Decodes base64 → `Int16Array` → `Float32Array` → `AudioBuffer`; schedules it to play back-to-back using `streamNextTime` so there are no gaps between sentences |
-| `sidecar:audio_end` | Queue drains naturally; clears `isAudioPlaying` flag when last buffer finishes |
+| `sidecar:audio_end` | Queue drains naturally; clears `isAudioPlaying` when the last buffer finishes and carries `ttsTime` timing metadata |
 
 The decode step (`decodeAudioChunk` in `audioUtils.ts`) converts the sidecar's raw int16 PCM into the float32 format that `AudioContext` expects:
 
@@ -222,13 +222,14 @@ useVAD (Silero WASM)
     submitSessionPrompt() ──── SESSION_SUBMIT_PROMPT ────→ handle_turn()
                                 captureForegroundWindow()    ↓ token stream
                           ←── sidecar:token ─────────────── {"type":"token"}
-    appendAssistantText()                                    ↓ done
-                          ←── sidecar:done ──────────────── {"type":"done"}
-    finishAssistantResponse()                                ↓ TTS
-                          ←── sidecar:audio_start ───────── {"type":"audio_start"}
-                          ←── sidecar:audio_chunk ───────── {"type":"audio_chunk"}
+    appendAssistantText()                                    ↓ TTS start
+                          ←── sidecar:audio_start ───────── {"type":"audio_start","sample_rate":24000,...}
+                          ←── sidecar:audio_chunk ───────── {"type":"audio_chunk","index":0,...}
     decodeAudioChunk()
     AudioContext.play()
+                          ←── sidecar:audio_end ─────────── {"type":"audio_end","tts_time":0.72}
+                          ←── sidecar:done ──────────────── {"type":"done"}
+    finishAssistantResponse()
     [user barges in]
     AudioContext.stop()
     sidecarInterrupt() ─────── sidecar:interrupt ─────────→ interrupted.set()

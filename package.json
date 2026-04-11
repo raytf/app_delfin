@@ -10,8 +10,10 @@
     "build": "electron-vite build",
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
     "preview": "electron-vite preview",
-    "setup": "npm install && npm run setup:sidecar",
+    "setup": "npm install && npm run setup:sidecar && npm run download:models && npm run check:env",
     "setup:sidecar": "node scripts/setup-sidecar.mjs",
+    "download:models": "node scripts/download-models.mjs",
+    "check:env": "node scripts/check-env.mjs",
     "test": "vitest run"
   },
   "devDependencies": {

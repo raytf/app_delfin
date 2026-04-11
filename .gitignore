@@ -10,3 +10,7 @@ __pycache__/
 *.tsbuildinfo
 
 default.profraw
+
+# Kokoro TTS model files — large binaries, downloaded via `npm run download:models`
+sidecar/*.onnx
+sidecar/*.bin
