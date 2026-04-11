@@ -230,7 +230,11 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
           minSpeechMs: 250,
 
           onSpeechStart: () => {
-            if (inGracePeriodRef.current) return
+            if (inGracePeriodRef.current) {
+              console.debug('[useVAD] onSpeechStart suppressed by grace period')
+              return
+            }
+            console.debug('[useVAD] onSpeechStart fired')
             setIsUserSpeaking(true)
             onSpeechStartRef.current?.()
           },
@@ -315,6 +319,12 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
       negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
     })
+    // Also clear grace period so subsequent onSpeechStart events are not suppressed.
+    if (graceTimerRef.current !== null) {
+      clearTimeout(graceTimerRef.current)
+      graceTimerRef.current = null
+    }
+    inGracePeriodRef.current = false
   }, [])
 
   return {

@@ -88,6 +88,7 @@ export default function App() {
   const audioNextStartTimeRef = useRef(0)
   const audioStreamActiveRef = useRef(false)
   const audioSampleRateRef = useRef(24_000)
+  const ignoreIncomingSidecarAudioRef = useRef(false)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
@@ -328,8 +329,10 @@ export default function App() {
       submitVoiceTurn(wavBase64)
     },
     onSpeechStart: () => {
-      const isAssistantThinking = useSessionStore.getState().isSubmitting && !aiStreamingStartedRef.current
+      const isSubmitting = useSessionStore.getState().isSubmitting
+      const isAssistantThinking = isSubmitting && !aiStreamingStartedRef.current
       if (isAssistantThinking) {
+        console.debug('[barge-in] blocked: assistant is thinking (isSubmitting=%s, aiStreamingStarted=%s)', isSubmitting, aiStreamingStartedRef.current)
         return
       }
 
@@ -338,13 +341,24 @@ export default function App() {
         audioStreamActiveRef.current ||
         fallbackSpeechTimerRef.current !== null
 
-      if (!isAssistantSpeaking) {
+      // Also allow barge-in while the assistant is streaming text (before audio starts).
+      // Without this, the user can't interrupt during the window between first token
+      // and first audio chunk.
+      const isAssistantStreaming = aiStreamingStartedRef.current && isSubmitting
+
+      if (!isAssistantSpeaking && !isAssistantStreaming) {
+        console.debug('[barge-in] blocked: assistant not active (isAudioPlaying=%s, audioStreamActive=%s, fallbackTimer=%s, aiStreaming=%s, isSubmitting=%s)',
+          isAudioPlayingRef.current, audioStreamActiveRef.current, fallbackSpeechTimerRef.current !== null, aiStreamingStartedRef.current, isSubmitting)
         return
       }
+
+      console.info('[barge-in] INTERRUPTING assistant (isAudioPlaying=%s, audioStreamActive=%s, aiStreaming=%s)',
+        isAudioPlayingRef.current, audioStreamActiveRef.current, aiStreamingStartedRef.current)
 
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
+      ignoreIncomingSidecarAudioRef.current = true
       aiStreamingStartedRef.current = false
       audioStreamActiveRef.current = false
       setAudioPlayingState(false)
@@ -527,6 +541,7 @@ export default function App() {
     })
 
     window.api.onSidecarAudioStart((data) => {
+      ignoreIncomingSidecarAudioRef.current = false
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
@@ -543,6 +558,10 @@ export default function App() {
     })
 
     window.api.onSidecarAudioChunk((data) => {
+      if (ignoreIncomingSidecarAudioRef.current) {
+        return
+      }
+
       lastAudioChunkPromise = lastAudioChunkPromise
         .then(async () => {
           const audioContext = await ensureAudioContext()
@@ -574,6 +593,11 @@ export default function App() {
     })
 
     window.api.onSidecarAudioEnd((data) => {
+      if (ignoreIncomingSidecarAudioRef.current) {
+        audioStreamActiveRef.current = false
+        return
+      }
+
       audioStreamActiveRef.current = false
       if (data.ttsTime > 0) {
         console.debug(`[App] TTS synthesis took ${data.ttsTime}s`)
