@@ -3,7 +3,7 @@
 > **A local, privacy-first screen copilot that helps you understand what's on your screen.**
 > 1.5-day hackathon · 5 people · 3 streams · Phase-gated milestones
 
-> ⚠️ **This plan reflects the team/parallel-stream view of the work. The authoritative API contract, file structure, and pseudocode live in [`docs/SPEC.md`](docs/SPEC.md) and the phase docs (`docs/phase-*.md`). Where this document conflicts with those, the SPEC wins.**
+> ⚠️ **This plan reflects the team/parallel-stream view of the work. The authoritative API contract, file structure, and pseudocode live in [`docs/SPEC.md`](docs/SPEC.md) and the phase docs (`docs/phases/phase-*.md`). Where this document conflicts with those, the SPEC wins.**
 
 ---
 
@@ -158,7 +158,7 @@ Before anyone goes to sleep Friday night, confirm in the team chat:
 - C1 is solo on the critical path. Protect their focus time — no interruptions from other streams.
 - Test the WebSocket turn first with `wscat` before wiring to Electron. See test commands below.
 - The sidecar uses WebSocket (not HTTP POST/SSE). Image blobs are confirmed to work via `{"type": "image", "blob": b64_str}` — no temp files needed.
-- Use the single-consumer Queue pattern from `docs/phase-1-sidecar.md` §1.4 — do not use two concurrent `iter_text()` consumers.
+- Use the single-consumer Queue pattern from `docs/phases/phase-1-sidecar.md` §1.4 — do not use two concurrent `iter_text()` consumers.
 
 **How to test the sidecar independently:**
 

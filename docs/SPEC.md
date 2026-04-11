@@ -62,13 +62,13 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
 
 | Phase | Name | What Gets Built | Depends On |
 |---|---|---|---|
-| 0 | [Project Scaffold](./phase-0-scaffold.md) | Repo structure, configs, .env, dependencies, setup scripts | Nothing |
-| 1 | [Inference Sidecar](./phase-1-sidecar.md) | FastAPI server, LiteRT-LM engine, tool calling, image preprocessing | Phase 0 |
-| 2 | [Electron Shell + Capture](./phase-2-electron.md) | Overlay window, desktopCapturer, WebSocket client, IPC handlers | Phase 0 |
-| 3 | [React Sidebar UI](./phase-3-ui.md) | All React components, Zustand stores, streaming display | Phase 2 |
-| 4 | [End-to-End Integration](./phase-4-integration.md) | Wire all three layers together, error handling, status reporting | Phases 1–3 |
-| 5 | [Auto-Refresh + TTS](./phase-5-autorefresh-tts.md) | Auto-refresh with debounce, TTS pipeline, audio playback | Phase 4 |
-| 6 | [Polish + Optimisation](./phase-6-polish.md) | Styling, error states, perf optimisations, demo prep | Phase 5 |
+| 0 | [Project Scaffold](./phases/phase-0-scaffold.md) | Repo structure, configs, .env, dependencies, setup scripts | Nothing |
+| 1 | [Inference Sidecar](./phases/phase-1-sidecar.md) | FastAPI server, LiteRT-LM engine, tool calling, image preprocessing | Phase 0 |
+| 2 | [Electron Shell + Capture](./phases/phase-2-electron.md) | Overlay window, desktopCapturer, WebSocket client, IPC handlers | Phase 0 |
+| 3 | [React Sidebar UI](./phases/phase-3-ui.md) | All React components, Zustand stores, streaming display | Phase 2 |
+| 4 | [End-to-End Integration](./phases/phase-4-integration.md) | Wire all three layers together, error handling, status reporting | Phases 1–3 |
+| 5 | [Auto-Refresh + TTS](./phases/phase-5-autorefresh-tts.md) | Auto-refresh with debounce, TTS pipeline, audio playback | Phase 4 |
+| 6 | [Polish + Optimisation](./phases/phase-6-polish.md) | Styling, error states, perf optimisations, demo prep | Phase 5 |
 
 ## Cross-Cutting Rules
 
