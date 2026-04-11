@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron'
 import { captureForegroundWindow } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
+import { sessionPromptRequestSchema } from '../../shared/schemas'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
   type SessionMessageImageRequest,
-  type SessionPromptRequest,
   type SessionPromptResponse,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
@@ -25,7 +25,8 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     await options.switchOverlayMode('expanded')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, request: SessionPromptRequest): Promise<SessionPromptResponse> => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, rawRequest): Promise<SessionPromptResponse> => {
+    const request = sessionPromptRequestSchema.parse(rawRequest)
     const mainWindow = options.getMainWindow()
 
     if (mainWindow === null || mainWindow.isDestroyed()) {

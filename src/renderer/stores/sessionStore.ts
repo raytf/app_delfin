@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { VOICE_TURN_TEXT } from '../../shared/constants'
 import type { ChatMessage, SessionListItem } from '../../shared/types'
 
 interface SessionStoreState {
@@ -94,7 +95,7 @@ export const useSessionStore = create<SessionStoreState>()(
           const userMessage: ChatMessage = {
             id: input.messageId,
             role: 'user',
-            content: '🎙️ Voice input',
+            content: VOICE_TURN_TEXT,
             timestamp: Date.now(),
             isVoiceTurn: true,
           }

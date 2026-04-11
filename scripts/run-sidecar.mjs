@@ -2,8 +2,10 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { config as dotenvConfig } from 'dotenv'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+dotenvConfig({ path: join(rootDir, '.env') })
 const sidecarDir = join(rootDir, 'sidecar')
 const venvPython = process.platform === 'win32'
   ? join(sidecarDir, '.venv', 'Scripts', 'python.exe')
