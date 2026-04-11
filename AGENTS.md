@@ -32,11 +32,81 @@ When `docs/SPEC.md` and any phase doc conflict, **SPEC.md wins**.
 
 ---
 
+## Feature Development Workflow
+
+Every unit of work — whether a new phase, a sub-feature within a phase, or a bug fix with non-trivial scope — **must** follow these five gates in order. Do not skip or reorder them.
+
+```
+┌─────────────┐     ┌──────────────┐     ┌───────────────┐     ┌─────────────┐     ┌──────────────┐
+│  1. SPEC    │────▶│ 2. APPROVAL  │────▶│ 3. IMPLEMENT  │────▶│ 4. REVIEW   │────▶│  5. DOCS     │
+│   (agent)   │     │   (human)    │     │   (agent)     │     │   (human)   │     │   (agent)    │
+└─────────────┘     └──────────────┘     └───────────────┘     └─────────────┘     └──────────────┘
+```
+
+### Gate 1 — Write the Spec (agent)
+
+Before touching any code, produce a spec in chat or as a temporary scratch document. The spec must include:
+
+- **Goal** — one-sentence statement of what this feature does and why it is needed.
+- **Scope** — explicit list of files / modules that will be created or modified.
+- **Out of scope** — what this work intentionally does not touch.
+- **Interface contract** — any new types, IPC channels, WebSocket message shapes, or REST endpoints, written out in full.
+- **Acceptance criteria** — concrete, observable conditions (CLI output, UI behaviour, passing tests) that prove the feature is done.
+- **Risks / open questions** — anything uncertain that the human reviewer should weigh in on.
+
+> If the work is purely mechanical (e.g. a one-line rename with no interface change) you may abbreviate the spec to Goal + Scope + Acceptance criteria and say so explicitly.
+
+### Gate 2 — Await Human Approval (human)
+
+**Stop. Do not write any implementation code until the human explicitly approves the spec.**
+
+The human reviewer must confirm:
+- The interface contract looks correct.
+- The scope is neither too broad nor too narrow.
+- All open questions are resolved.
+
+Once the human writes **"approved"** (or equivalent), proceed to Gate 3.
+
+### Gate 3 — Implement (agent)
+
+Implement exactly what the approved spec describes — nothing more. Follow all rules in `docs/SPEC.md` §Cross-Cutting Rules. In particular:
+
+- Run the relevant verification checklist from the phase doc before declaring work done.
+- Write or update tests that cover the acceptance criteria.
+- Keep commits atomic; one logical change per commit.
+
+### Gate 4 — Code Review (human)
+
+Present a summary of every file changed, with a brief rationale for each change. The human reviewer checks:
+
+- Implementation matches the approved spec.
+- No accidental scope creep.
+- Code quality, types, and error handling meet the cross-cutting rules.
+- Tests pass (`npm test` / `pytest`).
+
+Address all review comments before proceeding.
+
+### Gate 5 — Update Documentation (agent)
+
+After the human approves the implementation, update **all** affected documentation. At minimum, check:
+
+| Doc | Update if… |
+|---|---|
+| `docs/SPEC.md` | New IPC channel, WebSocket message type, env var, or arch decision added |
+| Relevant `docs/phases/phase-N.md` | Verification checklist items completed; pseudocode drifted from reality |
+| `AGENTS.md` §Validated Technical Decisions | A new confirmed technical fact was established during implementation |
+| `AGENTS.md` §Nice-to-Haves | A nice-to-have was implemented or explicitly ruled out |
+| `.env.example` | A new environment variable was introduced |
+
+Do **not** create new documentation files unless the spec explicitly called for one.
+
+---
+
 ## Phase Execution Order
 
-Complete phases in order and wait for human review before starting the next:
+Complete phases in order. Each phase follows the full Feature Development Workflow above before the gate is considered passed.
 
-| # | Phase doc | Gate |
+| # | Phase doc | Acceptance Gate |
 |---|---|---|
 | 0 | `docs/phases/phase-0-scaffold.md` | `npm run dev:full` starts Electron + sidecar; `/health` returns JSON |
 | 1 | `docs/phases/phase-1-sidecar.md` | WebSocket turn returns structured response via `wscat` |
