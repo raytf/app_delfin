@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (env validation implemented)
+> Last updated: 2026-04-11 (compact overlay resized/simplified and waveform upgraded to analyser-driven bars)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -44,7 +44,7 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent |
+| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, and resized compact bounds for waveform/status controls |
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Returns `CaptureFrame` with base64 JPEG at quality 80 |
 | `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
@@ -60,10 +60,18 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state; structured response removed |
+| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice-stream auto-open, and analyser-driven waveform routing |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
-| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
-| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
+| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
+| `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
+| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Simplified compact overlay with larger bounds, compact waveform/status chrome, voice toggle, and prompt/expand/end actions |
+| `src/renderer/components/VoiceWaveform.tsx` | ✅ | Reusable canvas waveform that renders analyser-driven per-bar motion plus ambient idle/processing fallback |
+| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance and voice-turn auto-open decisions |
+| `src/renderer/utils/waveformState.ts` | ✅ | Pure helper for waveform state priority, analyser-bin reduction, smoothing, and bar resampling |
+| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay voice auto-open and response-panel transitions |
+| `src/renderer/__tests__/minimizedSessionBar.test.ts` | ✅ | Vitest coverage for compact vs prompt-open minimized overlay rendering |
+| `src/renderer/__tests__/waveformState.test.ts` | ✅ | Vitest coverage for waveform state selection, helper smoothing/reduction, and component markup |
+| `package.json` — `npm test` script | ✅ | Runs Vitest renderer unit tests via `vitest run` |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
@@ -72,9 +80,10 @@
 | `src/renderer/components/StatusIndicator.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/StopButton.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/MinimizeToggle.tsx` | ⚠️ | Placeholder |
-| `src/renderer/stores/sessionStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/stores/sessionStore.ts` | ✅ | Persisted conversation state plus `vadListeningEnabled` toggle stored in localStorage |
 | `src/renderer/stores/settingsStore.ts` | ⚠️ | Placeholder — returns empty object |
 | `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/types/assets.d.ts` | ✅ | Renderer asset module declarations for strict TypeScript imports |
 
 ---
 
@@ -97,87 +106,90 @@
 
 ## Phase 5 — Voice Pipeline + TTS
 
-> **Approach revised (2026-04-11):** Voice is now the *default* input mode. When a session starts, always-on VAD (Silero via `@ricky0123/vad-web`) listens for speech. On speech end, a WAV blob + screen capture are sent to the sidecar. Gemma 4 processes audio natively. TTS streams response audio back as chunks. Manual text entry remains alongside. Auto-refresh remains a lower-priority stretch goal.
+> **Approach revised (2026-04-11):** Voice is now the *default* input mode. When a session starts, always-on VAD (Silero via `@ricky0123/vad-web`) listens for speech. The browser runtime is self-hosted from `vad-runtime/` via local script tags (`ort.wasm.min.js` + `bundle.min.js`) instead of importing VAD/ORT through the Vite module graph, and `useVAD` resolves `baseAssetPath` / `onnxWASMBasePath` to an absolute `vad-runtime/` URL to avoid duplicated relative paths in dev. This local-runtime contract is now confirmed working. On speech end, a WAV blob + screen capture are sent to the sidecar. Gemma 4 processes audio natively. TTS streams response audio back as chunks. Manual text entry remains alongside. Auto-refresh remains a lower-priority stretch goal.
 
 ### Step 1 — Dependencies + WASM asset serving
 
 | Item | Status | Notes |
 |---|---|---|
-| `@ricky0123/vad-web` npm package | ❌ | Not installed |
-| `vite-plugin-static-copy` dev dep | ❌ | Not installed |
-| Vite renderer config — copy VAD WASM/worker files | ❌ | `electron.vite.config.ts` not updated |
-| Electron main — COOP/COEP headers (`session.webRequest`) | ❌ | Required for `SharedArrayBuffer` used by Silero WASM |
-| Electron main — `media` permission handler (`getUserMedia`) | ❌ | Not added to `src/main/index.ts` |
+| `@ricky0123/vad-web` npm package | ✅ | Installed; renderer loads the self-hosted browser bundle from `vad-runtime/` |
+| `vite-plugin-static-copy` dev dep | ✅ | Installed; copies browser bundles, ONNX models, and all required `ort-wasm*` files |
+| Vite renderer config — copy VAD WASM/worker files | ✅ | `electron.vite.config.ts` serves a stable local `vad-runtime/` asset directory |
+| `npm run check:vad-runtime` build-output validator | ✅ | Verifies required `vad-runtime` files, checks wasm magic bytes, and confirms `index.html` references `ort.wasm.min.js` |
+| Electron main — COOP/COEP headers (`session.webRequest`) | ✅ | `src/main/index.ts` sets `same-origin` + `credentialless` to preserve `SharedArrayBuffer` |
+| Electron main — `media` permission handler (`getUserMedia`) | ✅ | `src/main/index.ts` grants `media` / `microphone` permission requests |
 
 ### Step 2 — Audio utilities
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/utils/audioUtils.ts` — `float32ToWavBase64()` | ❌ | RIFF header, 16 kHz, 16-bit mono |
-| `src/renderer/utils/audioUtils.ts` — `decodeAudioChunk()` | ❌ | base64 int16 PCM → `AudioBuffer` |
+| `src/renderer/utils/audioUtils.ts` — `float32ToWavBase64()` | ✅ | RIFF header, 16 kHz, 16-bit mono |
+| `src/renderer/utils/audioUtils.ts` — `decodeAudioChunk()` | ✅ | base64 int16 PCM → `AudioBuffer` |
 
 ### Step 3 — VAD hook
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/hooks/useVAD.ts` | ❌ | Wraps `MicVAD`; exposes `isListening`, `isMuted`, `toggleMute`, `raiseThreshold`, `lowerThreshold` |
-| Barge-in threshold management (0.50 normal / 0.92 while AI speaks) | ❌ | Inside `useVAD` |
-| Barge-in grace period (`BARGE_IN_GRACE_MS = 800`) | ❌ | Inside `useVAD` |
-| WAV conversion on `onSpeechEnd` (`float32ToWavBase64`) | ❌ | Inside `useVAD` |
+| `src/renderer/hooks/useVAD.ts` | ✅ | Uses global `window.vad.MicVAD`; exposes listening/mute state, `isUserSpeaking`, `userAudioLevel`, `userWaveformBars`, and threshold controls |
+| `src/renderer/types/vad-runtime.d.ts` | ✅ | Minimal ambient types for `window.vad` and `window.ort` in strict TS |
+| Barge-in threshold management (0.50 normal / 0.92 while AI speaks) | ✅ | Inside `useVAD` |
+| Barge-in grace period (`BARGE_IN_GRACE_MS = 800`) | ✅ | Inside `useVAD` |
+| WAV conversion on `onSpeechEnd` (`float32ToWavBase64`) | ✅ | Inside `useVAD` |
 
 ### Step 4 — Types, IPC wiring, session auto-start
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/shared/types.ts` — `audio?: string` on `SessionPromptRequest` + `WsOutboundMessage` | ❌ | |
-| `src/shared/schemas.ts` — `audio` field in `wsOutboundMessageSchema` | ❌ | |
-| `src/shared/constants.ts` — `VOICE_TURN_TEXT` constant | ❌ | `"Please respond to what the user just asked."` |
-| `src/main/ipc/sessionHandlers.ts` — pass `audio` to sidecar; relax empty-text guard | ❌ | |
-| `src/renderer/App.tsx` — `useVAD` wired; auto-starts when `sessionMode === 'active'` | ❌ | |
-| `src/renderer/App.tsx` — `onSpeechEnd` → `submitSessionPrompt` with WAV | ❌ | |
-| `VOICE_ENABLED` env var (`.env` / `.env.example`) | ❌ | `true` enables auto-start VAD on session start |
+| `src/shared/types.ts` — `audio?: string` on `SessionPromptRequest` + `WsOutboundMessage` | ✅ | Voice turns carry base64 WAV audio |
+| `src/shared/schemas.ts` — `audio` field in `wsOutboundMessageSchema` | ✅ | Zod schemas accept audio-bearing outbound/inbound WS messages |
+| `src/shared/constants.ts` — `VOICE_TURN_TEXT` constant | ✅ | `"Please respond to what the user just asked."` |
+| `src/main/ipc/sessionHandlers.ts` — pass `audio` to sidecar; relax empty-text guard | ✅ | Allows audio turns and forwards `audio` to the WS client |
+| `src/renderer/App.tsx` — `useVAD` wired; auto-starts when `sessionMode === 'active'` | ✅ | Auto-starts when `VOICE_ENABLED=true`; persisted UI toggle pauses/resumes listening without destroying MicVAD |
+| `src/renderer/App.tsx` — `onSpeechEnd` → `submitSessionPrompt` with WAV | ✅ | Uses `VOICE_TURN_TEXT` plus captured WAV audio |
+| `VOICE_ENABLED` env var (`.env` / `.env.example`) | ✅ | `true` enables auto-start VAD on session start |
 
 ### Step 5 — Sidecar: audio blob + configurable audio backend
 
 | Item | Status | Notes |
 |---|---|---|
-| `sidecar/server.py` `handle_turn` — prepend `{type:"audio", blob:...}` when present | ❌ | |
-| `sidecar/inference/engine.py` — `LITERT_AUDIO_BACKEND` env var (replaces hardcoded CPU) | ❌ | |
-| `.env.example` — `LITERT_AUDIO_BACKEND=CPU` | ❌ | |
+| `sidecar/server.py` `handle_turn` — prepend `{type:"audio", blob:...}` when present | ✅ | Voice turns append `{type: "audio", "blob": ...}` before text |
+| `sidecar/inference/engine.py` — `LITERT_AUDIO_BACKEND` env var (replaces hardcoded CPU) | ❌ | Engine still hardcodes CPU audio backend |
+| `.env.example` — `LITERT_AUDIO_BACKEND=CPU` | ✅ | Env example documents the current CPU-only audio backend setting |
 
 ### Step 6 — TTS pipeline + wire into `handle_turn`
 
 | Item | Status | Notes |
 |---|---|---|
-| `sidecar/tts.py` — real `TTSPipeline` (kokoro-onnx backend + `none` fallback) | ⚠️ | Placeholder exists; kokoro model files not yet downloaded |
-| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ❌ | Download: see `.env.example` instructions |
-| `sidecar/server.py` — accumulate `full_text` during token stream | ❌ | |
-| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` after `done` | ❌ | |
-| `.env.example` — `KOKORO_MODEL_PATH`, `KOKORO_VOICES_PATH` | ❌ | |
+| `sidecar/tts.py` — real `TTSPipeline` (kokoro-onnx backend + `none` fallback) | ✅ | Kokoro backend implemented; falls back to renderer TTS when unavailable |
+| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ✅ | Reads configurable model + voices paths from env |
+| `sidecar/server.py` — accumulate `full_text` during token stream | ✅ | Used to synthesize TTS after the token stream completes |
+| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` after `done` | ✅ | Streams sentence-sized audio chunks when server-side TTS is available |
+| `.env.example` — `KOKORO_MODEL_PATH`, `KOKORO_VOICES_PATH` | ✅ | Documented in `.env.example` |
 
 ### Step 7 — Web Audio API playback in renderer
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ❌ | |
-| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ❌ | |
-| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ❌ | |
-| Audio IPC listeners cleaned up in `useEffect` return | ❌ | |
+| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ✅ | Starts audio playback state and raises VAD threshold |
+| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ✅ | Decodes/schedules PCM chunks with Web Audio API |
+| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ✅ | Resets playback state and lowers VAD threshold |
+| Audio IPC listeners cleaned up in `useEffect` return | ✅ | Removes all sidecar/capture listeners on cleanup |
 
 ### Step 8 — Barge-in + Web Speech fallback
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` — `handleVADSpeechStart` stops `AudioContext` + calls `sidecarInterrupt` | ❌ | |
-| Web Speech API fallback — `speechSynthesis.speak()` after `onSidecarDone` when no audio arrived | ❌ | |
+| `src/renderer/App.tsx` — `handleVADSpeechStart` stops playback + conditionally calls `sidecarInterrupt` | ✅ | Barge-in still interrupts active speech playback, but thinking-phase speech is queued instead of killing the current turn |
+| Web Speech API fallback — `speechSynthesis.speak()` after `onSidecarDone` when no audio arrived | ✅ | Timed fallback via `speechSynthesis` when server audio is absent |
 
 ### Step 9 — UI indicators
 
 | Item | Status | Notes |
 |---|---|---|
-| `ExpandedSessionView` — 🔊 pulsing indicator while `isAudioPlaying` | ❌ | |
-| `ExpandedSessionView` — 🎙️ / 🔇 mic toggle button | ❌ | |
-| `MinimizedSessionBar` — same mic + speaker indicators | ❌ | |
+| `ExpandedSessionView` — waveform + speech status | ✅ | Expanded session shows reusable analyser-driven waveform when speech input is enabled, with token-based colours for user/AI/idle/processing |
+| `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state, waveform visibility follows the speech toggle, and the user can pause/resume VAD listening |
+| `MinimizedSessionBar` — compact waveform + mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay uses a simplified larger layout that keeps the waveform, status row, and actions visible while speech is enabled |
+| Minimized overlay voice auto-open decision tests | ✅ | `src/renderer/__tests__/minimizedOverlay.test.ts` verifies compact→response reveal and existing auto-advance rules |
 
 ### Auto-refresh (deprioritised)
 

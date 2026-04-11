@@ -14,6 +14,7 @@ export interface ChatMessage {
   content: string
   timestamp: number
   latencyMs?: number
+  isVoiceTurn?: boolean // if true, render a mic icon instead of raw content
   imagePath?: string
 }
 
@@ -22,12 +23,14 @@ export interface WsOutboundMessage {
   image?: string
   text: string
   preset_id: string
+  audio?: string // base64 WAV (16 kHz, 16-bit mono) — present on voice turns
 }
 
 export interface SessionPromptRequest {
   messageId: string
   text: string
   presetId: PresetId
+  audio?: string // base64 WAV — present on voice turns; text will be VOICE_TURN_TEXT
 }
 
 export interface SessionPromptResponse {
@@ -129,6 +132,10 @@ export interface OverlayState {
 
 // Electron API exposed via contextBridge (window.api)
 export interface ElectronAPI {
+  /** True when VOICE_ENABLED=true in .env. Read synchronously by renderer. */
+  voiceEnabled: boolean
+  /** True when TTS_ENABLED=true in .env. Used by renderer fallback logic. */
+  ttsEnabled: boolean
   captureNow: () => Promise<void>
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) => void
   sidecarSend: (msg: WsOutboundMessage) => void

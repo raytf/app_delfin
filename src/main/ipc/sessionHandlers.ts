@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron'
 import { captureForegroundWindow } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
+import { sessionPromptRequestSchema } from '../../shared/schemas'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
   type SessionMessageImageRequest,
-  type SessionPromptRequest,
   type SessionPromptResponse,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
@@ -25,7 +25,8 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     await options.switchOverlayMode('expanded')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, request: SessionPromptRequest): Promise<SessionPromptResponse> => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, rawRequest): Promise<SessionPromptResponse> => {
+    const request = sessionPromptRequestSchema.parse(rawRequest)
     const mainWindow = options.getMainWindow()
 
     if (mainWindow === null || mainWindow.isDestroyed()) {
@@ -33,8 +34,11 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     }
 
     const text = request.text.trim()
+    const isVoiceTurn = Boolean(request.audio)
 
-    if (text.length === 0) {
+    // Allow submission when audio is present even if text is the voice constant.
+    // Block only genuinely empty, non-audio submissions.
+    if (text.length === 0 && !isVoiceTurn) {
       throw new Error('Prompt cannot be empty.')
     }
 
@@ -55,6 +59,7 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
         image: frame.imageBase64,
         text,
         preset_id: request.presetId,
+        ...(request.audio !== undefined ? { audio: request.audio } : {}),
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send prompt to sidecar.'

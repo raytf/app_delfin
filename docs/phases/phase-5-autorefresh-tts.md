@@ -256,9 +256,19 @@ function speakText(text: string) {
 
 When `sidecar:structured` arrives and no `audio_start` follows within 500ms, trigger Web Speech on the answer text. This provides TTS on all platforms with zero server-side setup.
 
-### UI: TTS indicator
+### UI: TTS indicator / waveform
 
-In `ChatPanel.tsx`, when audio is playing, show a small waveform or speaker icon next to the relevant message. A simple pulsing "🔊" icon is sufficient.
+In the renderer, show a reusable waveform component that:
+
+- is visible in the approved expanded and minimized session views while speech input is toggled on
+- uses existing design tokens for state colour:
+  - `--success` (green) for user speech
+  - `--primary` (blue) for AI speech
+  - `--warning` (orange) for processing and idle states
+- uses faster orange motion while processing and slower/subtler orange motion while idle
+- tracks analyser-driven per-bar mic activity while listening is enabled, but only turns green once VAD classifies speech
+- routes streamed TTS chunks through a shared Web Audio analysis chain so blue playback bars stay visually continuous across chunk boundaries
+- keeps the compact minimized overlay large enough and simple enough that the waveform, status row, and actions do not clip
 
 ---
 
@@ -274,6 +284,7 @@ In `ChatPanel.tsx`, when audio is playing, show a small waveform or speaker icon
 - [ ] Clicking Stop while audio is playing stops both the inference and audio playback
 - [ ] With `TTS_BACKEND=web-speech`: after a structured response, the browser's speech synthesis reads the answer (no sidecar audio)
 - [ ] With `TTS_ENABLED=false`: no audio plays at all
-- [ ] A speaker icon/indicator appears in the chat while audio is playing
+- [ ] The waveform appears in expanded and minimized session views while speech is enabled
+- [ ] User speech drives the waveform green, AI speech drives it blue, and idle/processing show orange motion with different intensity
 - [ ] Audio playback does not block the UI (main thread stays responsive)
 - [ ] Auto-refresh + TTS combined: advance a slide → auto-capture → auto-summarise (if enabled) → TTS reads the summary

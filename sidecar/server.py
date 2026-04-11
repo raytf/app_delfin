@@ -1,6 +1,7 @@
 """FastAPI sidecar — LiteRT-LM inference over WebSocket."""
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from inference.engine import load_engine, pre_warm
 from inference.preprocess import resize_image_blob
 from prompts.presets import PRESETS
-from tts import TTSPipeline
+from tts import TTSPipeline, split_sentences
 
 load_dotenv(find_dotenv())
 logging.basicConfig(level=logging.INFO)
@@ -55,8 +56,9 @@ async def handle_turn(
         return
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         chunk_queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
+        full_text_parts: list[str] = []
 
         def _run_stream() -> None:
             try:
@@ -82,11 +84,18 @@ async def handle_turn(
                 break
             if isinstance(item, Exception):
                 raise item
+            full_text_parts.append(item)
             await ws.send_json({"type": "token", "text": item})
 
         await executor_fut
         await ws.send_json({"type": "done"})
         logger.info("[handle_turn] done sent")
+
+        await maybe_stream_tts_audio(
+            ws=ws,
+            response_text="".join(full_text_parts),
+            interrupted=interrupted,
+        )
 
     except Exception as exc:
         logger.exception("Inference error: %s", exc)
@@ -96,6 +105,39 @@ async def handle_turn(
             logger.exception("[handle_turn] failed to send error message to client")
 
 
+async def maybe_stream_tts_audio(
+    ws: WebSocket,
+    response_text: str,
+    interrupted: asyncio.Event,
+) -> None:
+    """Optionally synthesise and stream TTS audio after text generation."""
+    if interrupted.is_set() or tts_pipeline is None or not tts_pipeline.is_available():
+        return
+
+    sentences = split_sentences(response_text)
+    if not sentences:
+        return
+
+    loop = asyncio.get_running_loop()
+    await ws.send_json({"type": "audio_start"})
+
+    try:
+        for sentence in sentences:
+            if interrupted.is_set():
+                break
+
+            pcm = await loop.run_in_executor(None, tts_pipeline.generate, sentence)
+            if interrupted.is_set():
+                break
+            if pcm.size == 0:
+                continue
+
+            audio_b64 = base64.b64encode(pcm.tobytes()).decode("ascii")
+            await ws.send_json({"type": "audio_chunk", "audio": audio_b64})
+    finally:
+        await ws.send_json({"type": "audio_end"})
+
+
 # ---------------------------------------------------------------------------
 # Lifespan: load engine + pre-warm on startup
 # ---------------------------------------------------------------------------
@@ -103,7 +145,7 @@ async def handle_turn(
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN001
     global engine, active_backend, tts_pipeline
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     engine, active_backend = await loop.run_in_executor(None, load_engine)
     await loop.run_in_executor(None, pre_warm, engine)
     if os.environ.get("TTS_ENABLED", "false").lower() == "true":
