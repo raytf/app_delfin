@@ -63,42 +63,14 @@ export default function ExpandedSessionView({
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-4">
-        <div className="flex items-center gap-4">
-          <h1 className="font-display text-lg font-semibold text-[var(--text-primary)]">
-            {sessionName}
-          </h1>
-          <SessionTimer startTime={sessionStartTime} />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            aria-label="Minimize to overlay"
-            className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-            onClick={onMinimize}
-            type="button"
-          >
-            <Minimize2 size={16} />
-            Minimize
-          </button>
-          <button
-            aria-label="End session"
-            className="flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--danger)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--danger)]/80"
-            onClick={onStop}
-            type="button"
-          >
-            <Square size={14} fill="currentColor" />
-            End
-          </button>
-        </div>
+      <header className="border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-5 text-center">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--primary)]">
+          Delfin
+        </h1>
       </header>
 
-      {/* Main Content */}
       <div className="flex min-h-0 flex-1">
-        {/* Chat Section - 60% width */}
-        <main className="flex w-[60%] flex-col border-r border-[var(--border-soft)]">
-          {/* Chat Messages */}
+        <main className="flex min-w-0 flex-1 flex-col border-r border-[var(--border-soft)]">
           <div className="min-h-0 flex-1 overflow-hidden">
             <SessionConversation
               className="h-full"
@@ -108,7 +80,6 @@ export default function ExpandedSessionView({
             />
           </div>
 
-          {/* Ask Delfin Button */}
           <div className="border-t border-[var(--border-soft)] bg-[var(--bg-surface)] p-4">
             <button
               className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
@@ -121,48 +92,45 @@ export default function ExpandedSessionView({
           </div>
         </main>
 
-        {/* Right Panel - Context/Info */}
-        <aside className="flex w-[40%] flex-col bg-[var(--bg-app-soft)] p-6">
-          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-              Current Context
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {captureSourceLabel ?? 'No screen captured yet. Ask Delfin a question to capture what\'s on your screen.'}
-            </p>
+        <aside className="flex w-[21rem] shrink-0 flex-col bg-[var(--bg-app-soft)] p-6">
+          <h2 className="mt-3 font-display text-2xl font-semibold leading-tight text-[var(--text-primary)]">
+            {sessionName}
+          </h2>
+          <div className="mt-4 inline-flex w-fit rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
+            <SessionTimer startTime={sessionStartTime} />
           </div>
 
-          {errorMessage !== null && (
-            <div className="mt-4 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-5">
-              <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--danger)]">
+          <div className="mt-5 flex flex-col gap-3">
+            <button
+              aria-label="Minimize to overlay"
+              className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              onClick={onMinimize}
+              type="button"
+            >
+              <Minimize2 size={16} />
+              Minimize
+            </button>
+            <button
+              aria-label="End session"
+              className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--danger)] px-4 py-3 text-sm font-medium text-white transition hover:bg-[var(--danger)]/80"
+              onClick={onStop}
+              type="button"
+            >
+              <Square size={14} fill="currentColor" />
+              End Session
+            </button>
+          </div>
+
+          {errorMessage !== null ? (
+            <div className="mt-4 rounded-[1.75rem] border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-5">
+              <h2 className="text-xs font-medium uppercase tracking-[0.24em] text-[var(--danger)]">
                 Error
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--danger)]">
                 {errorMessage}
               </p>
             </div>
-          )}
-
-          {/* Stats */}
-          <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-              Session Stats
-            </h2>
-            <div className="mt-3 flex items-center gap-6">
-              <div>
-                <p className="text-2xl font-semibold text-[var(--text-primary)]">
-                  {messages.filter(m => m.role === 'user').length}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">Questions</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-[var(--text-primary)]">
-                  {messages.filter(m => m.role === 'assistant').length}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">Responses</p>
-              </div>
-            </div>
-          </div>
+          ) : null}
         </aside>
       </div>
     </div>
