@@ -1,4 +1,5 @@
-import type { SidecarStatus, StructuredResponse } from '../../shared/types'
+import { useEffect, useRef } from 'react'
+import type { SidecarStatus } from '../../shared/types'
 
 interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
@@ -9,7 +10,6 @@ interface ExpandedSessionViewProps {
   onStop: () => void
   sidecarStatus: SidecarStatus
   streamedText: string
-  structuredResponse: StructuredResponse | null
 }
 
 export default function ExpandedSessionView({
@@ -21,8 +21,13 @@ export default function ExpandedSessionView({
   onStop,
   sidecarStatus,
   streamedText,
-  structuredResponse,
 }: ExpandedSessionViewProps) {
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom whenever new tokens arrive
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [streamedText])
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-8 py-10">
@@ -44,6 +49,27 @@ export default function ExpandedSessionView({
           <div className="rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6 shadow-2xl shadow-black/20">
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Assistant</p>
             <div className="mt-6 space-y-4">
+              {/* Chat response box */}
+              <div className="flex max-h-96 min-h-48 flex-col overflow-y-auto rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Assistant</p>
+                <div className="mt-4 flex-1 text-sm leading-7 text-slate-300 whitespace-pre-wrap">
+                  {streamedText.length > 0 ? streamedText : (
+                    <span className="text-slate-500">Response will appear here.</span>
+                  )}
+                  {/* Scroll anchor */}
+                  <div ref={chatBottomRef} />
+                </div>
+                {/* Animated typing indicator */}
+                {isSubmitting && (
+                  <div className="mt-3 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400" />
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt form */}
               <form
                 className="rounded-[1.5rem] border border-slate-800 bg-slate-900/70 p-4"
                 onSubmit={(event) => {
@@ -77,6 +103,7 @@ export default function ExpandedSessionView({
                 </button>
               </form>
 
+              {/* Status strip */}
               <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-300">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Status</p>
@@ -88,39 +115,6 @@ export default function ExpandedSessionView({
                   {captureSourceLabel === null ? 'No frame captured yet.' : `Latest capture: ${captureSourceLabel}`}
                 </p>
                 {errorMessage !== null ? <p className="mt-3 text-red-300">{errorMessage}</p> : null}
-              </div>
-
-              <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Structured Response</p>
-                {structuredResponse === null ? (
-                  <p className="mt-4 text-sm leading-7 text-slate-400">No structured response yet.</p>
-                ) : (
-                  <div className="mt-4 space-y-4 text-sm text-slate-200">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Summary</p>
-                      <p className="mt-2 leading-7">{structuredResponse.summary}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Answer</p>
-                      <p className="mt-2 leading-7">{structuredResponse.answer}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Key Points</p>
-                      <ul className="mt-2 space-y-2 text-slate-300">
-                        {structuredResponse.key_points.map((point) => (
-                          <li key={point}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Stream</p>
-                <p className="mt-4 min-h-24 text-sm leading-7 text-slate-300">
-                  {streamedText.length > 0 ? streamedText : 'Streaming output will appear here.'}
-                </p>
               </div>
             </div>
           </div>

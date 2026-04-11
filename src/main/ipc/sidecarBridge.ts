@@ -16,11 +16,6 @@ export function registerSidecarBridge(options: RegisterIpcHandlersOptions): void
       case 'token':
         mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, { text: message.text ?? '' })
         return
-      case 'structured':
-        if (message.data !== undefined) {
-          mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STRUCTURED, message.data)
-        }
-        return
       case 'audio_start':
         mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START)
         return

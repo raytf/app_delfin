@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11
+> Last updated: 2026-04-11 (streaming-only refactor)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,10 +11,10 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Read in both main process and sidecar |
-| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types |
-| `src/shared/schemas.ts` | ✅ | Zod schemas for all inbound/outbound WS messages |
+| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types; `StructuredResponse` removed |
+| `src/shared/schemas.ts` | ✅ | Zod schemas for inbound/outbound WS messages; `structuredResponseSchema` removed |
 | `src/shared/constants.ts` | ✅ | Preset definitions, `DEFAULT_PRESET`, `SIDEBAR_WIDTH` |
-| `scripts/mock-sidecar.js` | ✅ | Mock sidecar for frontend development |
+| `scripts/mock-sidecar.js` | ✅ | Mock sidecar — tokens only (no structured message) |
 | `scripts/setup-check.sh` | ✅ | Environment validation script |
 
 ---
@@ -28,13 +28,12 @@
 | `sidecar/server.py` — `WS /ws` endpoint | ✅ | Single-consumer queue pattern, per-connection closure |
 | `sidecar/server.py` — interrupt handling | ✅ | `{"type":"interrupt"}` sets `asyncio.Event`, clears on next turn |
 | `sidecar/server.py` — preset switching per connection | ✅ | `preset_id` in message updates the active system prompt |
-| `sidecar/server.py` — Gemma 4 quote token cleanup | ✅ | `_clean_tool_result()` strips `<\|"\|>` artifacts |
-| `sidecar/server.py` — `_extract_structured_from_text()` | ✅ | Regex fallback when tool calling fails |
+| `sidecar/server.py` — pure token streaming | ✅ | `handle_turn` streams tokens directly; no tool calls or structured response |
 | `sidecar/inference/engine.py` — model load + GPU→CPU fallback | ✅ | `hf_hub_download`, `cache_dir` set |
 | `sidecar/inference/engine.py` — `pre_warm()` | ✅ | Throwaway prompt on startup |
 | `sidecar/inference/preprocess.py` — `resize_image_blob()` | ✅ | In-memory base64→PIL→resize→JPEG, no temp files |
-| `sidecar/prompts/lecture_slide.py` | ✅ | Lecture slide system prompt |
-| `sidecar/prompts/generic_screen.py` | ✅ | Generic screen system prompt |
+| `sidecar/prompts/lecture_slide.py` | ✅ | Answer-first plain prose; Key Points + conditional Hints sections; no tool-call instructions |
+| `sidecar/prompts/generic_screen.py` | ✅ | Description + Key Elements plain prose; no tool-call instructions |
 | `sidecar/prompts/presets.py` | ✅ | Registry: `preset_id → system prompt` |
 | `sidecar/tts.py` — TTS pipeline | ⚠️ | Placeholder — `generate()` returns empty array |
 | Conversation history trimming | ❌ | Not implemented (nice-to-have, Phase 6) |
@@ -61,9 +60,9 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state |
+| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state; structured response removed |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
-| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, structured response card, streaming text panel |
+| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
@@ -83,11 +82,11 @@
 
 | Feature | Status | Notes |
 |---|---|---|
-| Sidecar WS → IPC → renderer message routing | ✅ | `token`, `structured`, `audio_*`, `done`, `error` all forwarded |
+| Sidecar WS → IPC → renderer message routing | ✅ | `token`, `audio_*`, `done`, `error` all forwarded; `structured` removed |
 | `SESSION_SUBMIT_PROMPT` — capture + send to sidecar | ✅ | Captures foreground window, sends image + text over WS |
 | Session start/stop ↔ overlay mode transitions | ✅ | `home ↔ active`, `expanded ↔ minimized` fully wired |
-| Streaming token display in renderer | ✅ | `App.tsx` accumulates tokens into `streamedText` state |
-| Structured response display in renderer | ✅ | `ExpandedSessionView` renders summary / answer / key points |
+| Streaming token display in renderer | ✅ | `App.tsx` accumulates tokens into `streamedText`; chat box auto-scrolls with typing indicator |
+| Structured response display in renderer | ❌ | Removed — model now streams plain prose directly |
 | Sidecar connection status display | ✅ | Connected/disconnected shown inline in `ExpandedSessionView` |
 | Health check polling (`healthCheck.ts`) | ⚠️ | Placeholder — model/backend info not fetched |
 | Latency tracking (time-to-first-token) | ❌ | Not implemented (Phase 4.5) |
@@ -118,7 +117,7 @@
 | Global keyboard shortcut `Ctrl+Shift+C` | ❌ | Not implemented |
 | Error state polish (disconnected, loading, capture fail) | ❌ | Not implemented |
 | Visual styling pass (colour palette, spacing, typography) | ❌ | Current UI is functional but unstyled |
-| Structured response card styling (`StructuredCard`) | ❌ | Inline in `ExpandedSessionView`, not a dedicated component |
+| Markdown rendering in chat box | ❌ | Chat box displays raw text; add `react-markdown` to render bold, bullet lists, etc. |
 | Dark mode toggle | ❌ | Not implemented |
 | Manual window picker dropdown | ❌ | Not implemented |
 | Ollama fallback engine | ❌ | Not implemented |

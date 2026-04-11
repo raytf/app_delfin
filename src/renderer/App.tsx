@@ -9,7 +9,6 @@ import {
   type OverlayMode,
   type SessionMode,
   type SidecarStatus,
-  type StructuredResponse,
 } from '../shared/types'
 
 export default function App() {
@@ -21,7 +20,6 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const [streamedText, setStreamedText] = useState('')
-  const [structuredResponse, setStructuredResponse] = useState<StructuredResponse | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -50,16 +48,6 @@ export default function App() {
       setStreamedText((current) => current + data.text)
     })
 
-    window.api.onSidecarStructured((data) => {
-      setStructuredResponse(data)
-      // Also push the answer into streamedText so MinimizedSessionBar
-      // (which only receives responseText, not structuredResponse) can
-      // display something — structured responses never emit tokens.
-      if (data.answer) {
-        setStreamedText(data.answer)
-      }
-    })
-
     window.api.onSidecarDone(() => {
       setIsSubmitting(false)
     })
@@ -76,7 +64,6 @@ export default function App() {
     return () => {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
-      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STRUCTURED)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
@@ -124,7 +111,6 @@ export default function App() {
     setErrorMessage(null)
     setIsSubmitting(true)
     setStreamedText('')
-    setStructuredResponse(null)
 
     try {
       await window.api.submitSessionPrompt({
@@ -180,7 +166,6 @@ export default function App() {
         }}
         sidecarStatus={sidecarStatus}
         streamedText={streamedText}
-        structuredResponse={structuredResponse}
       />
     )
   }
