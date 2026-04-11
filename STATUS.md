@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (minimized waveform continuity restored across processing/TTS with automatic return to compact mode)
+> Last updated: 2026-04-11 (model downloads now use atomic .part files with cleanup on failure)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -15,6 +15,8 @@
 | `src/shared/schemas.ts` | ✅ | Zod schemas for inbound/outbound WS messages; `structuredResponseSchema` removed |
 | `src/shared/constants.ts` | ✅ | Preset definitions, `DEFAULT_PRESET`, `SIDEBAR_WIDTH` |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar — tokens only (no structured message) |
+| `scripts/download-models.mjs` | ✅ | Downloads Kokoro model files via temp `.part` files, then renames on success to avoid partial final files blocking retries |
+| `scripts/download-models.test.mjs` | ✅ | Vitest coverage for atomic rename-on-success and temp-file cleanup-on-failure |
 | `scripts/setup-check.sh` | ✅ | Environment validation script |
 
 ---
