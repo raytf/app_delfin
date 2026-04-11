@@ -45,11 +45,13 @@ export function connectToSidecar(wsUrl: string): void {
   });
 
   socket.on("message", (data) => {
+    const raw = data.toString();
     try {
-      const parsed = wsInboundMessageSchema.parse(JSON.parse(data.toString()));
+      const parsed = wsInboundMessageSchema.parse(JSON.parse(raw));
       messageHandler?.(parsed);
     } catch (error) {
-      console.error("Failed to parse sidecar message:", error);
+      console.error("[wsClient] Failed to parse sidecar message:", error);
+      console.error("[wsClient] Raw payload that failed:", raw.substring(0, 500));
     }
   });
 

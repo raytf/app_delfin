@@ -129,9 +129,15 @@ async def handle_turn(
             lambda: conversation.send_message({"role": "user", "content": content}),
         )
 
+        logger.info("[handle_turn] tool_result populated: %s, keys: %s",
+                    bool(tool_result), list(tool_result.keys()) if tool_result else [])
+
         if tool_result:
             # Primary path: model called the respond_to_user tool
-            await ws.send_json({"type": "structured", "data": _clean_tool_result(dict(tool_result))})
+            payload = _clean_tool_result(dict(tool_result))
+            logger.info("[handle_turn] sending structured response (summary length=%d, kp count=%d)",
+                        len(payload.get("summary", "")), len(payload.get("key_points", [])))
+            await ws.send_json({"type": "structured", "data": payload})
         else:
             # Fallback 1: try to extract structure from raw text
             raw_text: str = ""
@@ -141,18 +147,27 @@ async def handle_turn(
             else:
                 raw_text = str(result)
 
+            logger.info("[handle_turn] no tool_result; raw_text length=%d, snippet=%r",
+                        len(raw_text), raw_text[:120])
+
             extracted = _extract_structured_from_text(raw_text)
             if extracted:
+                logger.info("[handle_turn] fallback: sending extracted structured")
                 await ws.send_json({"type": "structured", "data": extracted})
             else:
                 # Fallback 2: plain token
+                logger.info("[handle_turn] fallback: sending raw token")
                 await ws.send_json({"type": "token", "text": raw_text})
 
         await ws.send_json({"type": "done"})
+        logger.info("[handle_turn] done sent")
 
     except Exception as exc:
         logger.exception("Inference error: %s", exc)
-        await ws.send_json({"type": "error", "message": str(exc)})
+        try:
+            await ws.send_json({"type": "error", "message": str(exc)})
+        except Exception:
+            logger.exception("[handle_turn] failed to send error message to client")
 
 
 # ---------------------------------------------------------------------------
@@ -215,18 +230,51 @@ async def ws_endpoint(ws: WebSocket) -> None:
         hints: list[str],
         follow_up_questions: list[str],
     ) -> str:
-        """Respond to the user with a structured, tutoring-aware analysis of the slide.
+        """Respond to the user with a structured analysis of the slide.
 
-        hints: graduated hints from broad conceptual nudge → specific pointer →
-               near-answer scaffold. Empty list when there is no problem to solve.
-        follow_up_questions: 1-2 Socratic questions to deepen understanding.
-               Empty list when not applicable.
+        Rules for ALL list fields (key_points, hints, follow_up_questions):
+        - Each element must be a plain string with NO prefix notation.
+        - Never start an element with [0], [1], [n], or any bracket-index.
+        - Use an empty list [] when the field is not applicable.
+
+        hints: plain-text hints from most general to most specific.
+        follow_up_questions: 1-2 plain-text follow-up questions.
         """
-        tool_result["summary"] = summary
-        tool_result["answer"] = answer
-        tool_result["key_points"] = key_points
-        tool_result["hints"] = hints
-        tool_result["follow_up_questions"] = follow_up_questions
+        # Normalise scalar fields — model may emit None or unexpected types.
+        # _clean() is intentionally NOT called here; _clean_tool_result() in
+        # handle_turn is the single place responsible for stripping Gemma 4
+        # quote tokens, avoiding a double-clean.
+        tool_result["summary"] = str(summary) if summary is not None else ""
+        tool_result["answer"] = str(answer) if answer is not None else ""
+
+        # Normalise list fields — Gemma 4 sometimes emits a plain newline-
+        # delimited string instead of a JSON array.  Python does NOT enforce
+        # type annotations at call-time so we guard explicitly.
+        # Again, no _clean() here — _clean_tool_result() handles that pass.
+        def _to_str_list(value: object) -> list[str]:
+            if isinstance(value, list):
+                return [str(item) for item in value if item is not None]
+            if isinstance(value, str) and value.strip():
+                lines = [
+                    _re.sub(r'^[-*\u2022]\s*', '', line).strip()
+                    for line in _re.split(r'\n|;', value)
+                    if line.strip()
+                ]
+                return lines if lines else [value.strip()]
+            return []
+
+        tool_result["key_points"] = _to_str_list(key_points)
+        tool_result["hints"] = _to_str_list(hints)
+        tool_result["follow_up_questions"] = _to_str_list(follow_up_questions)
+        logger.info(
+            "[respond_to_user] summary=%d chars, answer=%d chars, "
+            "key_points=%d, hints=%d, fup=%d",
+            len(tool_result["summary"]),
+            len(tool_result["answer"]),
+            len(tool_result["key_points"]),
+            len(tool_result["hints"]),
+            len(tool_result["follow_up_questions"]),
+        )
         return "OK"
 
     preset_id = "lecture-slide"
