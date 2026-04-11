@@ -26,22 +26,11 @@ wss.on('connection', (ws) => {
 
     console.log(`[mock-sidecar] Received: "${msg.text}" (preset: ${msg.preset_id})`)
 
-    // Simulate structured response
-    const structured = {
-      summary: 'This slide covers the fundamentals of the topic.',
-      answer:
-        'The key idea is that this concept builds on previous material and introduces new terminology that will be important for the exam.',
-      key_points: [
-        'First key concept explained',
-        'Second important term defined',
-        'Third relationship between ideas',
-      ],
-    }
+    // Simulate plain streaming response (no structured message)
+    const responseText =
+      'The key idea is that this concept builds on previous material and introduces new terminology that will be important for the exam.\n\nKey Points:\n- First key concept explained clearly\n- Second important term defined in context\n- Third relationship between ideas established'
 
-    ws.send(JSON.stringify({ type: 'structured', data: structured }))
-
-    // Simulate streaming tokens
-    const words = structured.answer.split(' ')
+    const words = responseText.split(' ')
     let i = 0
     const interval = setInterval(() => {
       if (i >= words.length) {

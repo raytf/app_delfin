@@ -1,4 +1,4 @@
-import type { PresetId, StructuredResponse } from '../../shared/types'
+import type { PresetId } from '../../shared/types'
 import type {
   ConversationMessageRecord,
   PersistedSessionStatus,
@@ -11,7 +11,6 @@ interface ActiveAssistantDraft {
   sessionId: string
   content: string
   timestamp: number
-  structuredData?: StructuredResponse
   errorMessage?: string
 }
 
@@ -101,21 +100,6 @@ export class SessionPersistenceService {
     await this.persistAssistantDraft(Date.now())
   }
 
-  async setAssistantStructured(data: StructuredResponse): Promise<void> {
-    if (this.activeAssistantDraft === null) {
-      return
-    }
-
-    this.activeAssistantDraft = {
-      ...this.activeAssistantDraft,
-      content: data.answer,
-      structuredData: data,
-      errorMessage: undefined,
-    }
-
-    await this.persistAssistantDraft(Date.now())
-  }
-
   async failAssistantResponse(message: string): Promise<void> {
     if (this.activeAssistantDraft === null) {
       return
@@ -182,7 +166,6 @@ export class SessionPersistenceService {
       role: 'assistant',
       content: draft.content,
       timestamp: draft.timestamp,
-      structuredData: draft.structuredData,
       errorMessage: draft.errorMessage,
     })
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { ChatMessage, SessionListItem, StructuredResponse } from '../../shared/types'
+import type { ChatMessage, SessionListItem } from '../../shared/types'
 
 interface SessionStoreState {
   errorMessage: string | null
@@ -11,7 +11,6 @@ interface SessionStoreState {
   clearConversation: () => void
   beginPromptSubmission: (prompt: string) => void
   appendAssistantText: (text: string) => void
-  setAssistantStructured: (response: StructuredResponse) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
@@ -74,25 +73,6 @@ export const useSessionStore = create<SessionStoreState>()(
             messages: state.messages.map((message) =>
               message.id === state.activeAssistantMessageId
                 ? { ...message, content: message.content + text }
-                : message,
-            ),
-          }
-        }),
-
-      setAssistantStructured: (response: StructuredResponse) =>
-        set((state) => {
-          if (state.activeAssistantMessageId === null) {
-            return state
-          }
-
-          return {
-            messages: state.messages.map((message) =>
-              message.id === state.activeAssistantMessageId
-                ? {
-                    ...message,
-                    content: response.answer,
-                    structuredData: response,
-                  }
                 : message,
             ),
           }

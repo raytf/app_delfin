@@ -14,17 +14,6 @@ export interface ChatMessage {
   content: string
   timestamp: number
   latencyMs?: number
-  structuredData?: StructuredResponse
-}
-
-export interface StructuredResponse {
-  summary: string
-  answer: string
-  key_points: string[]
-  /** Graduated hints for the visible problem: broad nudge → specific pointer → near-answer scaffold. */
-  hints?: string[]
-  /** Socratic follow-up questions to deepen understanding. */
-  follow_up_questions?: string[]
 }
 
 // WebSocket outbound (Electron → Sidecar)
@@ -46,7 +35,6 @@ export interface WsInterruptMessage {
 // WebSocket inbound (Sidecar → Electron)
 export type WsInboundType =
   | 'token'
-  | 'structured'
   | 'audio_start'
   | 'audio_chunk'
   | 'audio_end'
@@ -56,7 +44,6 @@ export type WsInboundType =
 export interface WsInboundMessage {
   type: WsInboundType
   text?: string
-  data?: StructuredResponse
   audio?: string
   message?: string
 }
@@ -80,7 +67,6 @@ export const RENDERER_TO_MAIN_CHANNELS = {
 export const MAIN_TO_RENDERER_CHANNELS = {
   FRAME_CAPTURED: 'frame:captured',
   SIDECAR_TOKEN: 'sidecar:token',
-  SIDECAR_STRUCTURED: 'sidecar:structured',
   SIDECAR_AUDIO_START: 'sidecar:audio_start',
   SIDECAR_AUDIO_CHUNK: 'sidecar:audio_chunk',
   SIDECAR_AUDIO_END: 'sidecar:audio_end',
@@ -145,7 +131,6 @@ export interface ElectronAPI {
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
-  onSidecarStructured: (cb: (data: StructuredResponse) => void) => void
   onSidecarAudioStart: (cb: () => void) => void
   onSidecarAudioChunk: (cb: (data: { audio: string }) => void) => void
   onSidecarAudioEnd: (cb: () => void) => void

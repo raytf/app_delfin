@@ -1,4 +1,4 @@
-import type { PresetId, StructuredResponse } from '../../shared/types'
+import type { PresetId } from '../../shared/types'
 
 export type PersistedSessionStatus = 'active' | 'completed' | 'failed' | 'aborted'
 
@@ -19,7 +19,6 @@ export interface ConversationMessageRecord {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
-  structuredData?: StructuredResponse
   errorMessage?: string
 }
 

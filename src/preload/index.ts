@@ -3,7 +3,6 @@ import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS } from '../shared/
 import type {
   WsOutboundMessage,
   CaptureFrame,
-  StructuredResponse,
   SidecarStatus,
   ElectronAPI,
   OverlayState,
@@ -48,9 +47,6 @@ const api: ElectronAPI = {
 
   onSidecarToken: (cb: (data: { text: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, (_event, data) => cb(data)),
-
-  onSidecarStructured: (cb: (data: StructuredResponse) => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STRUCTURED, (_event, data) => cb(data)),
 
   onSidecarAudioStart: (cb: () => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START, () => cb()),

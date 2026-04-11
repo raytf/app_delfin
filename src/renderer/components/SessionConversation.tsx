@@ -68,22 +68,6 @@ export default function SessionConversation({
                     {message.content.length > 0 ? message.content : 'Thinking…'}
                   </p>
 
-                  {message.structuredData !== undefined ? (
-                    <div className="mt-3 space-y-3 rounded-2xl border border-slate-800/80 bg-slate-950/65 p-3 text-slate-300">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Summary</p>
-                        <p className="mt-1 whitespace-pre-wrap">{message.structuredData.summary}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Key Points</p>
-                        <ul className="mt-1 space-y-1">
-                          {message.structuredData.key_points.map((point) => (
-                            <li key={`${message.id}-${point}`}>{point}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </article>
             )

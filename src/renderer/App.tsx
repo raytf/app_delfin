@@ -11,25 +11,12 @@ import {
   type OverlayMode,
   type SessionMode,
   type SidecarStatus,
-  type StructuredResponse,
 } from '../shared/types'
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'assistant') {
       return messages[index]
-    }
-  }
-
-  return null
-}
-
-function getLatestStructuredResponse(messages: ChatMessage[]): StructuredResponse | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const structuredData = messages[index]?.structuredData
-
-    if (structuredData !== undefined) {
-      return structuredData
     }
   }
 
@@ -46,7 +33,6 @@ export default function App() {
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
-  const setAssistantStructured = useSessionStore((state) => state.setAssistantStructured)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
@@ -55,7 +41,7 @@ export default function App() {
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
   const latestAssistantMessage = getLatestAssistantMessage(messages)
-  const latestStructuredResponse = getLatestStructuredResponse(messages)
+  const latestResponseText = latestAssistantMessage?.content ?? null
 
   useEffect(() => {
     if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
@@ -64,7 +50,7 @@ export default function App() {
 
     const shouldShowResponse =
       !isMinimizedPromptComposing &&
-      (errorMessage !== null || (!isSubmitting && latestStructuredResponse !== null))
+      (errorMessage !== null || (!isSubmitting && latestResponseText !== null && latestResponseText.length > 0))
     const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
 
     if (nextVariant === minimizedVariant) {
@@ -73,7 +59,7 @@ export default function App() {
 
     void window.api.setMinimizedOverlayVariant(nextVariant)
     setMinimizedVariant(nextVariant)
-  }, [errorMessage, isMinimizedPromptComposing, isSubmitting, latestStructuredResponse, minimizedVariant, overlayMode, sessionMode])
+  }, [errorMessage, isMinimizedPromptComposing, isSubmitting, latestResponseText, minimizedVariant, overlayMode, sessionMode])
 
   useEffect(() => {
     let cancelled = false
@@ -110,10 +96,6 @@ export default function App() {
       appendAssistantText(data.text)
     })
 
-    window.api.onSidecarStructured((data) => {
-      setAssistantStructured(data)
-    })
-
     window.api.onSidecarDone(() => {
       finishAssistantResponse()
     })
@@ -129,12 +111,11 @@ export default function App() {
     return () => {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
-      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STRUCTURED)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
-  }, [appendAssistantText, failAssistantResponse, finishAssistantResponse, setAssistantStructured])
+  }, [appendAssistantText, failAssistantResponse, finishAssistantResponse])
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
@@ -144,7 +125,6 @@ export default function App() {
     setSessionMode('active')
     setOverlayMode('minimized')
     setMinimizedVariant('compact')
-    setIsMinimizedPromptComposing(false)
   }
 
   async function handleRestoreOverlay(): Promise<void> {
@@ -193,7 +173,6 @@ export default function App() {
       })
     } catch (error) {
       failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
-      return
     }
   }
 
@@ -202,7 +181,7 @@ export default function App() {
       <MinimizedSessionBar
         errorMessage={errorMessage}
         isSubmitting={isSubmitting}
-        latestStructuredResponse={latestStructuredResponse}
+        latestResponseText={latestResponseText}
         minimizedVariant={minimizedVariant}
         onAskAnother={() => {
           void handleSetMinimizedVariant('prompt-input')
@@ -213,8 +192,8 @@ export default function App() {
         onSetPromptOpen={(isOpen) => {
           void handleSetMinimizedVariant(isOpen ? 'prompt-input' : 'compact')
         }}
-        onSubmitPrompt={(text) => {
-          void handleSubmitPrompt(text)
+        onSubmitPrompt={(nextText) => {
+          void handleSubmitPrompt(nextText)
         }}
         onStop={() => {
           void handleStopSession()
@@ -233,8 +212,8 @@ export default function App() {
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}
-        onSubmitPrompt={(text) => {
-          void handleSubmitPrompt(text)
+        onSubmitPrompt={(nextText) => {
+          void handleSubmitPrompt(nextText)
         }}
         onStop={() => {
           void handleStopSession()

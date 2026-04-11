@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import type { StructuredResponse } from '../../shared/types'
 import SessionPromptComposer from './SessionPromptComposer'
 
 interface MinimizedPromptPanelProps {
   errorMessage: string | null
   isSubmitting: boolean
   isShowingResponse: boolean
-  latestStructuredResponse: StructuredResponse | null
+  latestResponseText: string | null
   onAskAnother: () => void
   onExpand: () => void
   onSubmitPrompt: (text: string) => void
@@ -16,7 +15,7 @@ export default function MinimizedPromptPanel({
   errorMessage,
   isSubmitting,
   isShowingResponse,
-  latestStructuredResponse,
+  latestResponseText,
   onAskAnother,
   onExpand,
   onSubmitPrompt,
@@ -32,8 +31,6 @@ export default function MinimizedPromptPanel({
   useEffect(() => {
     setIsComposing(!isShowingResponse)
   }, [isShowingResponse])
-
-  console.log(latestStructuredResponse)
 
   if (isComposing) {
     return (
@@ -62,27 +59,13 @@ export default function MinimizedPromptPanel({
         <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-slate-800 bg-slate-950/45 p-4">
           {errorMessage !== null ? (
             <p className="text-sm leading-6 text-red-300">{errorMessage}</p>
-          ) : latestStructuredResponse !== null ? (
+          ) : latestResponseText !== null && latestResponseText.length > 0 ? (
             <div className="no-drag flex h-full min-h-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200">
-                <div className="space-y-3">
-                  {/* <div>
-                    <p className="mt-1 whitespace-pre-wrap">{latestStructuredResponse.summary}</p>
-                  </div> */}
-                  <div>
-                    <p className="mt-1 whitespace-pre-wrap">{latestStructuredResponse.answer}</p>
-                  </div>
-                  {/* <div>
-                    <ul className="mt-1 space-y-1">
-                      {latestStructuredResponse.key_points.map((point) => (
-                        <li key={point}>{point}</li>
-                      ))}
-                    </ul>
-                  </div> */}
-                </div>
+                <p className="whitespace-pre-wrap">{latestResponseText}</p>
               </div>
             </div>
-        ) : (
+          ) : (
             <p className="text-sm leading-6 text-slate-400">
               Ask about the current screen to get a response here.
             </p>

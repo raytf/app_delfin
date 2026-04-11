@@ -1,10 +1,10 @@
-import type { MinimizedOverlayVariant, StructuredResponse } from '../../shared/types'
+import type { MinimizedOverlayVariant } from '../../shared/types'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null
   isSubmitting: boolean
-  latestStructuredResponse: StructuredResponse | null
+  latestResponseText: string | null
   minimizedVariant: MinimizedOverlayVariant
   onAskAnother: () => void
   onOpen: () => void
@@ -58,7 +58,7 @@ function EndIcon() {
 export default function MinimizedSessionBar({
   errorMessage,
   isSubmitting,
-  latestStructuredResponse,
+  latestResponseText,
   minimizedVariant,
   onAskAnother,
   onOpen,
@@ -80,7 +80,7 @@ export default function MinimizedSessionBar({
             errorMessage={errorMessage}
             isSubmitting={isSubmitting}
             isShowingResponse={minimizedVariant === 'prompt-response'}
-            latestStructuredResponse={latestStructuredResponse}
+            latestResponseText={latestResponseText}
             onAskAnother={onAskAnother}
             onExpand={onOpen}
             onSubmitPrompt={onSubmitPrompt}
