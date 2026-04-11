@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (minimized waveform continuity restored across processing/TTS with automatic return to compact mode)
+> Last updated: 2026-04-11 (Parlor-style Kokoro TTS upgraded with MLX/ONNX backend selection, auto-download, richer audio metadata, and WSL2 espeak-ng fix)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -35,7 +35,7 @@
 | `sidecar/prompts/lecture_slide.py` | ✅ | Answer-first plain prose; Key Points + conditional Hints sections; no tool-call instructions |
 | `sidecar/prompts/generic_screen.py` | ✅ | Description + Key Elements plain prose; no tool-call instructions |
 | `sidecar/prompts/presets.py` | ✅ | Registry: `preset_id → system prompt` |
-| `sidecar/tts.py` — TTS pipeline | ⚠️ | Placeholder — `generate()` returns empty array |
+| `sidecar/tts.py` — TTS pipeline | ✅ | Polymorphic MLX/ONNX pipeline with HF auto-download, env-configurable voice/speed, and Linux/WSL2 espeak-ng patch |
 | Conversation history trimming | ❌ | Not implemented (nice-to-have, Phase 6) |
 
 ---
@@ -160,19 +160,21 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| `sidecar/tts.py` — real `TTSPipeline` (kokoro-onnx backend + `none` fallback) | ✅ | Kokoro backend implemented; falls back to renderer TTS when unavailable |
-| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ✅ | Reads configurable model + voices paths from env |
+| `sidecar/tts.py` — real `TTSPipeline` (MLX on Apple Silicon, ONNX elsewhere, `none` fallback) | ✅ | Auto-selects MLX on macOS arm64 and falls back to ONNX/web-speech as needed |
+| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ✅ | Supports local override paths and auto-downloads missing model files from HuggingFace |
+| `sidecar/tts.py` — `KOKORO_VOICE` / `KOKORO_SPEED` env vars | ✅ | Voice and speaking rate are configurable from `.env` |
 | `sidecar/server.py` — accumulate `full_text` during token stream | ✅ | Used to synthesize TTS after the token stream completes |
-| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` after `done` | ✅ | Streams sentence-sized audio chunks when server-side TTS is available |
-| `.env.example` — `KOKORO_MODEL_PATH`, `KOKORO_VOICES_PATH` | ✅ | Documented in `.env.example` |
+| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` before `done` | ✅ | Matches Parlor-style ordering so the turn only completes after audio finishes |
+| `sidecar/server.py` — audio metadata (`sample_rate`, `sentence_count`, `index`, `tts_time`) | ✅ | Sidecar now includes playback/perf metadata in TTS messages |
+| `.env.example` — Kokoro env vars | ✅ | Documents backend selection, voice/speed, and auto-download behavior |
 
 ### Step 7 — Web Audio API playback in renderer
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ✅ | Starts audio playback state and raises VAD threshold |
-| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ✅ | Decodes/schedules PCM chunks with Web Audio API |
-| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ✅ | Resets playback state and lowers VAD threshold |
+| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ✅ | Starts audio playback state, stores dynamic sample rate, and raises VAD threshold |
+| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ✅ | Decodes/schedules PCM chunks with server-provided sample rate metadata |
+| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ✅ | Resets playback state, lowers VAD threshold, and logs synthesis timing |
 | Audio IPC listeners cleaned up in `useEffect` return | ✅ | Removes all sidecar/capture listeners on cleanup |
 
 ### Step 8 — Barge-in + Web Speech fallback

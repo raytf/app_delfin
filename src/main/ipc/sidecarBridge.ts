@@ -74,19 +74,24 @@ export function registerSidecarBridge(
         case "audio_start":
           mainWindow.webContents.send(
             MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START,
+            {
+              sampleRate: message.sample_rate ?? 24_000,
+              sentenceCount: message.sentence_count ?? 0,
+            },
           );
           return;
         case "audio_chunk":
           if (message.audio !== undefined) {
             mainWindow.webContents.send(
               MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK,
-              { audio: message.audio },
+              { audio: message.audio, index: message.index },
             );
           }
           return;
         case "audio_end":
           mainWindow.webContents.send(
             MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END,
+            { ttsTime: message.tts_time ?? 0 },
           );
           return;
         case "done":

@@ -87,6 +87,7 @@ export default function App() {
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
   const audioStreamActiveRef = useRef(false)
+  const audioSampleRateRef = useRef(24_000)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
@@ -208,7 +209,7 @@ export default function App() {
     try {
       let audioContext = audioContextRef.current
       if (audioContext === null || audioContext.state === 'closed') {
-        audioContext = new AudioContext({ sampleRate: 24_000 })
+        audioContext = new AudioContext({ sampleRate: audioSampleRateRef.current })
         audioContextRef.current = audioContext
         const gainNode = audioContext.createGain()
         const analyser = audioContext.createAnalyser()
@@ -525,7 +526,7 @@ export default function App() {
       appendAssistantText(data.text)
     })
 
-    window.api.onSidecarAudioStart(() => {
+    window.api.onSidecarAudioStart((data) => {
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
@@ -533,6 +534,7 @@ export default function App() {
       aiStreamingStartedRef.current = true
       audioStartedForTurnRef.current = true
       audioStreamActiveRef.current = true
+      audioSampleRateRef.current = data.sampleRate
       setAudioPlayingState(true)
       raiseThreshold()
       void ensureAudioContext().then(() => {
@@ -548,7 +550,7 @@ export default function App() {
             return
           }
 
-          const audioBuffer = decodeAudioChunk(data.audio, audioContext)
+          const audioBuffer = decodeAudioChunk(data.audio, audioContext, audioSampleRateRef.current)
           const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
           const sourceNode = audioContext.createBufferSource()
           sourceNode.buffer = audioBuffer
@@ -571,8 +573,11 @@ export default function App() {
         .catch(() => { })
     })
 
-    window.api.onSidecarAudioEnd(() => {
+    window.api.onSidecarAudioEnd((data) => {
       audioStreamActiveRef.current = false
+      if (data.ttsTime > 0) {
+        console.debug(`[App] TTS synthesis took ${data.ttsTime}s`)
+      }
       if (audioSourceNodesRef.current.size === 0) {
         finishAudioPlayback()
       }

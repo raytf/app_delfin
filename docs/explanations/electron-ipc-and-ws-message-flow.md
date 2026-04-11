@@ -78,9 +78,12 @@ Tokens come out of the model one at a time. Each one is sent immediately:
 await ws.send_json({"type": "token", "text": chunk})
 ```
 
-When the stream ends:
+When the stream ends, the sidecar may optionally emit server-side TTS messages before the final `done`:
 
 ```python
+await ws.send_json({"type": "audio_start", "sample_rate": 24000, "sentence_count": 3})
+await ws.send_json({"type": "audio_chunk", "audio": "...", "index": 0})
+await ws.send_json({"type": "audio_end", "tts_time": 0.72})
 await ws.send_json({"type": "done"})
 ```
 
@@ -99,6 +102,15 @@ switch (message.type) {
   case 'token':
     sessionPersistence.appendAssistantToken(message.text)   // write to disk
     mainWindow.webContents.send('sidecar:token', { text: message.text })
+    break
+  case 'audio_start':
+    mainWindow.webContents.send('sidecar:audio_start', { sampleRate: 24000, sentenceCount: 3 })
+    break
+  case 'audio_chunk':
+    mainWindow.webContents.send('sidecar:audio_chunk', { audio: '...', index: 0 })
+    break
+  case 'audio_end':
+    mainWindow.webContents.send('sidecar:audio_end', { ttsTime: 0.72 })
     break
   case 'done':
     sessionPersistence.finishAssistantResponse()
@@ -135,7 +147,7 @@ window.api.onSidecarToken((data) => {
 
 Because the Zustand store mutated, every component subscribed to `messages` re-renders. The assistant bubble in the chat list shows the accumulated text so far. This cycle repeats for every token — typically dozens of times per second.
 
-When `done` arrives, `finishAssistantResponse()` sets `isSubmitting: false` and clears `activeAssistantMessageId`. The assistant bubble is now final.
+When `done` arrives, `finishAssistantResponse()` sets `isSubmitting: false` and clears `activeAssistantMessageId`. If server-side TTS was enabled, that happens after `audio_start` / `audio_chunk*` / `audio_end`, so the assistant bubble becomes final only after playback metadata has been delivered.
 
 ---
 
@@ -155,7 +167,11 @@ handleSubmitPrompt()
   onSidecarToken fires
   appendAssistantText()
   [React re-renders]
-                          ←─ webContents.send('done') ─── sidecarBridge        ←─ {"type":"done"}
+                          ←─ webContents.send('audio_start') sidecarBridge      ←─ {"type":"audio_start",...}
+  onSidecarAudioStart fires
+                          ←─ webContents.send('audio_chunk') sidecarBridge      ←─ {"type":"audio_chunk",...}
+                          ←─ webContents.send('audio_end') ─ sidecarBridge      ←─ {"type":"audio_end",...}
+                          ←─ webContents.send('done') ────── sidecarBridge      ←─ {"type":"done"}
   onSidecarDone fires
   finishAssistantResponse()
   [isSubmitting = false]

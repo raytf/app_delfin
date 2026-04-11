@@ -88,14 +88,21 @@ async def handle_turn(
             await ws.send_json({"type": "token", "text": item})
 
         await executor_fut
+
+        # Stream TTS audio BEFORE sending done (Parlor pattern).
+        # This way the renderer knows the full turn (text + audio) is
+        # truly finished only when it receives "done".
+        try:
+            await maybe_stream_tts_audio(
+                ws=ws,
+                response_text="".join(full_text_parts),
+                interrupted=interrupted,
+            )
+        except Exception as tts_exc:
+            logger.warning("[handle_turn] TTS error (non-fatal, inference already delivered): %s", tts_exc)
+
         await ws.send_json({"type": "done"})
         logger.info("[handle_turn] done sent")
-
-        await maybe_stream_tts_audio(
-            ws=ws,
-            response_text="".join(full_text_parts),
-            interrupted=interrupted,
-        )
 
     except Exception as exc:
         logger.exception("Inference error: %s", exc)
@@ -110,7 +117,7 @@ async def maybe_stream_tts_audio(
     response_text: str,
     interrupted: asyncio.Event,
 ) -> None:
-    """Optionally synthesise and stream TTS audio after text generation."""
+    """Optionally synthesise and stream TTS audio before done."""
     if interrupted.is_set() or tts_pipeline is None or not tts_pipeline.is_available():
         return
 
@@ -118,11 +125,18 @@ async def maybe_stream_tts_audio(
     if not sentences:
         return
 
-    loop = asyncio.get_running_loop()
-    await ws.send_json({"type": "audio_start"})
+    import time
 
+    loop = asyncio.get_running_loop()
+    await ws.send_json({
+        "type": "audio_start",
+        "sample_rate": tts_pipeline.sample_rate,
+        "sentence_count": len(sentences),
+    })
+
+    tts_start = time.monotonic()
     try:
-        for sentence in sentences:
+        for i, sentence in enumerate(sentences):
             if interrupted.is_set():
                 break
 
@@ -133,9 +147,11 @@ async def maybe_stream_tts_audio(
                 continue
 
             audio_b64 = base64.b64encode(pcm.tobytes()).decode("ascii")
-            await ws.send_json({"type": "audio_chunk", "audio": audio_b64})
+            await ws.send_json({"type": "audio_chunk", "audio": audio_b64, "index": i})
     finally:
-        await ws.send_json({"type": "audio_end"})
+        tts_time = round(time.monotonic() - tts_start, 3)
+        await ws.send_json({"type": "audio_end", "tts_time": tts_time})
+        logger.info("[TTS] streamed %d sentences in %.3fs", len(sentences), tts_time)
 
 
 # ---------------------------------------------------------------------------

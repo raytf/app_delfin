@@ -121,39 +121,23 @@ import numpy as np
 class TTSPipeline:
     def __init__(self):
         backend = os.environ.get("TTS_BACKEND", "web-speech")
-        
-        if backend == "kokoro":
-            try:
-                from kokoro_onnx import Kokoro
-                self.model = Kokoro("kokoro-v1.0.onnx", "voices.bin")
-                self._backend = "kokoro"
-            except Exception as e:
-                print(f"kokoro-onnx init failed: {e}, TTS disabled")
-                self._backend = "none"
-        elif backend == "mlx":
-            try:
-                import mlx_audio
-                self._backend = "mlx"
-            except Exception as e:
-                print(f"mlx-audio init failed: {e}, TTS disabled")
-                self._backend = "none"
+        self.voice = os.environ.get("KOKORO_VOICE", "af_heart")
+        self.speed = float(os.environ.get("KOKORO_SPEED", "1.1"))
+
+        if backend == "kokoro" and is_apple_silicon():
+            self._backend = MLXBackend()   # Apple GPU
+        elif backend == "kokoro":
+            self._backend = ONNXBackend()  # CPU, auto-download via HF
         else:
-            # web-speech or none — TTS handled client-side or disabled
-            self._backend = "none"
+            self._backend = None
     
     def is_available(self) -> bool:
         return self._backend != "none"
     
     def generate(self, text: str) -> np.ndarray:
-        if self._backend == "kokoro":
-            samples, _ = self.model.create(text, voice="af_heart", speed=1.0)
-            return (samples * 32767).astype(np.int16)
-        elif self._backend == "mlx":
-            # mlx-audio implementation
-            # Return int16 PCM samples
-            raise NotImplementedError("mlx-audio TTS not yet implemented")
-        else:
+        if self._backend is None:
             return np.array([], dtype=np.int16)
+        return self._backend.generate(text, voice=self.voice, speed=self.speed)
 ```
 
 ### Wire TTS into handle_turn
@@ -167,9 +151,13 @@ if tts_pipeline and tts_pipeline.is_available():
     # Split into sentences
     sentences = re.split(r'(?<=[.!?])\s+', response_text)
     
-    await ws.send_json({"type": "audio_start"})
+    await ws.send_json({
+        "type": "audio_start",
+        "sample_rate": tts_pipeline.sample_rate,
+        "sentence_count": len(sentences),
+    })
     
-    for sentence in sentences:
+    for index, sentence in enumerate(sentences):
         if interrupt.is_set():
             break
         if not sentence.strip():
@@ -177,9 +165,10 @@ if tts_pipeline and tts_pipeline.is_available():
         
         pcm = await loop.run_in_executor(None, tts_pipeline.generate, sentence)
         b64 = base64.b64encode(pcm.tobytes()).decode()
-        await ws.send_json({"type": "audio_chunk", "audio": b64})
+        await ws.send_json({"type": "audio_chunk", "audio": b64, "index": index})
     
-    await ws.send_json({"type": "audio_end"})
+    await ws.send_json({"type": "audio_end", "tts_time": elapsed})
+    await ws.send_json({"type": "done"})
 ```
 
 ## 5.3 Audio playback (renderer)
@@ -196,11 +185,11 @@ let isPlaying = false;
 
 function initAudio() {
   if (!audioContext) {
-    audioContext = new AudioContext({ sampleRate: 24000 }); // kokoro default
+    audioContext = new AudioContext({ sampleRate: sampleRateFromAudioStart });
   }
 }
 
-function decodeAudioChunk(base64Pcm: string): AudioBuffer {
+function decodeAudioChunk(base64Pcm: string, sampleRate: number): AudioBuffer {
   const bytes = Uint8Array.from(atob(base64Pcm), c => c.charCodeAt(0));
   const int16 = new Int16Array(bytes.buffer);
   const float32 = new Float32Array(int16.length);
@@ -209,7 +198,7 @@ function decodeAudioChunk(base64Pcm: string): AudioBuffer {
     float32[i] = int16[i] / 32768;
   }
   
-  const buffer = audioContext!.createBuffer(1, float32.length, 24000);
+  const buffer = audioContext!.createBuffer(1, float32.length, sampleRate);
   buffer.getChannelData(0).set(float32);
   return buffer;
 }
@@ -254,7 +243,7 @@ function speakText(text: string) {
 }
 ```
 
-When `sidecar:structured` arrives and no `audio_start` follows within 500ms, trigger Web Speech on the answer text. This provides TTS on all platforms with zero server-side setup.
+When `sidecar:done` arrives and no `audio_start` followed for that turn, trigger Web Speech on the final assistant text. This provides TTS on all platforms with zero server-side setup.
 
 ### UI: TTS indicator / waveform
 
@@ -281,8 +270,8 @@ In the renderer, show a reusable waveform component that:
 - [ ] Rapidly advance slides (click through 3 slides in 2 seconds) — only the final stable slide is captured (debounce works)
 - [ ] The same slide content does not re-trigger capture (hash diffing works)
 - [ ] Disable auto-refresh: click "Auto" again — polling stops
-- [ ] With `TTS_ENABLED=true` and `TTS_BACKEND=kokoro` on Linux/WSL2: after a response, audio plays from the sidecar
-- [ ] Audio plays sentence by sentence — first sentence starts before all sentences are generated
+- [x] With `TTS_ENABLED=true` and `TTS_BACKEND=kokoro` on Linux/WSL2: after a response, audio plays from the sidecar
+- [x] Audio plays sentence by sentence — first sentence starts before all sentences are generated
 - [ ] Clicking Stop while audio is playing stops both the inference and audio playback
 - [ ] With `TTS_BACKEND=web-speech`: after a structured response, the browser's speech synthesis reads the answer (no sidecar audio)
 - [ ] With `TTS_ENABLED=false`: no audio plays at all

@@ -60,16 +60,16 @@ const api: ElectronAPI = {
   onSidecarToken: (cb: (data: { text: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, (_event, data) => cb(data)),
 
-  onSidecarAudioStart: (cb: () => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START, () => cb()),
+  onSidecarAudioStart: (cb: (data: { sampleRate: number; sentenceCount: number }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START, (_event, data) => cb(data)),
 
-  onSidecarAudioChunk: (cb: (data: { audio: string }) => void) =>
+  onSidecarAudioChunk: (cb: (data: { audio: string; index?: number }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK, (_event, data) =>
       cb(data),
     ),
 
-  onSidecarAudioEnd: (cb: () => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END, () => cb()),
+  onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END, (_event, data) => cb(data)),
 
   onSidecarDone: (cb: () => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE, () => cb()),
