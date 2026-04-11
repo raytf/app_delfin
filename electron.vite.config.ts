@@ -7,6 +7,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 // Relative to project root — consistent across all machines since npm always
 // installs packages under node_modules/ at the repo root.
 const vadDist = 'node_modules/@ricky0123/vad-web/dist'
+const ortDist = 'node_modules/onnxruntime-web/dist'
 
 export default defineConfig({
   main: {
@@ -41,9 +42,13 @@ export default defineConfig({
       // out/renderer/ alongside index.html.
       viteStaticCopy({
         targets: [
+          // VAD AudioWorklet + Silero ONNX models
           { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: '.' },
           { src: `${vadDist}/silero_vad_v5.onnx`, dest: '.' },
           { src: `${vadDist}/silero_vad_legacy.onnx`, dest: '.' },
+          // ONNX Runtime WASM binaries required by onnxruntime-web inside vad-web
+          { src: `${ortDist}/ort-wasm-simd-threaded.wasm`, dest: '.' },
+          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.wasm`, dest: '.' },
         ],
       }),
     ],
