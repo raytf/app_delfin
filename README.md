@@ -1,8 +1,96 @@
-# Screen Copilot
+# Delfin
 
-A local, privacy-first AI desktop sidebar that captures your screen and explains what it sees — powered by Gemma 4 via LiteRT-LM, running entirely on-device with no cloud, no login, and no API costs.
+A live, voice-based study assistant that understands your screen context — fully local, private, and no API token costs. Powered by Gemma 4 via LiteRT-LM, running entirely on-device.
 
-**Primary demo: Lecture Slide Explainer** — point the sidebar at any lecture slide to get a plain-English summary, jargon explanations, and quiz questions, streamed in real time.
+Point Delfin at any lecture slide, textbook page, or study material. Ask questions by voice or text — get plain-English explanations, summaries, and quiz questions streamed back in real time with text-to-speech readback.
+
+**GitHub:** [github.com/raytf/app_delfin](https://github.com/raytf/app_delfin)
+
+---
+
+## Quickstart
+
+> **Prerequisites:** [Node.js 20+](https://nodejs.org/) and [Python 3.12+](https://www.python.org/downloads/).
+
+```bash
+git clone https://github.com/raytf/app_delfin.git
+cd app_delfin
+npm install
+npm run setup          # creates .env, sets up Python venv, downloads TTS models (~340 MB)
+npm run dev:full       # starts everything — sidecar + Electron app
+```
+
+That's it. A sidebar window will appear on the right side of your screen. Open any lecture slide or study material, then click **Start Studying** and ask a question by voice or text.
+
+> **No model or GPU?** Use `npm run dev:mock` instead of `dev:full` to run the UI against a mock sidecar — no Python, no model download needed.
+
+---
+
+## Setup (detailed)
+
+The quickstart above runs `npm run setup`, which does these steps automatically:
+
+1. **`npm run init:env`** — copies `.env.example` → `.env` (skipped if `.env` already exists)
+2. **`npm run setup:sidecar`** — creates a Python 3.12 venv in `sidecar/.venv` and installs dependencies
+3. **`npm run download:models`** — downloads Kokoro TTS model files (~340 MB total) into `sidecar/`
+4. **`npm run check:env`** — warns about any missing `.env` keys
+
+You only need to run `npm run setup` once. After that, just use `npm run dev:full`.
+
+### Environment variables
+
+The defaults work out of the box for most setups. Edit `.env` only if you need to change something:
+
+| Variable | Default | When to change |
+|---|---|---|
+| `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | On WSL2: replace `localhost` with your WSL IP (run `hostname -I`) |
+| `LITERT_BACKEND` | `CPU` | Set to `GPU` if you have a supported GPU |
+| `MODEL_REPO` | `litert-community/gemma-4-E2B-it-litert-lm` | Switch to `E4B` variant on 32 GB machines |
+| `TTS_BACKEND` | `kokoro` | Set to `web-speech` to skip Kokoro model downloads |
+
+See [`.env.example`](.env.example) for the full list with documentation.
+
+### Manual sidecar setup (if `npm run setup:sidecar` fails)
+
+```bash
+cd sidecar
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt   # Linux / macOS
+# or: .venv\Scripts\pip install -r requirements.txt   # Windows
+```
+
+---
+
+## Running the app
+
+| Command | What it does |
+|---|---|
+| `npm run dev:full` | Starts the real sidecar + Electron app together (recommended) |
+| `npm run dev:mock` | Starts a mock sidecar + Electron app — no model needed, great for UI work |
+| `npm run dev` | Electron + Vite only (run your own sidecar separately) |
+
+All commands show labelled, colour-coded output in one terminal. Press **Ctrl-C** to stop.
+
+### Start the sidecar separately (advanced)
+
+```bash
+cd sidecar
+.venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8321
+```
+
+Verify it is running:
+
+```bash
+curl http://localhost:8321/health
+# → {"status":"ok","model_loaded":true,...}
+```
+
+### Verify your environment
+
+```bash
+bash scripts/setup-check.sh        # Linux / macOS
+.\scripts\setup-check.ps1          # Windows PowerShell
+```
 
 ---
 
@@ -28,146 +116,10 @@ Electron Main (Node.js)  ←→  WebSocket ws://localhost:8321/ws  ←→  Pytho
 
 ---
 
-## Prerequisites
-
-| Requirement | Minimum version | Notes |
-|---|---|---|
-| Node.js | 20+ | For Electron + Vite |
-| Python | 3.12+ | For the FastAPI sidecar |
-| pip / venv | bundled with Python | Used by the sidecar setup script |
-
-Run the setup checker at any time to verify your environment:
-
-```bash
-bash scripts/setup-check.sh        # Linux / macOS
-.\scripts\setup-check.ps1          # Windows PowerShell
-```
-
----
-
-## Setup
-
-### 1. Clone and install frontend dependencies
-
-```bash
-git clone <repo-url>
-cd screen-copilot
-npm install
-```
-
-### 2. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and adjust the values for your machine. The defaults work for most setups — the only thing you may need to change is `SIDECAR_WS_URL` on WSL2 (replace `localhost` with the WSL2 IP from `hostname -I`).
-
-Key variables:
-
-| Variable | Default | Description |
-|---|---|---|
-| `MODEL_REPO` | `litert-community/gemma-4-E2B-it-litert-lm` | HuggingFace model repo |
-| `MODEL_FILE` | `gemma-4-E2B-it.litertlm` | Model filename inside the repo |
-| `SIDECAR_PORT` | `8321` | Port the sidecar listens on |
-| `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | WebSocket URL used by Electron |
-| `LITERT_BACKEND` | `CPU` | Inference backend (`CPU`, `GPU`) |
-| `TTS_ENABLED` | `true` | Enable text-to-speech readback |
-| `TTS_BACKEND` | `kokoro` | TTS engine (`kokoro`, `web-speech`) |
-| `KOKORO_MODEL_PATH` | `kokoro-v1.0.onnx` | Path to Kokoro ONNX model (relative to `sidecar/`) |
-| `KOKORO_VOICES_PATH` | `voices-v1.0.bin` | Path to Kokoro voice embeddings (relative to `sidecar/`) |
-
-See `.env.example` for the full list with documentation.
-
-### 3. Set up the Python sidecar
-
-```bash
-npm run setup:sidecar
-```
-
-This creates a Python 3.12 virtual environment in `sidecar/.venv` and installs all Python dependencies. You only need to run this once (or after updating `sidecar/requirements.txt`).
-
-To install manually:
-
-```bash
-cd sidecar
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-```
-
-### 4. Download Kokoro TTS model files
-
-```bash
-npm run download:models
-```
-
-This downloads `kokoro-v1.0.onnx` (~311 MB) and `voices-v1.0.bin` (~27 MB) from the [kokoro-onnx GitHub release](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) into `sidecar/`. Files that already exist are skipped automatically.
-
-> **Note:** These files are not committed to the repository. Every team member must run this step once. The files are gitignored to keep the repo lightweight.
-
-Alternatively, run **all** setup steps at once:
-
-```bash
-npm run setup   # npm install + setup:sidecar + download:models
-```
-
----
-
-## Running the app
-
-### Start everything (recommended)
-
-```bash
-npm run dev:full
-```
-
-This launches the Python sidecar and the Electron + Vite dev server together. Their output is labelled and colour-coded in the same terminal. Press **Ctrl-C** to stop both.
-
-### Start Electron only (with mock sidecar)
-
-Useful when iterating on the UI without needing the real model:
-
-```bash
-# Terminal 1 — mock sidecar (no model required)
-node scripts/mock-sidecar.js
-
-# Terminal 2 — Electron + Vite
-npm run dev
-```
-
-### Start the real sidecar separately
-
-```bash
-cd sidecar
-.venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8321
-```
-
-Verify it is running:
-
-```bash
-curl http://localhost:8321/health
-# → {"status":"ok","model_loaded":true,...}
-```
-
----
-
-## Development
-
-### Test the WebSocket protocol manually
-
-```bash
-# Install wscat globally if needed
-npm i -g wscat
-
-wscat -c ws://localhost:8321/ws
-# Then type:
-{"text": "Summarize this slide", "preset_id": "lecture-slide"}
-```
-
-### Project structure
+## Project structure
 
 ```
-screen-copilot/
+delfin/
 ├── src/
 │   ├── main/          # Electron main process (capture, IPC, WebSocket client)
 │   ├── preload/       # contextBridge bindings
@@ -179,11 +131,35 @@ screen-copilot/
 │   ├── prompts/       # Preset prompt templates
 │   ├── tts.py
 │   └── requirements.txt
-├── scripts/           # Dev utilities (setup check, mock sidecar)
-├── demo-content/      # Sample lecture slides for testing
+├── scripts/           # Dev utilities (setup, mock sidecar, env check)
 ├── docs/              # Architecture spec and phase implementation plans
-├── .env.example       # Environment variable reference (copy to .env)
+├── .env.example       # Environment variable reference (auto-copied to .env)
 └── package.json
+```
+
+---
+
+## Development
+
+### npm scripts reference
+
+| Script | Description |
+|---|---|
+| `npm run setup` | One-time setup: init .env, Python venv, download TTS models |
+| `npm run dev:full` | Start sidecar + Electron (real model) |
+| `npm run dev:mock` | Start mock sidecar + Electron (no model needed) |
+| `npm run dev` | Electron + Vite only |
+| `npm run build` | Production build (also validates VAD runtime assets) |
+| `npm test` | Run Vitest unit tests |
+| `npm run check:env` | Warn about missing .env keys |
+
+### Test the WebSocket protocol manually
+
+```bash
+npm i -g wscat
+wscat -c ws://localhost:8321/ws
+# Then type:
+{"text": "Summarize this slide", "preset_id": "lecture-slide"}
 ```
 
 ### Build for production
@@ -191,6 +167,16 @@ screen-copilot/
 ```bash
 npm run build
 ```
+
+---
+
+## WSL2 notes
+
+If you're developing inside WSL2:
+
+- **Sidecar URL:** Replace `localhost` in `SIDECAR_WS_URL` with your WSL2 IP address (run `hostname -I` inside WSL2).
+- **Screen capture:** Electron's `desktopCapturer` cannot enumerate Windows windows from inside WSL2. Delfin falls back to full-screen capture automatically.
+- **espeak-ng:** The Kokoro TTS pipeline patches the espeak-ng data path on WSL2/Linux automatically. No manual setup needed.
 
 ---
 
