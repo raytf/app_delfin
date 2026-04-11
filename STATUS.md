@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (local VAD runtime contract fix validated)
+> Last updated: 2026-04-11 (local VAD runtime contract fix confirmed working)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -97,7 +97,7 @@
 
 ## Phase 5 — Voice Pipeline + TTS
 
-> **Approach revised (2026-04-11):** Voice is now the *default* input mode. When a session starts, always-on VAD (Silero via `@ricky0123/vad-web`) listens for speech. The browser runtime is self-hosted from `vad-runtime/` via local script tags (`ort.wasm.min.js` + `bundle.min.js`) instead of importing VAD/ORT through the Vite module graph, and `useVAD` now resolves `baseAssetPath` / `onnxWASMBasePath` to an absolute `vad-runtime/` URL to avoid duplicated relative paths in dev. On speech end, a WAV blob + screen capture are sent to the sidecar. Gemma 4 processes audio natively. TTS streams response audio back as chunks. Manual text entry remains alongside. Auto-refresh remains a lower-priority stretch goal.
+> **Approach revised (2026-04-11):** Voice is now the *default* input mode. When a session starts, always-on VAD (Silero via `@ricky0123/vad-web`) listens for speech. The browser runtime is self-hosted from `vad-runtime/` via local script tags (`ort.wasm.min.js` + `bundle.min.js`) instead of importing VAD/ORT through the Vite module graph, and `useVAD` resolves `baseAssetPath` / `onnxWASMBasePath` to an absolute `vad-runtime/` URL to avoid duplicated relative paths in dev. This local-runtime contract is now confirmed working. On speech end, a WAV blob + screen capture are sent to the sidecar. Gemma 4 processes audio natively. TTS streams response audio back as chunks. Manual text entry remains alongside. Auto-refresh remains a lower-priority stretch goal.
 
 ### Step 1 — Dependencies + WASM asset serving
 
