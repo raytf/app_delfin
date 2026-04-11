@@ -131,7 +131,18 @@ async def handle_turn(
     if msg.get("image"):
         blob = resize_image_blob(msg["image"])
         content.append({"type": "image", "blob": blob})
-    content.append({"type": "text", "text": msg.get("text", "")})
+
+    if msg.get("audio"):
+        blob = msg["audio"]
+        content.append({"type": "audio", "blob": blob})
+
+    text = msg.get("text")
+    if isinstance(text, str) and text.strip():
+        content.append({"type": "text", "text": text})
+
+    if not content:
+        await ws.send_json({"type": "error", "message": "Request must include text, image, or audio."})
+        return
 
     try:
         loop = asyncio.get_event_loop()
