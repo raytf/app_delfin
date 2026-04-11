@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { User, Layers3 } from 'lucide-react'
 import type { ChatMessage } from '../../shared/types'
+import delfinLogo from '../assets/logo-alt.png'
 
 interface SessionConversationProps {
   className?: string
@@ -9,23 +10,14 @@ interface SessionConversationProps {
   messages: ChatMessage[]
 }
 
-// Delfin avatar - a simple dolphin-inspired icon
 function DelfinAvatar() {
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-white">
-      <svg
-        className="h-4 w-4"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M2 12c.6-.5 1.2-1 2.3-1 2 0 3.5 2 5.5 2 1.5 0 2.7-.5 3.5-1.5" />
-        <path d="M19 8c-.6-.4-1.5-.8-2.5-.8-2 0-4 1.8-6.5 1.8-1 0-2-.3-2.8-.8" />
-        <circle cx="18" cy="6" r="2" />
-      </svg>
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)]">
+      <img
+        alt="Delfin"
+        className="h-6 w-6 object-contain"
+        src={delfinLogo}
+      />
     </div>
   )
 }
@@ -65,8 +57,12 @@ export default function SessionConversation({
     return (
       <div className={`flex items-center justify-center p-8 ${className ?? ''}`}>
         <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary-soft)]">
-            <DelfinAvatar />
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)]">
+            <img
+              alt="Delfin"
+              className="h-14 w-14 object-contain"
+              src={delfinLogo}
+            />
           </div>
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">
             {emptyMessage}

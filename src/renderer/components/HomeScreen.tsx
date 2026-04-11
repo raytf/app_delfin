@@ -44,7 +44,7 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-8 py-12">
         {/* Hero Section - Centered */}
         <main className="flex flex-1 flex-col items-center justify-center pb-8 pt-4 text-center">
-          <div className="flex items-center gap-4 sm:gap-5">
+          <div className="flex items-center gap-2 sm:gap-2">
             <img
               alt="Delfin logo"
               className="h-28 w-28 object-contain sm:h-32 sm:w-32 mb-1"
