@@ -1,3 +1,4 @@
+import { MessageCircle, Maximize2, Square } from 'lucide-react'
 import type { MinimizedOverlayVariant } from '../../shared/types'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
 
@@ -11,48 +12,6 @@ interface MinimizedSessionBarProps {
   onSetPromptOpen: (isOpen: boolean) => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
-}
-
-function PromptIcon() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M12 4v16m8-8H4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  )
-}
-
-function ExpandIcon() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M9 4H4v5m11-5h5v5M20 15v5h-5M4 15v5h5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  )
-}
-
-function EndIcon() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M6 6l12 12M18 6 6 18"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  )
 }
 
 export default function MinimizedSessionBar({
@@ -69,12 +28,12 @@ export default function MinimizedSessionBar({
   const isPromptOpen = minimizedVariant !== 'compact'
 
   return (
-    <div className=" drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
+    <div className="drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
       <div
-        className={`flex h-full w-full flex-col overflow-hidden border border-[var(--border-soft)] bg-[var(--bg-overlay)] shadow-[0_24px_60px_var(--shadow-tint)] backdrop-blur-xl ${
+        className={`flex h-full w-full flex-col overflow-hidden bg-[var(--bg-overlay)] backdrop-blur-xl ${
           isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
         }`}
-      >
+        >
         {isPromptOpen ? (
           <MinimizedPromptPanel
             errorMessage={errorMessage}
@@ -87,32 +46,45 @@ export default function MinimizedSessionBar({
           />
         ) : null}
 
-        <div className={isPromptOpen ? 'drag-region mt-3 flex items-center justify-center gap-2' : 'drag-region flex items-center justify-center gap-2'}>
+        {/* Action Bar */}
+        <div
+          className={`drag-region flex items-center gap-1.5 ${
+            isPromptOpen ? 'mt-3 justify-center' : 'rounded-full bg-[var(--bg-surface)] p-1.5 shadow-sm'
+          }`}
+        >
+          {/* Ask Delfin - Primary Action */}
           <button
-            aria-label="Start prompt"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-            onClick={() => {
-              onSetPromptOpen(!isPromptOpen)
-            }}
+            aria-label="Ask Delfin"
+            className={`no-drag flex cursor-pointer items-center gap-2 rounded-full font-medium transition ${
+              isPromptOpen
+                ? 'h-10 w-10 justify-center border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+                : 'bg-[var(--primary)] px-4 py-2.5 text-sm text-white hover:bg-[var(--primary-hover)]'
+            }`}
+            onClick={() => onSetPromptOpen(!isPromptOpen)}
             type="button"
           >
-            <PromptIcon />
+            <MessageCircle size={18} />
+            {!isPromptOpen && <span>Ask Delfin</span>}
           </button>
+
+          {/* Expand - Secondary Action */}
           <button
             aria-label="Expand session"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+            className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
             onClick={onOpen}
             type="button"
           >
-            <ExpandIcon />
+            <Maximize2 size={18} />
           </button>
+
+          {/* End Session */}
           <button
             aria-label="End session"
-            className="no-drag flex h-11 w-11 items-center justify-center rounded-full bg-[var(--danger)] text-white transition hover:bg-[#b14d4d]"
+            className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[var(--danger)] text-white transition hover:bg-[var(--danger)]/80"
             onClick={onStop}
             type="button"
           >
-            <EndIcon />
+            <Square size={14} fill="currentColor" />
           </button>
         </div>
       </div>

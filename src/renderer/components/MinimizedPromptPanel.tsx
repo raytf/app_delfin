@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Maximize2 } from 'lucide-react'
 import SessionPromptComposer from './SessionPromptComposer'
 
 interface MinimizedPromptPanelProps {
@@ -38,12 +39,12 @@ export default function MinimizedPromptPanel({
     return (
       <SessionPromptComposer
         autoFocus
-        className="drag-region flex items-center gap-2"
+        className="flex items-center gap-2"
         isSubmitting={isSubmitting}
         onSubmitPrompt={(text) => {
           onSubmitPrompt(text)
         }}
-        placeholder="Ask about the current screen"
+        placeholder="Ask about what's on screen..."
         submitLabel="Send"
       />
     )
@@ -54,7 +55,7 @@ export default function MinimizedPromptPanel({
       <div className="flex h-full min-h-0 flex-1 items-center justify-center">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent-teal)] [animation-delay:150ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)] [animation-delay:150ms]" />
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:300ms]" />
         </div>
       </div>
@@ -73,7 +74,7 @@ export default function MinimizedPromptPanel({
       {!isSubmitting || hasResponseText ? (
         <div className="no-drag flex items-center gap-2">
           <button
-            className="flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            className="flex-1 cursor-pointer rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
             onClick={() => {
               onAskAnother()
             }}
@@ -82,10 +83,11 @@ export default function MinimizedPromptPanel({
             Ask Another
           </button>
           <button
-            className="rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+            className="flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
             onClick={onExpand}
             type="button"
           >
+            <Maximize2 size={16} />
             Expand
           </button>
         </div>
@@ -121,7 +123,7 @@ function StreamingResponseBody({
   }, [latestResponseText, scrollContainer])
 
   return (
-    <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[0_14px_32px_rgba(20,129,186,0.08)]">
+    <div className="min-h-[12rem] flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
       {errorMessage !== null ? (
         <p className="text-sm leading-6 text-[var(--danger)]">{errorMessage}</p>
       ) : latestResponseText !== null && latestResponseText.length > 0 ? (
@@ -134,8 +136,8 @@ function StreamingResponseBody({
           </div>
         </div>
       ) : (
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          Ask about the current screen to get a response here.
+        <p className="text-sm leading-6 text-[var(--text-muted)]">
+          Ask about what's on screen to get a response here.
         </p>
       )}
     </div>

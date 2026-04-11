@@ -35,7 +35,7 @@ export default function SessionPromptComposer({
   }
 
   return (
-    <div className='no-drag '>
+    <div className='no-drag'>
       <form className={className} onSubmit={handleSubmit}>
         {multiline ? (
           <textarea
