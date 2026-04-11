@@ -1,9 +1,12 @@
 import { app, BrowserWindow } from "electron";
+import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
+import { SessionPersistenceService } from "./session/sessionPersistenceService";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
 import { validateEnv } from "./envValidation";
+import { FileSessionStorage } from "./storage/fileSessionStorage";
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type MinimizedOverlayVariant,
@@ -19,6 +22,7 @@ let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
 let minimizedVariant: MinimizedOverlayVariant = "compact";
 let sessionMode: SessionMode = "home";
+let sessionPersistence: SessionPersistenceService | null = null;
 
 function createWindow(mode: OverlayMode): BrowserWindow {
   const window = createOverlayWindow(mode, minimizedVariant);
@@ -74,9 +78,13 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Screen Copilot started");
+  sessionPersistence = new SessionPersistenceService(
+    new FileSessionStorage(join(app.getPath("userData"), "storage")),
+  );
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
+    sessionPersistence,
     sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
     setMinimizedVariant,
     switchOverlayMode,
