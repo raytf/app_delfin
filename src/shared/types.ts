@@ -58,7 +58,7 @@ export interface WsInboundMessage {
 }
 
 // IPC channel names (as const for type safety)
-export const IPC_CHANNELS = {
+export const RENDERER_TO_MAIN_CHANNELS = {
   CAPTURE_NOW: 'capture:now',
   CAPTURE_AUTO_REFRESH: 'capture:auto-refresh',
   SIDECAR_SEND: 'sidecar:send',
@@ -70,6 +70,9 @@ export const IPC_CHANNELS = {
   SESSION_START: 'session:start',
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
+} as const
+
+export const MAIN_TO_RENDERER_CHANNELS = {
   FRAME_CAPTURED: 'frame:captured',
   SIDECAR_TOKEN: 'sidecar:token',
   SIDECAR_STRUCTURED: 'sidecar:structured',

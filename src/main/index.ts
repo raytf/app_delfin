@@ -4,7 +4,7 @@ import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
 import {
-  IPC_CHANNELS,
+  MAIN_TO_RENDERER_CHANNELS,
   type MinimizedOverlayVariant,
   type OverlayMode,
   type OverlayState,
@@ -23,7 +23,7 @@ function createWindow(mode: OverlayMode): BrowserWindow {
   overlayMode = mode;
   mainWindow = window;
   window.webContents.once("did-finish-load", () => {
-    window.webContents.send(IPC_CHANNELS.SIDECAR_STATUS, getSidecarStatus());
+    window.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, getSidecarStatus());
   });
   window.on("closed", () => {
     if (mainWindow === window) {

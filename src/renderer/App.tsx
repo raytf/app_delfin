@@ -3,7 +3,7 @@ import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import {
-  IPC_CHANNELS,
+  MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
   type MinimizedOverlayVariant,
   type OverlayMode,
@@ -68,12 +68,12 @@ export default function App() {
     })
 
     return () => {
-      window.api.removeAllListeners(IPC_CHANNELS.FRAME_CAPTURED)
-      window.api.removeAllListeners(IPC_CHANNELS.SIDECAR_TOKEN)
-      window.api.removeAllListeners(IPC_CHANNELS.SIDECAR_STRUCTURED)
-      window.api.removeAllListeners(IPC_CHANNELS.SIDECAR_DONE)
-      window.api.removeAllListeners(IPC_CHANNELS.SIDECAR_ERROR)
-      window.api.removeAllListeners(IPC_CHANNELS.SIDECAR_STATUS)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STRUCTURED)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
   }, [])
 
