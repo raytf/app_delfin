@@ -17,25 +17,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { float32ToWavBase64 } from '../utils/audioUtils'
 
-const VAD_RUNTIME_ASSET_PATH = './vad-runtime/'
-const ORT_WASM_MODULE_PATH = './vad-runtime/ort-wasm-simd-threaded.mjs'
-const ORT_WASM_BINARY_PATH = './vad-runtime/ort-wasm-simd-threaded.wasm'
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
 const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
 // Silero authors recommend negativeSpeechThreshold = positiveSpeechThreshold − 0.15
 const NEGATIVE_DELTA = 0.15
 const BARGE_IN_GRACE_MS = 800
 
-type OrtEnvWithWasmPaths = {
-  env?: {
-    wasm?: {
-      wasmPaths?: unknown
-    }
-  }
-}
-
-type VadMicVADOptionsWithOrtConfig = Partial<VadMicVADOptions> & {
-  ortConfig?: (ort: unknown) => void
+function getVadRuntimeBaseUrl(): string {
+  return new URL('./vad-runtime/', document.baseURI).href
 }
 
 export interface UseVADOptions {
@@ -90,31 +79,22 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       try {
         const vadRuntime = window.vad
         if (window.ort == null) {
-          throw new Error('window.ort is unavailable. Check ./vad-runtime/ort.min.js.')
+          throw new Error('window.ort is unavailable. Check ./vad-runtime/ort.wasm.min.js.')
         }
         if (vadRuntime?.MicVAD == null) {
           throw new Error('window.vad.MicVAD is unavailable. Check ./vad-runtime/bundle.min.js.')
         }
 
-        const vadOptions: VadMicVADOptionsWithOrtConfig = {
+        const runtimeBaseUrl = getVadRuntimeBaseUrl()
+
+        const vad = await vadRuntime.MicVAD.new({
           model: 'v5',
-          // Point at an app-owned runtime directory populated by
-          // vite-plugin-static-copy. Using a stable relative path keeps this
-          // working in both dev (http://localhost:5173/...) and production
-          // (file://...) without depending on runtime node_modules URLs.
-          baseAssetPath: VAD_RUNTIME_ASSET_PATH,
-          // vad-web assigns ort.env.wasm.wasmPaths before calling ortConfig().
-          // Override it explicitly with concrete module/binary URLs so ORT does
-          // not resolve either file relative to the wrong base path.
-          ortConfig: (ort) => {
-            const runtime = ort as OrtEnvWithWasmPaths
-            runtime.env ??= {}
-            runtime.env.wasm ??= {}
-            runtime.env.wasm.wasmPaths = {
-              mjs: ORT_WASM_MODULE_PATH,
-              wasm: ORT_WASM_BINARY_PATH,
-            }
-          },
+          // Follow the upstream browser contract closely: serve the VAD worklet,
+          // ONNX model, and ORT wasm/mjs files from one absolute base URL. Using
+          // a fully-qualified URL avoids duplicated relative-path resolution like
+          // /vad-runtime/vad-runtime/... in dev while also working under file://.
+          baseAssetPath: runtimeBaseUrl,
+          onnxWASMBasePath: runtimeBaseUrl,
           positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
           negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
           preSpeechPadMs: 300,
@@ -134,9 +114,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
           onVADMisfire: () => {
             // Speech too short — ignore silently
           },
-        }
-
-        const vad = await vadRuntime.MicVAD.new(vadOptions)
+        })
 
         if (destroyed) {
           await vad.destroy()

@@ -64,7 +64,7 @@ export default defineConfig({
           { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
           { src: `${vadDist}/silero_vad_v5.onnx`, dest: 'vad-runtime', rename: { stripBase: true } },
           { src: `${vadDist}/silero_vad_legacy.onnx`, dest: 'vad-runtime', rename: { stripBase: true } },
-          { src: `${ortDist}/ort.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${ortDist}/ort.wasm.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
           { src: `${ortDist}/ort-wasm*`, dest: 'vad-runtime', rename: { stripBase: true } },
         ],
       }),
