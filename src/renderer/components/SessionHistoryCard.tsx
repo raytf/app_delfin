@@ -2,6 +2,7 @@ import { Clock3, MessageSquare } from 'lucide-react'
 import type { SessionListItem } from '../../shared/types'
 
 interface SessionHistoryCardProps {
+  onClick?: () => void
   session: SessionListItem
   variant?: 'compact' | 'detailed'
 }
@@ -55,6 +56,7 @@ function formatStatus(status: SessionListItem['status']): string {
 }
 
 export default function SessionHistoryCard({
+  onClick,
   session,
   variant = 'compact',
 }: SessionHistoryCardProps) {
@@ -64,7 +66,8 @@ export default function SessionHistoryCard({
     <article
       className={`rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-[0_18px_40px_rgba(20,129,186,0.08)] ${
         isDetailed ? 'p-6' : 'p-5'
-      }`}
+      } ${onClick !== undefined ? 'cursor-pointer hover:border-[var(--primary)]' : ''}`}
+      onClick={onClick}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -114,17 +117,17 @@ export default function SessionHistoryCard({
         </div>
       ) : (
         <>
-          <div className="mt-4 flex items-center gap-4 text-sm text-[var(--text-muted)]">
-            <div className="flex items-center gap-1.5">
-              <MessageSquare size={14} />
-              <span>{session.messageCount}</span>
+          <div className="mt-4 flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+              <MessageSquare size={14} className="text-[var(--primary)]" />
+              <span className="font-medium">{session.messageCount}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock3 size={14} />
-              <span>{formatDuration(session.startedAt, session.endedAt)}</span>
+            <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+              <Clock3 size={14} className="text-[var(--primary)]" />
+              <span className="font-medium">{formatDuration(session.startedAt, session.endedAt)}</span>
             </div>
           </div>
-          <p className="mt-3 text-xs text-[var(--text-muted)]">
+          <p className="mt-3 text-xs text-[var(--text-secondary)]">
             {formatRelativeTime(session.lastUpdatedAt)}
           </p>
         </>

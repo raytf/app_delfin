@@ -6,6 +6,8 @@ import type {
   SidecarStatus,
   ElectronAPI,
   OverlayState,
+  SessionDetail,
+  SessionDetailRequest,
   SessionMessageImageRequest,
   SessionPromptRequest,
   SessionPromptResponse,
@@ -36,6 +38,9 @@ const api: ElectronAPI = {
 
   listSessions: () =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST) as Promise<SessionListItem[]>,
+
+  getSessionDetail: (request: SessionDetailRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_DETAIL, request) as Promise<SessionDetail>,
 
   getSessionMessageImage: (request: SessionMessageImageRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, request) as Promise<string>,

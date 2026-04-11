@@ -3,18 +3,21 @@ import AllSessionsPage from './components/AllSessionsPage'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
+import PastSessionView from './components/PastSessionView'
 import { useSessionStore } from './stores/sessionStore'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
   type MinimizedOverlayVariant,
   type OverlayMode,
+  type SessionDetail,
   type SessionMode,
   type SidecarStatus,
 } from '../shared/types'
 
 export default function App() {
   const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
+  const [selectedPastSession, setSelectedPastSession] = useState<SessionDetail | null>(null)
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
@@ -114,12 +117,14 @@ export default function App() {
     }
   }, [appendAssistantText, failAssistantResponse, finishAssistantResponse])
 
-  async function handleStartSession(): Promise<void> {
+  async function handleStartSession(sessionName: string): Promise<void> {
     await window.api.startSession()
     setSessionHistory([])
     clearConversation()
     startSession()
+    setCaptureSourceLabel(sessionName)
     setHomeView('landing')
+    setSelectedPastSession(null)
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
@@ -152,6 +157,7 @@ export default function App() {
     setSessionHistory(sessions)
     clearConversation()
     setHomeView('landing')
+    setSelectedPastSession(null)
     setIsMinimizedPromptComposing(false)
     setSessionMode('home')
     setOverlayMode('expanded')
@@ -197,6 +203,11 @@ export default function App() {
     } catch (error) {
       failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
     }
+  }
+
+  async function handleOpenPastSession(sessionId: string): Promise<void> {
+    const detail = await window.api.getSessionDetail({ sessionId })
+    setSelectedPastSession(detail)
   }
 
   if (sessionMode === 'active' && overlayMode === 'minimized') {
@@ -245,11 +256,26 @@ export default function App() {
     )
   }
 
+  if (sessionMode === 'home' && selectedPastSession !== null) {
+    return (
+      <PastSessionView
+        messages={selectedPastSession.messages}
+        onBack={() => {
+          setSelectedPastSession(null)
+        }}
+        session={selectedPastSession.session}
+      />
+    )
+  }
+
   if (sessionMode === 'home' && homeView === 'all-sessions') {
     return (
       <AllSessionsPage
         onBack={() => {
           setHomeView('landing')
+        }}
+        onSelectSession={(sessionId) => {
+          void handleOpenPastSession(sessionId)
         }}
         sessions={sessionHistory}
       />
@@ -258,12 +284,15 @@ export default function App() {
 
   return (
     <HomeScreen
+      onSelectSession={(sessionId) => {
+        void handleOpenPastSession(sessionId)
+      }}
       onViewAllSessions={() => {
         setHomeView('all-sessions')
       }}
       sessions={sessionHistory}
-      onStartSession={() => {
-        void handleStartSession()
+      onStartSession={(sessionName) => {
+        void handleStartSession(sessionName)
       }}
     />
   )

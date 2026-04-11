@@ -1,9 +1,12 @@
+import { useState } from 'react'
+import { Focus } from 'lucide-react'
 import type { SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionHistoryCard from './SessionHistoryCard'
 
 interface HomeScreenProps {
-  onStartSession: () => void
+  onStartSession: (sessionName: string) => void
+  onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
   sessions: SessionListItem[]
 }
@@ -34,8 +37,90 @@ function WaveDecoration() {
   )
 }
 
-export default function HomeScreen({ onStartSession, onViewAllSessions, sessions }: HomeScreenProps) {
+interface StartSessionModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onStart: (sessionName: string) => void
+}
+
+function StartSessionModal({ isOpen, onClose, onStart }: StartSessionModalProps) {
+  const [sessionName, setSessionName] = useState('')
+
+  if (!isOpen) return null
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    onStart(sessionName.trim() || 'Study Session')
+    setSessionName('')
+  }
+
+  function handleClose() {
+    setSessionName('')
+    onClose()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      handleClose()
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 backdrop-blur-sm"
+      onClick={handleClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-[var(--bg-surface)] p-8 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-center font-display text-xl font-semibold text-[var(--text-primary)]">
+          Name your session
+        </h2>
+        <p className="mt-2 text-center text-sm text-[var(--text-muted)]">
+          Give it a name so you can find it later
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-5">
+          <input
+            autoFocus
+            className="h-11 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+            onChange={(e) => setSessionName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What are you studying today?"
+            type="text"
+            value={sessionName}
+          />
+
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <button
+              className="cursor-pointer rounded-xl px-4 py-2.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-secondary)]"
+              onClick={handleClose}
+              type="button"
+            >
+              Maybe later
+            </button>
+            <button
+              className="cursor-pointer rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+              type="submit"
+            >
+              Lock In
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default function HomeScreen({ onStartSession, onSelectSession, onViewAllSessions, sessions }: HomeScreenProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const recentSessions = sessions.slice(0, 6)
+
+  function handleStartSession(sessionName: string) {
+    setIsModalOpen(false)
+    onStartSession(sessionName)
+  }
 
   return (
     <div className="ocean-gradient relative min-h-screen text-[var(--text-primary)]">
@@ -47,7 +132,7 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           <div className="flex items-center gap-2 sm:gap-2">
             <img
               alt="Delfin logo"
-              className="h-28 w-28 object-contain sm:h-32 sm:w-32 mb-1"
+              className="mb-1 h-28 w-28 object-contain sm:h-32 sm:w-32"
               src={delfinLogo}
             />
             <h1 className="font-display text-8xl font-bold tracking-tight text-[var(--primary)]">
@@ -67,7 +152,7 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           {/* Start Session Button */}
           <button
             className="btn-ocean mt-8 cursor-pointer rounded-2xl px-8 py-4 text-base font-semibold text-white shadow-lg"
-            onClick={onStartSession}
+            onClick={() => setIsModalOpen(true)}
             type="button"
           >
             Start Studying
@@ -94,7 +179,13 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           {recentSessions.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {recentSessions.map((session) => (
-                <SessionHistoryCard key={session.id} session={session} />
+                <SessionHistoryCard
+                  key={session.id}
+                  onClick={() => {
+                    onSelectSession(session.id)
+                  }}
+                  session={session}
+                />
               ))}
             </div>
           ) : (
@@ -124,6 +215,12 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           )}
         </section>
       </div>
+
+      <StartSessionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onStart={handleStartSession}
+      />
     </div>
   )
 }

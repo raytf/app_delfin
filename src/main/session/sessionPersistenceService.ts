@@ -1,4 +1,4 @@
-import type { PresetId } from '../../shared/types'
+import type { ChatMessage, PresetId, SessionDetail } from '../../shared/types'
 import type {
   ConversationMessageRecord,
   PersistedSessionStatus,
@@ -165,6 +165,27 @@ export class SessionPersistenceService {
 
   async listSessions(): Promise<SessionRecord[]> {
     return this.storage.listSessions()
+  }
+
+  async getSessionDetail(sessionId: string): Promise<SessionDetail> {
+    const session = await this.storage.getSession(sessionId)
+
+    if (session === null) {
+      throw new Error(`Session not found: ${sessionId}`)
+    }
+
+    const conversation = await this.storage.getConversation(sessionId)
+
+    return {
+      session,
+      messages: conversation.map<ChatMessage>((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp,
+        imagePath: message.imagePath,
+      })),
+    }
   }
 
   async getCaptureImageDataUrl(relativePath: string): Promise<string> {
