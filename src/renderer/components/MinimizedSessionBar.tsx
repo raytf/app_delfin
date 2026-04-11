@@ -1,4 +1,4 @@
-import { MessageCircle, Maximize2, Square } from 'lucide-react'
+import { MessageCircle, Maximize2, Square, ChevronDown } from 'lucide-react'
 import type { MinimizedOverlayVariant } from '../../shared/types'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
 
@@ -30,7 +30,7 @@ export default function MinimizedSessionBar({
   return (
     <div className="drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
       <div
-        className={`flex h-full w-full flex-col overflow-hidden bg-[var(--bg-overlay)] backdrop-blur-xl ${
+        className={`flex h-full w-full flex-col overflow-hidden ${
           isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
         }`}
         >
@@ -49,12 +49,12 @@ export default function MinimizedSessionBar({
         {/* Action Bar */}
         <div
           className={`drag-region flex items-center gap-1.5 ${
-            isPromptOpen ? 'mt-3 justify-center' : 'rounded-full bg-[var(--bg-surface)] p-1.5 shadow-sm'
+            isPromptOpen ? 'mt-3 justify-center' : 'p-1.5'
           }`}
         >
-          {/* Ask Delfin - Primary Action */}
+          {/* Ask Delfin - Primary Action / Collapse */}
           <button
-            aria-label="Ask Delfin"
+            aria-label={isPromptOpen ? "Collapse" : "Ask Delfin"}
             className={`no-drag flex cursor-pointer items-center gap-2 rounded-full font-medium transition ${
               isPromptOpen
                 ? 'h-10 w-10 justify-center border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
@@ -63,7 +63,7 @@ export default function MinimizedSessionBar({
             onClick={() => onSetPromptOpen(!isPromptOpen)}
             type="button"
           >
-            <MessageCircle size={18} />
+            {isPromptOpen ? <ChevronDown size={18} /> : <MessageCircle size={18} />}
             {!isPromptOpen && <span>Ask Delfin</span>}
           </button>
 
