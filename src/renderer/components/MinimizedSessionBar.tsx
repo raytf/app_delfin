@@ -67,15 +67,17 @@ export default function MinimizedSessionBar({
             {!isPromptOpen && <span>Ask Delfin</span>}
           </button>
 
-          {/* Expand - Secondary Action */}
-          <button
-            aria-label="Expand session"
-            className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
-            onClick={onOpen}
-            type="button"
-          >
-            <Maximize2 size={18} />
-          </button>
+          {/* Expand - Secondary Action (hidden when showing response, as there's a dedicated expand button) */}
+          {minimizedVariant !== 'prompt-response' && (
+            <button
+              aria-label="Expand session"
+              className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
+              onClick={onOpen}
+              type="button"
+            >
+              <Maximize2 size={18} />
+            </button>
+          )}
 
           {/* End Session */}
           <button

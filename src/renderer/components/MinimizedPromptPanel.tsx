@@ -129,7 +129,7 @@ function StreamingResponseBody({
       ) : latestResponseText !== null && latestResponseText.length > 0 ? (
         <div className="no-drag flex h-full min-h-0 flex-col">
           <div
-            className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-[var(--text-primary)]"
+            className="min-h-0 flex-1 overflow-y-auto text-sm leading-6 text-[var(--text-primary)]"
             ref={setScrollContainer}
           >
             <p className="whitespace-pre-wrap">{latestResponseText}</p>
