@@ -46,7 +46,18 @@ def _clean_tool_result(result: dict) -> dict:
         if isinstance(v, str):
             cleaned[k] = _clean(v)
         elif isinstance(v, list):
-            cleaned[k] = [_clean(item) if isinstance(item, str) else item for item in v]
+            # Clean each item and drop any that become empty after cleaning —
+            # guards against the model emitting bare index tokens like "[0]"
+            # or <|"|> pairs that collapse to empty strings.
+            cleaned_items: list = []
+            for item in v:
+                if isinstance(item, str):
+                    c = _clean(item)
+                    if c:  # drop empty strings
+                        cleaned_items.append(c)
+                else:
+                    cleaned_items.append(item)
+            cleaned[k] = cleaned_items
         else:
             cleaned[k] = v
     return cleaned
@@ -253,7 +264,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
         # Again, no _clean() here — _clean_tool_result() handles that pass.
         def _to_str_list(value: object) -> list[str]:
             if isinstance(value, list):
-                return [str(item) for item in value if item is not None]
+                # Filter None AND empty/whitespace-only strings — the model
+                # sometimes emits ["", "real content"] when it applies bracket-
+                # index notation ([0], [1]…) to list fields.
+                return [s for item in value
+                        if item is not None and (s := str(item).strip())]
             if isinstance(value, str) and value.strip():
                 lines = [
                     _re.sub(r'^[-*\u2022]\s*', '', line).strip()
