@@ -57,6 +57,9 @@ const api: ElectronAPI = {
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
 
+  onOverlayError: (cb: (data: { message: string }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR, (_event, data) => cb(data)),
+
   onSidecarToken: (cb: (data: { text: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, (_event, data) => cb(data)),
 

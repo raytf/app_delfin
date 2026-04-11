@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (model downloads now use atomic .part files with cleanup on failure)
+> Last updated: 2026-04-11 (overlay minimized-variant IPC errors now forward `overlay:error` and resync renderer state)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,7 +11,7 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Read in both main process and sidecar |
-| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types; `StructuredResponse` removed |
+| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types, including `overlay:error`; `StructuredResponse` removed |
 | `src/shared/schemas.ts` | ✅ | Zod schemas for inbound/outbound WS messages; `structuredResponseSchema` removed |
 | `src/shared/constants.ts` | ✅ | Preset definitions, `DEFAULT_PRESET`, `SIDEBAR_WIDTH` |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar — tokens only (no structured message) |
@@ -51,8 +51,9 @@
 | `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
 | `src/main/ipc/handlers.ts` | ✅ | All IPC channels wired: capture, sidecar send/interrupt, overlay, session |
+| `src/main/ipc/overlayHandlers.ts` | ✅ | Overlay minimized-variant handler reverts on failure, logs, and forwards `overlay:error` to the renderer |
 | `src/main/index.ts` | ✅ | App entry, window lifecycle, overlay/session mode state machine |
-| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, and session methods |
+| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, and session methods plus `onOverlayError` |
 | `src/main/capture/autoRefresh.ts` | ⚠️ | Placeholder — `start/stop` are no-ops |
 | `src/main/sidecar/healthCheck.ts` | ⚠️ | Placeholder — polling not implemented |
 
@@ -62,7 +63,7 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice auto-open, delayed auto-collapse after speaking, and analyser-driven waveform routing |
+| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice auto-open, delayed auto-collapse after speaking, analyser-driven waveform routing, and overlay-error resync |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
 | `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |

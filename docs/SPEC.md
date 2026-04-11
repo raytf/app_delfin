@@ -179,5 +179,6 @@ interface WsInboundMessage {
 | Main → Renderer | `sidecar:audio_chunk` | `{ audio: string }` |
 | Main → Renderer | `sidecar:audio_end` | — |
 | Main → Renderer | `sidecar:done` | — |
+| Main → Renderer | `overlay:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:status` | `{ connected: boolean, backend?: string, model?: string }` |

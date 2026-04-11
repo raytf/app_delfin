@@ -81,6 +81,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
 
 export const MAIN_TO_RENDERER_CHANNELS = {
   FRAME_CAPTURED: 'frame:captured',
+  OVERLAY_ERROR: 'overlay:error',
   SIDECAR_TOKEN: 'sidecar:token',
   SIDECAR_AUDIO_START: 'sidecar:audio_start',
   SIDECAR_AUDIO_CHUNK: 'sidecar:audio_chunk',
@@ -150,6 +151,7 @@ export interface ElectronAPI {
   restoreOverlay: () => Promise<void>
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
+  onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
   onSidecarAudioStart: (cb: () => void) => void
   onSidecarAudioChunk: (cb: (data: { audio: string }) => void) => void
