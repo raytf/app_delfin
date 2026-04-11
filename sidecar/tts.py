@@ -40,7 +40,7 @@ class TTSPipeline:
 
         if requested_backend == "kokoro":
             model_path = os.environ.get("KOKORO_MODEL_PATH", "kokoro-v1.0.onnx")
-            voices_path = os.environ.get("KOKORO_VOICES_PATH", "voices.bin")
+            voices_path = os.environ.get("KOKORO_VOICES_PATH", "voices-v1.0.bin")
 
             try:
                 from kokoro_onnx import Kokoro

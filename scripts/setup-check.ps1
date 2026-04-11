@@ -47,6 +47,29 @@ if (Test-Path ".env") {
   Write-Host "⚠️  .env: missing (copy from .env.example)" -ForegroundColor Yellow
 }
 
+# Kokoro TTS model files
+$kokoroModel = "kokoro-v1.0.onnx"
+$kokoroVoices = "voices-v1.0.bin"
+if (Test-Path ".env") {
+  $envLines = Get-Content ".env"
+  foreach ($line in $envLines) {
+    if ($line -match '^KOKORO_MODEL_PATH=(.+)') { $kokoroModel = $Matches[1] }
+    if ($line -match '^KOKORO_VOICES_PATH=(.+)') { $kokoroVoices = $Matches[1] }
+  }
+}
+
+if (Test-Path "sidecar\$kokoroModel") {
+  Write-Host "✅ Kokoro model ($kokoroModel): present" -ForegroundColor Green
+} else {
+  Write-Host "⚠️  Kokoro model ($kokoroModel): missing (run: npm run download:models)" -ForegroundColor Yellow
+}
+
+if (Test-Path "sidecar\$kokoroVoices") {
+  Write-Host "✅ Kokoro voices ($kokoroVoices): present" -ForegroundColor Green
+} else {
+  Write-Host "⚠️  Kokoro voices ($kokoroVoices): missing (run: npm run download:models)" -ForegroundColor Yellow
+}
+
 # Sidecar health check
 $port = if ($env:SIDECAR_PORT) { $env:SIDECAR_PORT } else { "8321" }
 try {

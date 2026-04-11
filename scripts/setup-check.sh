@@ -48,6 +48,24 @@ else
   echo "⚠️  .env: missing (copy from .env.example)"
 fi
 
+# Kokoro TTS model files
+KOKORO_MODEL=$(grep -E '^KOKORO_MODEL_PATH=' .env 2>/dev/null | cut -d= -f2)
+KOKORO_MODEL=${KOKORO_MODEL:-kokoro-v1.0.onnx}
+KOKORO_VOICES=$(grep -E '^KOKORO_VOICES_PATH=' .env 2>/dev/null | cut -d= -f2)
+KOKORO_VOICES=${KOKORO_VOICES:-voices-v1.0.bin}
+
+if [ -f "sidecar/$KOKORO_MODEL" ]; then
+  echo "✅ Kokoro model ($KOKORO_MODEL): present"
+else
+  echo "⚠️  Kokoro model ($KOKORO_MODEL): missing (run: npm run download:models)"
+fi
+
+if [ -f "sidecar/$KOKORO_VOICES" ]; then
+  echo "✅ Kokoro voices ($KOKORO_VOICES): present"
+else
+  echo "⚠️  Kokoro voices ($KOKORO_VOICES): missing (run: npm run download:models)"
+fi
+
 # Sidecar health check
 SIDECAR_PORT=${SIDECAR_PORT:-8321}
 if curl -s "http://localhost:$SIDECAR_PORT/health" > /dev/null 2>&1; then

@@ -72,7 +72,10 @@ Key variables:
 | `SIDECAR_PORT` | `8321` | Port the sidecar listens on |
 | `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | WebSocket URL used by Electron |
 | `LITERT_BACKEND` | `CPU` | Inference backend (`CPU`, `GPU`) |
-| `TTS_ENABLED` | `false` | Enable text-to-speech readback |
+| `TTS_ENABLED` | `true` | Enable text-to-speech readback |
+| `TTS_BACKEND` | `kokoro` | TTS engine (`kokoro`, `web-speech`) |
+| `KOKORO_MODEL_PATH` | `kokoro-v1.0.onnx` | Path to Kokoro ONNX model (relative to `sidecar/`) |
+| `KOKORO_VOICES_PATH` | `voices-v1.0.bin` | Path to Kokoro voice embeddings (relative to `sidecar/`) |
 
 See `.env.example` for the full list with documentation.
 
@@ -90,6 +93,22 @@ To install manually:
 cd sidecar
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+```
+
+### 4. Download Kokoro TTS model files
+
+```bash
+npm run download:models
+```
+
+This downloads `kokoro-v1.0.onnx` (~311 MB) and `voices-v1.0.bin` (~27 MB) from the [kokoro-onnx GitHub release](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) into `sidecar/`. Files that already exist are skipped automatically.
+
+> **Note:** These files are not committed to the repository. Every team member must run this step once. The files are gitignored to keep the repo lightweight.
+
+Alternatively, run **all** setup steps at once:
+
+```bash
+npm run setup   # npm install + setup:sidecar + download:models
 ```
 
 ---
