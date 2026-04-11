@@ -4,7 +4,6 @@ import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import { useSessionStore } from './stores/sessionStore'
 import {
-  type ChatMessage,
   MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
   type MinimizedOverlayVariant,
@@ -12,16 +11,6 @@ import {
   type SessionMode,
   type SidecarStatus,
 } from '../shared/types'
-
-function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role === 'assistant') {
-      return messages[index]
-    }
-  }
-
-  return null
-}
 
 export default function App() {
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
@@ -36,14 +25,18 @@ export default function App() {
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
   const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
   const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
-  const latestAssistantMessage = getLatestAssistantMessage(messages)
-  const latestResponseText = latestAssistantMessage?.content ?? null
+  const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
+  const latestResponseText =
+    minimizedResponseMessageId === null
+      ? null
+      : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
 
   useEffect(() => {
     if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
@@ -131,7 +124,7 @@ export default function App() {
   }
 
   async function handleAskDelfin(): Promise<void> {
-    await window.api.minimizeOverlay()
+    clearLatestResponse()
     await window.api.setMinimizedOverlayVariant('prompt-input')
     setOverlayMode('minimized')
     setMinimizedVariant('prompt-input')
@@ -139,8 +132,9 @@ export default function App() {
   }
 
   async function handleRestoreOverlay(): Promise<void> {
-    await window.api.restoreOverlay()
     setOverlayMode('expanded')
+    clearLatestResponse()
+    await window.api.restoreOverlay()
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
@@ -161,6 +155,10 @@ export default function App() {
   }
 
   async function handleSetMinimizedVariant(variant: MinimizedOverlayVariant): Promise<void> {
+    if (variant !== 'prompt-response') {
+      clearLatestResponse()
+    }
+
     await window.api.setMinimizedOverlayVariant(variant)
     setOverlayMode('minimized')
     setMinimizedVariant(variant)

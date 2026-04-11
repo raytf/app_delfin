@@ -8,8 +8,10 @@ interface SessionStoreState {
   messages: ChatMessage[]
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
+  minimizedResponseMessageId: string | null
   sessionStartTime: number | null
   clearConversation: () => void
+  clearLatestResponse: () => void
   startSession: () => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   appendAssistantText: (text: string) => void
@@ -31,6 +33,7 @@ export const useSessionStore = create<SessionStoreState>()(
       messages: [],
       sessionHistory: [],
       activeAssistantMessageId: null,
+      minimizedResponseMessageId: null,
       sessionStartTime: null,
 
       clearConversation: () =>
@@ -40,8 +43,14 @@ export const useSessionStore = create<SessionStoreState>()(
           messages: [],
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
+          minimizedResponseMessageId: null,
           sessionStartTime: null,
         })),
+
+      clearLatestResponse: () =>
+        set({
+          minimizedResponseMessageId: null,
+        }),
 
       startSession: () =>
         set((state) => ({
@@ -71,6 +80,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: true,
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
+            minimizedResponseMessageId: assistantMessageId,
           }
         }),
 
@@ -114,6 +124,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: false,
             messages,
             activeAssistantMessageId: null,
+            minimizedResponseMessageId: state.activeAssistantMessageId,
           }
         }),
 
@@ -143,6 +154,7 @@ export const useSessionStore = create<SessionStoreState>()(
         messages: state.messages,
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
+        minimizedResponseMessageId: state.minimizedResponseMessageId,
         sessionStartTime: state.sessionStartTime,
       }),
     },
