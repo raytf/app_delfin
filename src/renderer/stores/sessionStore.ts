@@ -9,16 +9,19 @@ interface SessionStoreState {
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
   vadListeningEnabled: boolean
+  minimizedResponseMessageId: string | null
+  sessionStartTime: number | null
   clearConversation: () => void
-  beginPromptSubmission: (prompt: string) => void
-  /** Like beginPromptSubmission but marks the user turn as a voice turn so the
-   *  UI renders a 🎙️ icon instead of the raw VOICE_TURN_TEXT constant. */
-  beginVoiceTurn: () => void
+  clearLatestResponse: () => void
+  startSession: () => void
+  beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
+  beginVoiceTurn: (input: { messageId: string }) => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
   toggleVadListening: () => void
+  setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
 }
 
 function createMessageId(): string {
@@ -34,6 +37,8 @@ export const useSessionStore = create<SessionStoreState>()(
       sessionHistory: [],
       activeAssistantMessageId: null,
       vadListeningEnabled: true,
+      minimizedResponseMessageId: null,
+      sessionStartTime: null,
 
       clearConversation: () =>
         set((state) => ({
@@ -43,14 +48,27 @@ export const useSessionStore = create<SessionStoreState>()(
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
           vadListeningEnabled: state.vadListeningEnabled,
+          minimizedResponseMessageId: null,
+          sessionStartTime: null,
         })),
 
-      beginPromptSubmission: (prompt: string) =>
+      clearLatestResponse: () =>
+        set({
+          minimizedResponseMessageId: null,
+        }),
+
+      startSession: () =>
+        set((state) => ({
+          ...state,
+          sessionStartTime: state.sessionStartTime ?? Date.now(),
+        })),
+
+      beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {
           const userMessage: ChatMessage = {
-            id: createMessageId(),
+            id: input.messageId,
             role: 'user',
-            content: prompt,
+            content: input.prompt,
             timestamp: Date.now(),
           }
 
@@ -67,13 +85,14 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: true,
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
+            minimizedResponseMessageId: assistantMessageId,
           }
         }),
 
-      beginVoiceTurn: () =>
+      beginVoiceTurn: (input: { messageId: string }) =>
         set((state) => {
           const userMessage: ChatMessage = {
-            id: createMessageId(),
+            id: input.messageId,
             role: 'user',
             content: '🎙️ Voice input',
             timestamp: Date.now(),
@@ -93,6 +112,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: true,
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
+            minimizedResponseMessageId: assistantMessageId,
           }
         }),
 
@@ -136,6 +156,7 @@ export const useSessionStore = create<SessionStoreState>()(
             isSubmitting: false,
             messages,
             activeAssistantMessageId: null,
+            minimizedResponseMessageId: state.activeAssistantMessageId,
           }
         }),
 
@@ -148,6 +169,18 @@ export const useSessionStore = create<SessionStoreState>()(
         set((state) => ({
           vadListeningEnabled: !state.vadListeningEnabled,
         })),
+
+      setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === input.messageId
+              ? {
+                ...message,
+                imagePath: input.imagePath,
+              }
+              : message,
+          ),
+        })),
     }),
     {
       name: 'screen-copilot-active-session',
@@ -159,6 +192,8 @@ export const useSessionStore = create<SessionStoreState>()(
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
         vadListeningEnabled: state.vadListeningEnabled,
+        minimizedResponseMessageId: state.minimizedResponseMessageId,
+        sessionStartTime: state.sessionStartTime,
       }),
     },
   ),

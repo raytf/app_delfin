@@ -1,11 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import ExpandedSessionView from './components/ExpandedSessionView'
-import HomeScreen from './components/HomeScreen'
-import MinimizedSessionBar from './components/MinimizedSessionBar'
-import { useVAD } from './hooks/useVAD'
-import { useSessionStore } from './stores/sessionStore'
-import { decodeAudioChunk } from './utils/audioUtils'
-import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
 import {
   type ChatMessage,
   MAIN_TO_RENDERER_CHANNELS,
@@ -16,6 +9,14 @@ import {
   type SidecarStatus,
 } from '../shared/types'
 import { VOICE_TURN_TEXT } from '../shared/constants'
+import AllSessionsPage from './components/AllSessionsPage'
+import ExpandedSessionView from './components/ExpandedSessionView'
+import HomeScreen from './components/HomeScreen'
+import MinimizedSessionBar from './components/MinimizedSessionBar'
+import { useVAD } from './hooks/useVAD'
+import { useSessionStore } from './stores/sessionStore'
+import { decodeAudioChunk } from './utils/audioUtils'
+import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -28,6 +29,7 @@ function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null 
 }
 
 export default function App() {
+  const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
@@ -35,21 +37,30 @@ export default function App() {
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
+
   const clearConversation = useSessionStore((state) => state.clearConversation)
+  const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
+  const startSession = useSessionStore((state) => state.startSession)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
   const beginVoiceTurn = useSessionStore((state) => state.beginVoiceTurn)
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
   const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
+  const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
   const toggleVadListening = useSessionStore((state) => state.toggleVadListening)
   const vadListeningEnabled = useSessionStore((state) => state.vadListeningEnabled)
-  const latestAssistantMessage = getLatestAssistantMessage(messages)
-  const latestResponseText = latestAssistantMessage?.content ?? null
+
+  const latestResponseText =
+    minimizedResponseMessageId === null
+      ? null
+      : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
+
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
@@ -59,10 +70,8 @@ export default function App() {
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingVoiceWavRef = useRef<string | null>(null)
+  const lowerThresholdRef = useRef<(() => void) | null>(null)
 
-  // ---------------------------------------------------------------------------
-  // VAD — always-on mic when session is active and VOICE_ENABLED=true
-  // ---------------------------------------------------------------------------
   const voiceEnabled = window.api.voiceEnabled
   const ttsEnabled = window.api.ttsEnabled
 
@@ -77,22 +86,6 @@ export default function App() {
       fallbackSpeechTimerRef.current = null
     }
   }, [])
-
-  const revealMinimizedVoiceResponse = useCallback(() => {
-    const nextVariant = getVoiceTurnRevealVariant({
-      minimizedVariant,
-      overlayMode,
-      sessionMode,
-    })
-
-    if (nextVariant === null) {
-      return
-    }
-
-    setIsMinimizedPromptComposing(false)
-    setMinimizedVariant(nextVariant)
-    void window.api.setMinimizedOverlayVariant(nextVariant)
-  }, [minimizedVariant, overlayMode, sessionMode])
 
   const cancelSpeechSynthesis = useCallback(() => {
     if ('speechSynthesis' in window) {
@@ -136,6 +129,77 @@ export default function App() {
     }
   }, [])
 
+  const finishAudioPlayback = useCallback(() => {
+    audioStreamActiveRef.current = false
+    setAudioPlayingState(false)
+    lowerThresholdRef.current?.()
+  }, [setAudioPlayingState])
+
+  const revealMinimizedVoiceResponse = useCallback(() => {
+    const nextVariant = getVoiceTurnRevealVariant({
+      minimizedVariant,
+      overlayMode,
+      sessionMode,
+    })
+
+    if (nextVariant === null) {
+      return
+    }
+
+    setIsMinimizedPromptComposing(false)
+    setMinimizedVariant(nextVariant)
+    void window.api.setMinimizedOverlayVariant(nextVariant)
+  }, [minimizedVariant, overlayMode, sessionMode])
+
+  const submitVoiceTurn = useCallback(
+    (wavBase64: string) => {
+      if (sessionMode !== 'active') {
+        return
+      }
+
+      const messageId = crypto.randomUUID()
+
+      aiStreamingStartedRef.current = false
+      audioStartedForTurnRef.current = false
+      clearFallbackSpeechTimer()
+      revealMinimizedVoiceResponse()
+      beginVoiceTurn({ messageId })
+
+      void window.api
+        .submitSessionPrompt({
+          messageId,
+          text: VOICE_TURN_TEXT,
+          presetId: 'lecture-slide',
+          audio: wavBase64,
+        })
+        .then((response) => {
+          setUserMessageImagePath({
+            imagePath: response.imagePath,
+            messageId: response.messageId,
+          })
+        })
+        .catch((err: unknown) => {
+          failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
+        })
+    },
+    [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
+  )
+
+  const submitPendingVoiceTurn = useCallback(() => {
+    if (sessionMode !== 'active') {
+      pendingVoiceWavRef.current = null
+      return
+    }
+
+    const pendingWav = pendingVoiceWavRef.current
+    if (pendingWav === null) {
+      return
+    }
+
+    pendingVoiceWavRef.current = null
+    submitVoiceTurn(pendingWav)
+  }, [sessionMode, submitVoiceTurn])
+
   const { raiseThreshold, lowerThreshold, isListening, isMuted, toggleMute } = useVAD({
     enabled: voiceEnabled && sessionMode === 'active',
     onSpeechEnd: (wavBase64: string) => {
@@ -148,21 +212,7 @@ export default function App() {
         return
       }
 
-      aiStreamingStartedRef.current = false
-      audioStartedForTurnRef.current = false
-      clearFallbackSpeechTimer()
-      revealMinimizedVoiceResponse()
-      beginVoiceTurn()
-
-      window.api
-        .submitSessionPrompt({
-          text: VOICE_TURN_TEXT,
-          presetId: 'lecture-slide',
-          audio: wavBase64,
-        })
-        .catch((err: unknown) => {
-          failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
-        })
+      submitVoiceTurn(wavBase64)
     },
     onSpeechStart: () => {
       const isAssistantThinking = useSessionStore.getState().isSubmitting && !aiStreamingStartedRef.current
@@ -195,6 +245,8 @@ export default function App() {
     },
   })
 
+  lowerThresholdRef.current = lowerThreshold
+
   useEffect(() => {
     if (!voiceEnabled || sessionMode !== 'active' || !isListening) {
       return
@@ -208,75 +260,43 @@ export default function App() {
     toggleMute()
   }, [isListening, isMuted, sessionMode, toggleMute, vadListeningEnabled, voiceEnabled])
 
-  const finishAudioPlayback = useCallback(() => {
-    audioStreamActiveRef.current = false
-    setAudioPlayingState(false)
-    lowerThreshold()
-  }, [lowerThreshold, setAudioPlayingState])
-
-  const speakWithWebSpeech = useCallback((text: string) => {
-    const trimmedText = text.trim()
-    if (!ttsEnabled || trimmedText.length === 0 || !('speechSynthesis' in window)) {
-      return
-    }
-
-    clearFallbackSpeechTimer()
-    fallbackSpeechTimerRef.current = setTimeout(() => {
-      fallbackSpeechTimerRef.current = null
-
-      if (audioStartedForTurnRef.current) {
+  const speakWithWebSpeech = useCallback(
+    (text: string) => {
+      const trimmedText = text.trim()
+      if (!ttsEnabled || trimmedText.length === 0 || !('speechSynthesis' in window)) {
         return
       }
 
-      cancelSpeechSynthesis()
+      clearFallbackSpeechTimer()
+      fallbackSpeechTimerRef.current = setTimeout(() => {
+        fallbackSpeechTimerRef.current = null
 
-      const utterance = new SpeechSynthesisUtterance(trimmedText)
-      utterance.rate = 1.0
-      utterance.pitch = 1.0
-      utterance.onstart = () => {
-        aiStreamingStartedRef.current = true
-        setAudioPlayingState(true)
-        raiseThreshold()
-      }
-      utterance.onend = () => {
-        finishAudioPlayback()
-      }
-      utterance.onerror = () => {
-        finishAudioPlayback()
-      }
+        if (audioStartedForTurnRef.current) {
+          return
+        }
 
-      window.speechSynthesis.speak(utterance)
-    }, 500)
-  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, finishAudioPlayback, raiseThreshold, setAudioPlayingState, ttsEnabled])
+        cancelSpeechSynthesis()
 
-  const submitPendingVoiceTurn = useCallback(() => {
-    if (sessionMode !== 'active') {
-      pendingVoiceWavRef.current = null
-      return
-    }
+        const utterance = new SpeechSynthesisUtterance(trimmedText)
+        utterance.rate = 1.0
+        utterance.pitch = 1.0
+        utterance.onstart = () => {
+          aiStreamingStartedRef.current = true
+          setAudioPlayingState(true)
+          raiseThreshold()
+        }
+        utterance.onend = () => {
+          finishAudioPlayback()
+        }
+        utterance.onerror = () => {
+          finishAudioPlayback()
+        }
 
-    const pendingWav = pendingVoiceWavRef.current
-    if (pendingWav === null) {
-      return
-    }
-
-    pendingVoiceWavRef.current = null
-    aiStreamingStartedRef.current = false
-    audioStartedForTurnRef.current = false
-    clearFallbackSpeechTimer()
-    revealMinimizedVoiceResponse()
-    beginVoiceTurn()
-
-    window.api
-      .submitSessionPrompt({
-        text: VOICE_TURN_TEXT,
-        presetId: 'lecture-slide',
-        audio: pendingWav,
-      })
-      .catch((err: unknown) => {
-        failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
-      })
-  }, [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode])
+        window.speechSynthesis.speak(utterance)
+      }, 500)
+    },
+    [cancelSpeechSynthesis, clearFallbackSpeechTimer, finishAudioPlayback, raiseThreshold, setAudioPlayingState, ttsEnabled],
+  )
 
   useEffect(() => {
     const nextVariant = getAutoAdvanceMinimizedVariant({
@@ -294,7 +314,7 @@ export default function App() {
 
     void window.api.setMinimizedOverlayVariant(nextVariant)
     setMinimizedVariant(nextVariant)
-  }, [errorMessage, isMinimizedPromptComposing, isSubmitting, latestResponseText, minimizedVariant, overlayMode, sessionMode])
+  }, [errorMessage, isMinimizedPromptComposing, latestResponseText, minimizedVariant, overlayMode, sessionMode])
 
   useEffect(() => {
     let cancelled = false
@@ -433,6 +453,8 @@ export default function App() {
     aiStreamingStartedRef.current = false
     setSessionHistory([])
     clearConversation()
+    startSession()
+    setHomeView('landing')
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
@@ -440,8 +462,9 @@ export default function App() {
   }
 
   async function handleRestoreOverlay(): Promise<void> {
-    await window.api.restoreOverlay()
     setOverlayMode('expanded')
+    clearLatestResponse()
+    await window.api.restoreOverlay()
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
@@ -468,6 +491,7 @@ export default function App() {
     const sessions = await window.api.listSessions()
     setSessionHistory(sessions)
     clearConversation()
+    setHomeView('landing')
     setIsMinimizedPromptComposing(false)
     setSessionMode('home')
     setOverlayMode('expanded')
@@ -475,6 +499,10 @@ export default function App() {
   }
 
   async function handleSetMinimizedVariant(variant: MinimizedOverlayVariant): Promise<void> {
+    if (variant !== 'prompt-response') {
+      clearLatestResponse()
+    }
+
     await window.api.setMinimizedOverlayVariant(variant)
     setOverlayMode('minimized')
     setMinimizedVariant(variant)
@@ -487,6 +515,8 @@ export default function App() {
     if (trimmedText.length === 0) {
       return
     }
+
+    const messageId = crypto.randomUUID()
 
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
@@ -505,12 +535,21 @@ export default function App() {
     }
 
     setIsMinimizedPromptComposing(false)
-    beginPromptSubmission(trimmedText)
+    beginPromptSubmission({
+      messageId,
+      prompt: trimmedText,
+    })
 
     try {
-      await window.api.submitSessionPrompt({
+      const response = await window.api.submitSessionPrompt({
+        messageId,
         text: trimmedText,
         presetId: 'lecture-slide',
+      })
+
+      setUserMessageImagePath({
+        imagePath: response.imagePath,
+        messageId: response.messageId,
       })
     } catch (error) {
       failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
@@ -521,10 +560,10 @@ export default function App() {
     return (
       <MinimizedSessionBar
         errorMessage={errorMessage}
+        isAudioPlaying={isAudioPlaying}
         isSubmitting={isSubmitting}
         isMicListening={isListening}
         isMicMuted={isMuted}
-        isAudioPlaying={isAudioPlaying}
         latestResponseText={latestResponseText}
         minimizedVariant={minimizedVariant}
         onAskAnother={() => {
@@ -553,19 +592,19 @@ export default function App() {
       <ExpandedSessionView
         captureSourceLabel={captureSourceLabel}
         errorMessage={errorMessage}
+        isAudioPlaying={isAudioPlaying}
         isSubmitting={isSubmitting}
         isMicListening={isListening}
         isMicMuted={isMuted}
-        isAudioPlaying={isAudioPlaying}
         messages={messages}
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}
-        onSubmitPrompt={(nextText) => {
-          void handleSubmitPrompt(nextText)
-        }}
         onStop={() => {
           void handleStopSession()
+        }}
+        onSubmitPrompt={(nextText) => {
+          void handleSubmitPrompt(nextText)
         }}
         onToggleVadListening={toggleVadListening}
         sidecarStatus={sidecarStatus}
@@ -574,12 +613,26 @@ export default function App() {
     )
   }
 
+  if (sessionMode === 'home' && homeView === 'all-sessions') {
+    return (
+      <AllSessionsPage
+        onBack={() => {
+          setHomeView('landing')
+        }}
+        sessions={sessionHistory}
+      />
+    )
+  }
+
   return (
     <HomeScreen
-      sessions={sessionHistory}
+      onViewAllSessions={() => {
+        setHomeView('all-sessions')
+      }}
       onStartSession={() => {
         void handleStartSession()
       }}
+      sessions={sessionHistory}
     />
   )
 }
