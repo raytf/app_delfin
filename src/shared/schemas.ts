@@ -4,6 +4,10 @@ export const structuredResponseSchema = z.object({
   summary: z.string(),
   answer: z.string(),
   key_points: z.array(z.string()),
+  /** Graduated hints: broad conceptual nudge → specific pointer → near-answer scaffold. */
+  hints: z.array(z.string()).optional(),
+  /** Socratic follow-up questions to deepen understanding. */
+  follow_up_questions: z.array(z.string()).optional(),
 })
 
 export const wsInboundMessageSchema = z.object({

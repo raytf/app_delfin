@@ -59,8 +59,9 @@ def _clean_tool_result(result: dict) -> dict:
 def _extract_structured_from_text(text: str) -> dict | None:
     """Try to extract structured fields from raw model output when tool calling fails.
 
-    Looks for patterns like 'Summary: ...', 'Answer: ...', 'Key points: - ...'
-    Returns a dict with summary/answer/key_points if any fields are found, else None.
+    Looks for patterns like 'Summary: ...', 'Answer: ...', 'Key points: - ...',
+    'Hints: - ...', 'Follow-up questions: - ...'
+    Returns a dict with any fields found, else None.
     """
     result: dict = {}
 
@@ -76,16 +77,29 @@ def _extract_structured_from_text(text: str) -> dict | None:
     if answer_match:
         result["answer"] = answer_match.group(1).strip()
 
-    kp_match = _re.search(
-        r'(?:Key [Pp]oints?|Points?|Bullets?)[:\s]+((?:[-*\u2022]\s*.+\n?)+)',
-        text, _re.IGNORECASE
-    )
-    if kp_match:
-        lines = kp_match.group(1).strip().split('\n')
-        result["key_points"] = [
+    def _extract_bullet_list(pattern: str) -> list[str] | None:
+        match = _re.search(pattern, text, _re.IGNORECASE)
+        if not match:
+            return None
+        lines = match.group(1).strip().split('\n')
+        return [
             _re.sub(r'^[-*\u2022]\s*', '', line).strip()
             for line in lines if line.strip()
         ]
+
+    kp = _extract_bullet_list(r'(?:Key [Pp]oints?|Points?|Bullets?)[:\s]+((?:[-*\u2022]\s*.+\n?)+)')
+    if kp:
+        result["key_points"] = kp
+
+    hints = _extract_bullet_list(r'(?:Hints?)[:\s]+((?:[-*\u2022]\s*.+\n?)+)')
+    if hints:
+        result["hints"] = hints
+
+    fuq = _extract_bullet_list(
+        r'(?:Follow[- ]up [Qq]uestions?|Socratic [Qq]uestions?)[:\s]+((?:[-*\u2022]\s*.+\n?)+)'
+    )
+    if fuq:
+        result["follow_up_questions"] = fuq
 
     return result if result else None
 
@@ -194,11 +208,25 @@ async def ws_endpoint(ws: WebSocket) -> None:
     # Per-connection tool result via closure — avoids global data races
     tool_result: dict = {}
 
-    def respond_to_user(summary: str, answer: str, key_points: list[str]) -> str:
-        """Respond to the user with a structured analysis of the screen content."""
+    def respond_to_user(
+        summary: str,
+        answer: str,
+        key_points: list[str],
+        hints: list[str],
+        follow_up_questions: list[str],
+    ) -> str:
+        """Respond to the user with a structured, tutoring-aware analysis of the slide.
+
+        hints: graduated hints from broad conceptual nudge → specific pointer →
+               near-answer scaffold. Empty list when there is no problem to solve.
+        follow_up_questions: 1-2 Socratic questions to deepen understanding.
+               Empty list when not applicable.
+        """
         tool_result["summary"] = summary
         tool_result["answer"] = answer
         tool_result["key_points"] = key_points
+        tool_result["hints"] = hints
+        tool_result["follow_up_questions"] = follow_up_questions
         return "OK"
 
     preset_id = "lecture-slide"
