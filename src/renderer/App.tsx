@@ -50,7 +50,7 @@ export default function App() {
 
     const shouldShowResponse =
       !isMinimizedPromptComposing &&
-      (errorMessage !== null || (!isSubmitting && latestResponseText !== null && latestResponseText.length > 0))
+      (errorMessage !== null || (latestResponseText !== null && latestResponseText.length > 0))
     const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
 
     if (nextVariant === minimizedVariant) {

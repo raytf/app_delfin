@@ -21,6 +21,7 @@ export default function MinimizedPromptPanel({
   onSubmitPrompt,
 }: MinimizedPromptPanelProps) {
   const [isComposing, setIsComposing] = useState(!isShowingResponse)
+  const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
 
   useEffect(() => {
     if (isSubmitting) {
@@ -49,31 +50,14 @@ export default function MinimizedPromptPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {isSubmitting ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center gap-2">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:0ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:150ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:300ms]" />
-        </div>
-      ) : (
-        <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-slate-800 bg-slate-950/45 p-4">
-          {errorMessage !== null ? (
-            <p className="text-sm leading-6 text-red-300">{errorMessage}</p>
-          ) : latestResponseText !== null && latestResponseText.length > 0 ? (
-            <div className="no-drag flex h-full min-h-0 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200">
-                <p className="whitespace-pre-wrap">{latestResponseText}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm leading-6 text-slate-400">
-              Ask about the current screen to get a response here.
-            </p>
-          )}
-        </div>
-      )}
+      <StreamingResponseBody
+        errorMessage={errorMessage}
+        hasResponseText={hasResponseText}
+        isSubmitting={isSubmitting}
+        latestResponseText={latestResponseText}
+      />
 
-      {!isSubmitting ? (
+      {!isSubmitting || hasResponseText ? (
         <div className="no-drag flex items-center gap-2">
           <button
             className="flex-1 rounded-2xl border border-slate-700 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400 hover:text-white"
@@ -93,6 +77,60 @@ export default function MinimizedPromptPanel({
           </button>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+interface StreamingResponseBodyProps {
+  errorMessage: string | null
+  hasResponseText: boolean
+  isSubmitting: boolean
+  latestResponseText: string | null
+}
+
+function StreamingResponseBody({
+  errorMessage,
+  hasResponseText,
+  isSubmitting,
+  latestResponseText,
+}: StreamingResponseBodyProps) {
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (scrollContainer === null) {
+      return
+    }
+
+    scrollContainer.scrollTo({
+      top: scrollContainer.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [latestResponseText, scrollContainer])
+
+  return (
+    <div className="min-h-[12rem] flex-1 rounded-[1.5rem] border border-slate-800 bg-slate-950/45 p-4">
+      {errorMessage !== null ? (
+        <p className="text-sm leading-6 text-red-300">{errorMessage}</p>
+      ) : latestResponseText !== null && latestResponseText.length > 0 ? (
+        <div className="no-drag flex h-full min-h-0 flex-col">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200"
+            ref={setScrollContainer}
+          >
+            <p className="whitespace-pre-wrap">{latestResponseText}</p>
+          </div>
+        </div>
+      ) : isSubmitting && !hasResponseText ? (
+        <div className="flex h-full min-h-0 items-center justify-center gap-2">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:0ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:150ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:300ms]" />
+        </div>
+      ) : (
+        <p className="text-sm leading-6 text-slate-400">
+          Ask about the current screen to get a response here.
+        </p>
+      )}
     </div>
   )
 }
