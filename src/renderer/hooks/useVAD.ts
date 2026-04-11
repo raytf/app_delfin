@@ -75,11 +75,12 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       try {
         const vad = await MicVAD.new({
           model: 'v5',
-          // Explicitly point to the root of the dev server / production bundle
-          // so the library can find the ONNX model and worklet files copied
-          // there by vite-plugin-static-copy.
-          baseAssetPath: '/',
-          onnxWASMBasePath: '/',
+          // Point at the paths Electron Vite actually serves/emits for these
+          // package assets. Using relative paths keeps this working in both
+          // dev (http://localhost:5173/...) and production (file://...)
+          // without assuming everything is hosted at the URL root.
+          baseAssetPath: './node_modules/@ricky0123/vad-web/dist/',
+          onnxWASMBasePath: './node_modules/onnxruntime-web/dist/',
           positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
           negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
           preSpeechPadMs: 300,
