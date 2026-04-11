@@ -62,9 +62,13 @@ export default defineConfig({
           { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: '.' },
           { src: `${vadDist}/silero_vad_v5.onnx`, dest: '.' },
           { src: `${vadDist}/silero_vad_legacy.onnx`, dest: '.' },
-          // ONNX Runtime WASM binaries required by onnxruntime-web inside vad-web
+          // ONNX Runtime WASM binaries + JS glue modules required by onnxruntime-web.
+          // ORT dynamically imports the .mjs companion alongside the .wasm binary,
+          // so both must be served at the same path root.
           { src: `${ortDist}/ort-wasm-simd-threaded.wasm`, dest: '.' },
+          { src: `${ortDist}/ort-wasm-simd-threaded.mjs`, dest: '.' },
           { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.wasm`, dest: '.' },
+          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.mjs`, dest: '.' },
         ],
       }),
     ],
