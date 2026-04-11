@@ -30,6 +30,11 @@ export interface WsOutboundMessage {
   preset_id: string
 }
 
+export interface SessionPromptRequest {
+  text: string
+  presetId: PresetId
+}
+
 export interface WsInterruptMessage {
   type: 'interrupt'
 }
@@ -58,6 +63,13 @@ export const IPC_CHANNELS = {
   CAPTURE_AUTO_REFRESH: 'capture:auto-refresh',
   SIDECAR_SEND: 'sidecar:send',
   SIDECAR_INTERRUPT: 'sidecar:interrupt',
+  OVERLAY_GET_STATE: 'overlay:get-state',
+  OVERLAY_MINIMIZE: 'overlay:minimize',
+  OVERLAY_RESTORE: 'overlay:restore',
+  OVERLAY_SET_MINIMIZED_VARIANT: 'overlay:set-minimized-variant',
+  SESSION_START: 'session:start',
+  SESSION_STOP: 'session:stop',
+  SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
   FRAME_CAPTURED: 'frame:captured',
   SIDECAR_TOKEN: 'sidecar:token',
   SIDECAR_STRUCTURED: 'sidecar:structured',
@@ -86,12 +98,29 @@ export interface SidecarStatus {
   visionTokens?: string
 }
 
+export type OverlayMode = 'expanded' | 'minimized'
+export type MinimizedOverlayVariant = 'compact' | 'prompt'
+export type SessionMode = 'home' | 'active'
+
+export interface OverlayState {
+  overlayMode: OverlayMode
+  minimizedVariant: MinimizedOverlayVariant
+  sessionMode: SessionMode
+}
+
 // Electron API exposed via contextBridge (window.api)
 export interface ElectronAPI {
   captureNow: () => Promise<void>
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) => void
   sidecarSend: (msg: WsOutboundMessage) => void
   sidecarInterrupt: () => void
+  getOverlayState: () => Promise<OverlayState>
+  startSession: () => Promise<void>
+  stopSession: () => Promise<void>
+  submitSessionPrompt: (request: SessionPromptRequest) => Promise<void>
+  minimizeOverlay: () => Promise<void>
+  restoreOverlay: () => Promise<void>
+  setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
   onSidecarStructured: (cb: (data: StructuredResponse) => void) => void
