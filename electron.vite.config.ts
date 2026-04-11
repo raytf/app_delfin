@@ -57,11 +57,11 @@ export default defineConfig({
   },
   renderer: {
     optimizeDeps: {
-      // ORT's dynamic wasm-loader imports do not survive Vite's dep optimizer
-      // in dev mode. Keep both packages unbundled so their runtime asset paths
-      // remain stable and load from the served package files instead of
-      // node_modules/.vite/deps/... cache paths.
-      exclude: ['@ricky0123/vad-web', 'onnxruntime-web'],
+      // vad-web is CommonJS and should still be prebundled to browser-safe ESM.
+      // onnxruntime-web stays excluded because ORT's dynamic wasm-loader imports
+      // break when Vite rewrites them through node_modules/.vite/deps in dev.
+      include: ['@ricky0123/vad-web'],
+      exclude: ['onnxruntime-web'],
     },
     // In dev mode the renderer loads from the Vite HTTP server, so we must set
     // COOP/COEP there directly — webRequest.onHeadersReceived fires too late for
