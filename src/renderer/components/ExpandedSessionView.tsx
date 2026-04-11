@@ -3,7 +3,7 @@ import { Clock, Minimize2, Square } from 'lucide-react'
 import type { ChatMessage, SidecarStatus } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import { useSessionStore } from '../stores/sessionStore'
-import type { WaveformVisualState } from '../utils/waveformState'
+import type { WaveformBars, WaveformVisualState } from '../utils/waveformState'
 import SessionConversation from './SessionConversation'
 import SessionPromptComposer from './SessionPromptComposer'
 import VoiceWaveform from './VoiceWaveform'
@@ -23,7 +23,7 @@ interface ExpandedSessionViewProps {
   showVoiceWaveform: boolean
   sidecarStatus: SidecarStatus
   vadListeningEnabled: boolean
-  waveformLevel: number
+  waveformBars: WaveformBars
   waveformState: WaveformVisualState
 }
 
@@ -80,7 +80,7 @@ export default function ExpandedSessionView({
   showVoiceWaveform,
   sidecarStatus,
   vadListeningEnabled,
-  waveformLevel,
+  waveformBars,
   waveformState,
 }: ExpandedSessionViewProps) {
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
@@ -155,8 +155,8 @@ export default function ExpandedSessionView({
             {showVoiceWaveform ? (
               <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)] px-3 py-2">
                 <VoiceWaveform
+                  bars={waveformBars}
                   label={`Speech waveform in ${waveformState} mode`}
-                  level={waveformLevel}
                   state={waveformState}
                 />
               </div>

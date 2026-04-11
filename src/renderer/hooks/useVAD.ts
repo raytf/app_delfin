@@ -16,6 +16,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { float32ToWavBase64 } from '../utils/audioUtils'
+import {
+  createWaveformBars,
+  getWaveformActivityLevel,
+  reduceFrequencyDataToWaveformBars,
+  smoothWaveformBars,
+  WAVEFORM_BAR_COUNT,
+  type WaveformBars,
+} from '../utils/waveformState'
 
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
 const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
@@ -45,6 +53,8 @@ export interface UseVADReturn {
   isMuted: boolean
   /** Smoothed microphone activity level, normalized to 0..1 during speech. */
   userAudioLevel: number
+  /** Smoothed per-bar microphone waveform data for renderer-local visualisation. */
+  userWaveformBars: WaveformBars
   /** Toggle mic on/off without destroying the VAD instance. */
   toggleMute: () => void
   /**
@@ -64,6 +74,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
   const [isUserSpeaking, setIsUserSpeaking] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [userAudioLevel, setUserAudioLevel] = useState(0)
+  const [userWaveformBars, setUserWaveformBars] = useState<WaveformBars>(() => createWaveformBars())
 
   const vadRef = useRef<VadMicVADInstance | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -74,6 +85,9 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
   const smoothedLevelRef = useRef(0)
+  const isMutedRef = useRef(false)
+  const userWaveformBarsRef = useRef<number[]>(createWaveformBars())
+  const waveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
 
   // Keep callback refs current so we never need to recreate the VAD instance
   // just because the parent re-rendered with a new inline function.
@@ -81,23 +95,76 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
   const onSpeechStartRef = useRef(onSpeechStart)
   useEffect(() => { onSpeechEndRef.current = onSpeechEnd }, [onSpeechEnd])
   useEffect(() => { onSpeechStartRef.current = onSpeechStart }, [onSpeechStart])
+  useEffect(() => { isMutedRef.current = isMuted }, [isMuted])
+
+  const resetUserWaveform = useCallback(() => {
+    const emptyBars = createWaveformBars(WAVEFORM_BAR_COUNT)
+    userWaveformBarsRef.current = emptyBars
+    waveformFrequencyDataRef.current = null
+    smoothedLevelRef.current = 0
+    setUserWaveformBars(emptyBars)
+    setUserAudioLevel(0)
+  }, [])
+
+  const stopUserLevelLoop = useCallback(() => {
+    if (levelAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(levelAnimationFrameRef.current)
+      levelAnimationFrameRef.current = null
+    }
+  }, [])
+
+  const startUserLevelLoop = useCallback(() => {
+    if (levelAnimationFrameRef.current !== null) {
+      return
+    }
+
+    const sample = () => {
+      const analyser = analyserRef.current
+      if (analyser === null) {
+        stopUserLevelLoop()
+        resetUserWaveform()
+        return
+      }
+
+      let nextBars: WaveformBars
+
+      if (isMutedRef.current) {
+        nextBars = smoothWaveformBars(userWaveformBarsRef.current, createWaveformBars(WAVEFORM_BAR_COUNT), {
+          attack: 0.22,
+          release: 0.24,
+        })
+      } else {
+        if (waveformFrequencyDataRef.current === null || waveformFrequencyDataRef.current.length !== analyser.frequencyBinCount) {
+          waveformFrequencyDataRef.current = new Uint8Array(analyser.frequencyBinCount)
+        }
+
+        analyser.getByteFrequencyData(waveformFrequencyDataRef.current)
+        const reducedBars = reduceFrequencyDataToWaveformBars(waveformFrequencyDataRef.current, WAVEFORM_BAR_COUNT)
+        nextBars = smoothWaveformBars(userWaveformBarsRef.current, reducedBars, {
+          attack: 0.4,
+          release: 0.16,
+        })
+      }
+
+      const nextLevel = getWaveformActivityLevel(nextBars)
+      userWaveformBarsRef.current = [...nextBars]
+      smoothedLevelRef.current = nextLevel
+      setUserWaveformBars(userWaveformBarsRef.current)
+      setUserAudioLevel(nextLevel)
+      levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+    }
+
+    levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+  }, [resetUserWaveform, stopUserLevelLoop])
 
   useEffect(() => {
     if (!enabled) return
 
     let destroyed = false
 
-    const stopUserLevelLoop = (): void => {
-      if (levelAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(levelAnimationFrameRef.current)
-        levelAnimationFrameRef.current = null
-      }
-      smoothedLevelRef.current = 0
-      setUserAudioLevel(0)
-    }
-
     const cleanupAudioResources = (): void => {
       stopUserLevelLoop()
+      resetUserWaveform()
       for (const track of micStreamRef.current?.getTracks() ?? []) {
         track.stop()
       }
@@ -148,36 +215,6 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         analyserRef.current = analyser
         micSourceRef.current = micSource
 
-        const startUserLevelLoop = (): void => {
-          if (levelAnimationFrameRef.current !== null) {
-            return
-          }
-
-          const sample = () => {
-            const activeAnalyser = analyserRef.current
-            if (activeAnalyser === null) {
-              stopUserLevelLoop()
-              return
-            }
-
-            const data = new Uint8Array(activeAnalyser.frequencyBinCount)
-            activeAnalyser.getByteFrequencyData(data)
-            let sum = 0
-            for (const value of data) {
-              sum += value
-            }
-
-            const average = data.length === 0 ? 0 : sum / data.length
-            const normalized = Math.min(1, average / 96)
-            const smoothed = smoothedLevelRef.current * 0.72 + normalized * 0.28
-            smoothedLevelRef.current = smoothed
-            setUserAudioLevel(smoothed)
-            levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
-          }
-
-          levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
-        }
-
         const vad = await vadRuntime.MicVAD.new({
           getStream: async () => micStream,
           model: 'v5',
@@ -195,14 +232,12 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
           onSpeechStart: () => {
             if (inGracePeriodRef.current) return
             setIsUserSpeaking(true)
-            startUserLevelLoop()
             onSpeechStartRef.current?.()
           },
 
           onSpeechEnd: (audio: Float32Array) => {
             if (inGracePeriodRef.current) return
             setIsUserSpeaking(false)
-            stopUserLevelLoop()
             const wavBase64 = float32ToWavBase64(audio)
             onSpeechEndRef.current(wavBase64)
           },
@@ -219,6 +254,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
         vadRef.current = vad
         await vad.start()
+        startUserLevelLoop()
         setIsListening(true)
       } catch (err) {
         cleanupAudioResources()
@@ -239,28 +275,26 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       vadRef.current = null
       setIsListening(false)
     }
-  }, [enabled])
+  }, [enabled, resetUserWaveform, startUserLevelLoop, stopUserLevelLoop])
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
       const next = !prev
+      isMutedRef.current = next
       if (vadRef.current !== null) {
         if (next) {
-          if (levelAnimationFrameRef.current !== null) {
-            window.cancelAnimationFrame(levelAnimationFrameRef.current)
-            levelAnimationFrameRef.current = null
-          }
-          smoothedLevelRef.current = 0
+          stopUserLevelLoop()
           setIsUserSpeaking(false)
-          setUserAudioLevel(0)
+          resetUserWaveform()
           void vadRef.current.pause()
         } else {
           void vadRef.current.start()
+          startUserLevelLoop()
         }
       }
       return next
     })
-  }, [])
+  }, [resetUserWaveform, startUserLevelLoop, stopUserLevelLoop])
 
   const raiseThreshold = useCallback(() => {
     vadRef.current?.setOptions({
@@ -283,5 +317,14 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
     })
   }, [])
 
-  return { isListening, isUserSpeaking, isMuted, userAudioLevel, toggleMute, raiseThreshold, lowerThreshold }
+  return {
+    isListening,
+    isUserSpeaking,
+    isMuted,
+    userAudioLevel,
+    userWaveformBars,
+    toggleMute,
+    raiseThreshold,
+    lowerThreshold,
+  }
 }

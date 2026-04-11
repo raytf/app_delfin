@@ -17,7 +17,14 @@ import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import { decodeAudioChunk } from './utils/audioUtils'
 import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
-import { resolveWaveformPresentation } from './utils/waveformState'
+import {
+  createWaveformBars,
+  getWaveformActivityLevel,
+  reduceFrequencyDataToWaveformBars,
+  resolveWaveformPresentation,
+  smoothWaveformBars,
+  WAVEFORM_BAR_COUNT,
+} from './utils/waveformState'
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -39,6 +46,7 @@ export default function App() {
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [assistantAudioLevel, setAssistantAudioLevel] = useState(0)
+  const [assistantWaveformBars, setAssistantWaveformBars] = useState(() => createWaveformBars())
 
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
@@ -64,6 +72,7 @@ export default function App() {
       : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
 
   const audioContextRef = useRef<AudioContext | null>(null)
+  const assistantGainNodeRef = useRef<GainNode | null>(null)
   const assistantAnalyserRef = useRef<AnalyserNode | null>(null)
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
@@ -71,6 +80,8 @@ export default function App() {
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
+  const assistantWaveformBarsRef = useRef(createWaveformBars())
+  const assistantWaveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingVoiceWavRef = useRef<string | null>(null)
@@ -83,6 +94,67 @@ export default function App() {
     isAudioPlayingRef.current = nextValue
     setIsAudioPlaying(nextValue)
   }, [])
+
+  const resetAssistantWaveform = useCallback(() => {
+    const emptyBars = createWaveformBars(WAVEFORM_BAR_COUNT)
+    assistantWaveformBarsRef.current = emptyBars
+    assistantWaveformFrequencyDataRef.current = null
+    setAssistantWaveformBars(emptyBars)
+    setAssistantAudioLevel(0)
+  }, [])
+
+  const stopAssistantWaveformLoop = useCallback(() => {
+    if (assistantLevelAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
+      assistantLevelAnimationFrameRef.current = null
+    }
+  }, [])
+
+  const startAssistantWaveformLoop = useCallback(() => {
+    if (assistantLevelAnimationFrameRef.current !== null) {
+      return
+    }
+
+    const sample = () => {
+      const analyser = assistantAnalyserRef.current
+      if (analyser === null) {
+        stopAssistantWaveformLoop()
+        return
+      }
+
+      if (
+        assistantWaveformFrequencyDataRef.current === null ||
+        assistantWaveformFrequencyDataRef.current.length !== analyser.frequencyBinCount
+      ) {
+        assistantWaveformFrequencyDataRef.current = new Uint8Array(analyser.frequencyBinCount)
+      }
+
+      analyser.getByteFrequencyData(assistantWaveformFrequencyDataRef.current)
+      const reducedBars = reduceFrequencyDataToWaveformBars(
+        assistantWaveformFrequencyDataRef.current,
+        WAVEFORM_BAR_COUNT,
+      )
+      const nextBars = smoothWaveformBars(assistantWaveformBarsRef.current, reducedBars, {
+        attack: 0.36,
+        release: 0.14,
+      })
+      const nextLevel = getWaveformActivityLevel(nextBars)
+
+      assistantWaveformBarsRef.current = nextBars
+      setAssistantWaveformBars(nextBars)
+      setAssistantAudioLevel(nextLevel)
+
+      const shouldContinue = isAudioPlayingRef.current || audioStreamActiveRef.current || nextLevel > 0.014
+      if (!shouldContinue) {
+        stopAssistantWaveformLoop()
+        return
+      }
+
+      assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+    }
+
+    assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+  }, [stopAssistantWaveformLoop])
 
   const clearFallbackSpeechTimer = useCallback(() => {
     if (fallbackSpeechTimerRef.current !== null) {
@@ -120,9 +192,13 @@ export default function App() {
       if (audioContext === null || audioContext.state === 'closed') {
         audioContext = new AudioContext({ sampleRate: 24_000 })
         audioContextRef.current = audioContext
+        const gainNode = audioContext.createGain()
         const analyser = audioContext.createAnalyser()
         analyser.fftSize = 256
         analyser.smoothingTimeConstant = 0.8
+        gainNode.connect(analyser)
+        analyser.connect(audioContext.destination)
+        assistantGainNodeRef.current = gainNode
         assistantAnalyserRef.current = analyser
       }
 
@@ -139,7 +215,6 @@ export default function App() {
 
   const finishAudioPlayback = useCallback(() => {
     audioStreamActiveRef.current = false
-    setAssistantAudioLevel(0)
     setAudioPlayingState(false)
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
@@ -209,7 +284,16 @@ export default function App() {
     submitVoiceTurn(pendingWav)
   }, [sessionMode, submitVoiceTurn])
 
-  const { raiseThreshold, lowerThreshold, isListening, isMuted, isUserSpeaking, toggleMute, userAudioLevel } = useVAD({
+  const {
+    raiseThreshold,
+    lowerThreshold,
+    isListening,
+    isMuted,
+    isUserSpeaking,
+    toggleMute,
+    userAudioLevel,
+    userWaveformBars,
+  } = useVAD({
     enabled: voiceEnabled && sessionMode === 'active',
     onSpeechEnd: (wavBase64: string) => {
       if (sessionMode !== 'active') {
@@ -259,59 +343,13 @@ export default function App() {
   const showVoiceWaveform = voiceEnabled && vadListeningEnabled
   const waveformPresentation = resolveWaveformPresentation({
     assistantAudioLevel,
+    assistantWaveformBars,
     isAssistantSpeaking: isAudioPlaying,
     isProcessing: isSubmitting,
     isUserSpeaking,
     userAudioLevel,
+    userWaveformBars,
   })
-
-  useEffect(() => {
-    if (!isAudioPlaying) {
-      if (assistantLevelAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
-        assistantLevelAnimationFrameRef.current = null
-      }
-      setAssistantAudioLevel(0)
-      return
-    }
-
-    const sampleAssistantLevel = () => {
-      const analyser = assistantAnalyserRef.current
-
-      if (analyser === null) {
-        assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
-        return
-      }
-
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      analyser.getByteFrequencyData(data)
-
-      let sum = 0
-      for (const value of data) {
-        sum += value
-      }
-
-      const average = data.length === 0 ? 0 : sum / data.length
-      const normalized = Math.min(1, average / 112)
-
-      setAssistantAudioLevel((previousLevel) => {
-        const nextLevel = previousLevel * 0.68 + normalized * 0.32
-        return Math.abs(nextLevel - previousLevel) < 0.01 ? previousLevel : nextLevel
-      })
-
-      assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
-    }
-
-    assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
-
-    return () => {
-      if (assistantLevelAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
-        assistantLevelAnimationFrameRef.current = null
-      }
-      setAssistantAudioLevel(0)
-    }
-  }, [isAudioPlaying])
 
   useEffect(() => {
     if (!voiceEnabled || sessionMode !== 'active' || !isListening) {
@@ -422,12 +460,15 @@ export default function App() {
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
+      resetAssistantWaveform()
       aiStreamingStartedRef.current = true
       audioStartedForTurnRef.current = true
       audioStreamActiveRef.current = true
       setAudioPlayingState(true)
       raiseThreshold()
-      void ensureAudioContext()
+      void ensureAudioContext().then(() => {
+        startAssistantWaveformLoop()
+      })
     })
 
     window.api.onSidecarAudioChunk((data) => {
@@ -441,9 +482,10 @@ export default function App() {
         const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
         const sourceNode = audioContext.createBufferSource()
         sourceNode.buffer = audioBuffer
-        sourceNode.connect(audioContext.destination)
-        if (assistantAnalyserRef.current !== null) {
-          sourceNode.connect(assistantAnalyserRef.current)
+        if (assistantGainNodeRef.current !== null) {
+          sourceNode.connect(assistantGainNodeRef.current)
+        } else {
+          sourceNode.connect(audioContext.destination)
         }
         sourceNode.onended = () => {
           sourceNode.disconnect()
@@ -456,6 +498,7 @@ export default function App() {
         audioSourceNodesRef.current.add(sourceNode)
         sourceNode.start(startAt)
         audioNextStartTimeRef.current = startAt + audioBuffer.duration
+        startAssistantWaveformLoop()
       })()
     })
 
@@ -509,26 +552,24 @@ export default function App() {
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
-
-      if (assistantLevelAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
-        assistantLevelAnimationFrameRef.current = null
-      }
-
-      setAssistantAudioLevel(0)
+      stopAssistantWaveformLoop()
+      resetAssistantWaveform()
 
       if (audioContextRef.current !== null) {
         void audioContextRef.current.close()
         audioContextRef.current = null
       }
 
+      assistantGainNodeRef.current = null
       assistantAnalyserRef.current = null
     }
-  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, stopScheduledAudioSources])
+  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
     aiStreamingStartedRef.current = false
+    stopAssistantWaveformLoop()
+    resetAssistantWaveform()
     setSessionHistory([])
     clearConversation()
     startSession()
@@ -557,7 +598,16 @@ export default function App() {
     clearFallbackSpeechTimer()
     cancelSpeechSynthesis()
     stopScheduledAudioSources()
+    stopAssistantWaveformLoop()
+    resetAssistantWaveform()
     finishAudioPlayback()
+
+    if (audioContextRef.current !== null) {
+      void audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    assistantGainNodeRef.current = null
+    assistantAnalyserRef.current = null
 
     try {
       window.api.sidecarInterrupt()
@@ -661,8 +711,8 @@ export default function App() {
         }}
         onToggleVadListening={toggleVadListening}
         vadListeningEnabled={vadListeningEnabled}
+        waveformBars={waveformPresentation.bars}
         showVoiceWaveform={showVoiceWaveform}
-        waveformLevel={waveformPresentation.level}
         waveformState={waveformPresentation.state}
       />
     )
@@ -690,8 +740,8 @@ export default function App() {
         onToggleVadListening={toggleVadListening}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
+        waveformBars={waveformPresentation.bars}
         showVoiceWaveform={showVoiceWaveform}
-        waveformLevel={waveformPresentation.level}
         waveformState={waveformPresentation.state}
       />
     )
