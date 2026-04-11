@@ -1,19 +1,22 @@
 {
-  "name": "screen-copilot",
-  "version": "0.0.0",
-  "description": "Local AI desktop sidebar for screen analysis",
+  "name": "delfin",
+  "version": "0.1.0",
+  "description": "Delfin — a live voice-based study assistant that understands your screen context. Fully local, private, no API costs.",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "dev:sidecar": "node scripts/run-sidecar.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
+    "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
     "build": "electron-vite build",
-    "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
+    "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
-    "setup": "npm install && npm run setup:sidecar && npm run download:models && npm run check:env",
+    "setup": "npm run init:env && npm run setup:sidecar && npm run download:models && npm run check:env",
     "setup:sidecar": "node scripts/setup-sidecar.mjs",
+    "init:env": "node scripts/init-env.mjs",
     "download:models": "node scripts/download-models.mjs",
     "check:env": "node scripts/check-env.mjs",
+    "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
