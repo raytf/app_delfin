@@ -26,6 +26,23 @@ const child = spawn(
   },
 )
 
+const child = spawn(
+  venvPython,
+  ['-m', 'uvicorn', 'server:app', '--host', host, '--port', port],
+  {
+    cwd: sidecarDir,
+    stdio: 'inherit',
+  },
+)
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => {
+    if (!child.killed) {
+      child.kill(signal)
+    }
+  })
+}
+
 child.on('exit', (code, signal) => {
   if (signal !== null) {
     process.kill(process.pid, signal)
