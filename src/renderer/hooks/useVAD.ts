@@ -75,12 +75,12 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       try {
         const vad = await MicVAD.new({
           model: 'v5',
-          // Point at the paths Electron Vite actually serves/emits for these
-          // package assets. Using relative paths keeps this working in both
-          // dev (http://localhost:5173/...) and production (file://...)
-          // without assuming everything is hosted at the URL root.
-          baseAssetPath: './node_modules/@ricky0123/vad-web/dist/',
-          onnxWASMBasePath: './node_modules/onnxruntime-web/dist/',
+          // Point at an app-owned asset directory populated by
+          // vite-plugin-static-copy. Using a stable relative path keeps this
+          // working in both dev (http://localhost:5173/...) and production
+          // (file://...) without depending on runtime node_modules URLs.
+          baseAssetPath: './vad-assets/',
+          onnxWASMBasePath: './vad-assets/',
           positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
           negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
           preSpeechPadMs: 300,

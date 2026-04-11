@@ -56,6 +56,13 @@ export default defineConfig({
     },
   },
   renderer: {
+    optimizeDeps: {
+      // ORT's dynamic wasm-loader imports do not survive Vite's dep optimizer
+      // in dev mode. Keep both packages unbundled so their runtime asset paths
+      // remain stable and load from the served package files instead of
+      // node_modules/.vite/deps/... cache paths.
+      exclude: ['@ricky0123/vad-web', 'onnxruntime-web'],
+    },
     // In dev mode the renderer loads from the Vite HTTP server, so we must set
     // COOP/COEP there directly — webRequest.onHeadersReceived fires too late for
     // the initial document and SharedArrayBuffer stays undefined without this.
@@ -84,23 +91,22 @@ export default defineConfig({
       // Strips ?import query param from ORT .mjs dynamic-import URLs in dev mode.
       // Vite appends ?import to dynamic imports; static copy serves without it → 404.
       ortWasmDevServePlugin(),
-      // Copies VAD worker + ONNX model files into the renderer output root so
-      // @ricky0123/vad-web can load them via its asset-path resolution logic.
-      // In dev mode the plugin serves them directly; in production they land in
-      // out/renderer/ alongside index.html.
+      // Copies VAD worker + ONNX model files into an app-owned vad-assets/
+      // directory. This avoids runtime dependence on node_modules/... paths and
+      // keeps dev/prod asset URLs stable.
       viteStaticCopy({
         targets: [
           // VAD AudioWorklet + Silero ONNX models
-          { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: '.' },
-          { src: `${vadDist}/silero_vad_v5.onnx`, dest: '.' },
-          { src: `${vadDist}/silero_vad_legacy.onnx`, dest: '.' },
+          { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${vadDist}/silero_vad_v5.onnx`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${vadDist}/silero_vad_legacy.onnx`, dest: 'vad-assets', rename: { stripBase: true } },
           // ONNX Runtime WASM binaries + JS glue modules required by onnxruntime-web.
           // ORT dynamically imports the .mjs companion alongside the .wasm binary,
-          // so both must be served at the same path root.
-          { src: `${ortDist}/ort-wasm-simd-threaded.wasm`, dest: '.' },
-          { src: `${ortDist}/ort-wasm-simd-threaded.mjs`, dest: '.' },
-          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.wasm`, dest: '.' },
-          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.mjs`, dest: '.' },
+          // so both must be served under the same stable vad-assets/ prefix.
+          { src: `${ortDist}/ort-wasm-simd-threaded.wasm`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${ortDist}/ort-wasm-simd-threaded.mjs`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.wasm`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.mjs`, dest: 'vad-assets', rename: { stripBase: true } },
         ],
       }),
     ],
