@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
@@ -78,6 +78,33 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Screen Copilot started");
+
+  // ------------------------------------------------------------------
+  // COOP/COEP headers — required for SharedArrayBuffer used by
+  // @ricky0123/vad-web (Silero VAD runs in a SharedArrayBuffer-backed
+  // AudioWorklet). Must be applied before any window loads.
+  // ------------------------------------------------------------------
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers: Record<string, string[]> = {
+      ...details.responseHeaders as Record<string, string[]>,
+    };
+    headers["Cross-Origin-Opener-Policy"] = ["same-origin"];
+    headers["Cross-Origin-Embedder-Policy"] = ["require-corp"];
+    callback({ responseHeaders: headers });
+  });
+
+  // ------------------------------------------------------------------
+  // Grant microphone (getUserMedia) permission automatically.
+  // The user will still see the OS-level mic permission prompt on first
+  // run — this just prevents Electron from blocking the request itself.
+  // ------------------------------------------------------------------
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      const allowed = ["media", "microphone"];
+      callback(allowed.includes(permission));
+    },
+  );
+
   sessionPersistence = new SessionPersistenceService(
     new FileSessionStorage(join(app.getPath("userData"), "storage")),
   );
