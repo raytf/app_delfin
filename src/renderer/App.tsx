@@ -52,6 +52,12 @@ export default function App() {
 
     window.api.onSidecarStructured((data) => {
       setStructuredResponse(data)
+      // Also push the answer into streamedText so MinimizedSessionBar
+      // (which only receives responseText, not structuredResponse) can
+      // display something — structured responses never emit tokens.
+      if (data.answer) {
+        setStreamedText(data.answer)
+      }
     })
 
     window.api.onSidecarDone(() => {
@@ -130,8 +136,9 @@ export default function App() {
       setIsSubmitting(false)
       return
     }
-
-    setIsSubmitting(false)
+    // Do NOT call setIsSubmitting(false) here — submitSessionPrompt resolves
+    // as soon as the message is dispatched (fire-and-forget). isSubmitting is
+    // reset by onSidecarDone / onSidecarError when the sidecar actually replies.
   }
 
   if (sessionMode === 'active' && overlayMode === 'minimized') {
