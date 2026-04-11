@@ -5,6 +5,7 @@ import MinimizedSessionBar from './components/MinimizedSessionBar'
 import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import { decodeAudioChunk } from './utils/audioUtils'
+import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
 import {
   type ChatMessage,
   MAIN_TO_RENDERER_CHANNELS,
@@ -78,13 +79,19 @@ export default function App() {
   }, [])
 
   const revealMinimizedVoiceResponse = useCallback(() => {
-    if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant !== 'compact') {
+    const nextVariant = getVoiceTurnRevealVariant({
+      minimizedVariant,
+      overlayMode,
+      sessionMode,
+    })
+
+    if (nextVariant === null) {
       return
     }
 
     setIsMinimizedPromptComposing(false)
-    setMinimizedVariant('prompt-response')
-    void window.api.setMinimizedOverlayVariant('prompt-response')
+    setMinimizedVariant(nextVariant)
+    void window.api.setMinimizedOverlayVariant(nextVariant)
   }, [minimizedVariant, overlayMode, sessionMode])
 
   const cancelSpeechSynthesis = useCallback(() => {
@@ -272,16 +279,16 @@ export default function App() {
   }, [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode])
 
   useEffect(() => {
-    if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
-      return
-    }
+    const nextVariant = getAutoAdvanceMinimizedVariant({
+      errorMessage,
+      isMinimizedPromptComposing,
+      latestResponseText,
+      minimizedVariant,
+      overlayMode,
+      sessionMode,
+    })
 
-    const shouldShowResponse =
-      !isMinimizedPromptComposing &&
-      (errorMessage !== null || (latestResponseText !== null && latestResponseText.length > 0))
-    const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
-
-    if (nextVariant === minimizedVariant) {
+    if (nextVariant === null) {
       return
     }
 

@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (manual speech toggle, thinking-phase interrupt guard, and minimized voice-stream auto-open implemented)
+> Last updated: 2026-04-11 (voice overlay tests added and final voice UX review completed)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -65,6 +65,9 @@
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
 | `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand/end-session buttons, manual speech toggle, and live voice-response streaming when auto-opened |
+| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance and voice-turn auto-open decisions |
+| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay voice auto-open and response-panel transitions |
+| `package.json` — `npm test` script | ✅ | Runs Vitest renderer unit tests via `vitest run` |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
@@ -181,6 +184,7 @@
 | `ExpandedSessionView` — 🔊 pulsing indicator while `isAudioPlaying` | ✅ | Inline speaking indicator shown during audio playback |
 | `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state and lets the user pause/resume VAD listening |
 | `MinimizedSessionBar` — mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay shows live mic/speaking state, auto-opens for voice turns, and streams text in-panel |
+| Minimized overlay voice auto-open decision tests | ✅ | `src/renderer/__tests__/minimizedOverlay.test.ts` verifies compact→response reveal and existing auto-advance rules |
 
 ### Auto-refresh (deprioritised)
 

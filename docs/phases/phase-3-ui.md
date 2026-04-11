@@ -252,12 +252,15 @@ Design guidelines:
 
 ## 3.5 Smoke test
 
-Create a minimal test file at `src/renderer/__tests__/stores.test.ts`:
+Create a minimal renderer test file under `src/renderer/__tests__/`.
 
-- Test that `sessionStore.addMessage` adds a message
-- Test that `sessionStore.appendStreamingToken` accumulates text
-- Test that `sessionStore.finaliseStreaming` moves streaming text to a message
-- Use Vitest (already included with electron-vite) or plain assertions
+Current implementation uses `src/renderer/__tests__/minimizedOverlay.test.ts` to verify:
+
+- voice turns auto-open minimized `compact` mode into `prompt-response`
+- streamed/error response auto-advance still toggles between `prompt-input` and `prompt-response`
+- non-voice compact mode does not auto-open through the standard auto-advance path
+
+Use Vitest via `npm test`.
 
 ---
 
@@ -282,4 +285,4 @@ Create a minimal test file at `src/renderer/__tests__/stores.test.ts`:
 - [ ] Chat panel auto-scrolls to the bottom on new messages
 - [ ] Error messages from sidecar display inline with red styling
 - [ ] Input is disabled while streaming
-- [ ] Zustand store tests pass (if implemented)
+- [x] Renderer unit tests pass (`npm test`) — minimized overlay voice behavior covered by Vitest
