@@ -21,6 +21,10 @@ export interface StructuredResponse {
   summary: string
   answer: string
   key_points: string[]
+  /** Graduated hints for the visible problem: broad nudge → specific pointer → near-answer scaffold. */
+  hints?: string[]
+  /** Socratic follow-up questions to deepen understanding. */
+  follow_up_questions?: string[]
 }
 
 // WebSocket outbound (Electron → Sidecar)
