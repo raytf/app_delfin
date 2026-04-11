@@ -69,9 +69,9 @@ export default function MinimizedSessionBar({
   const isPromptOpen = minimizedVariant !== 'compact'
 
   return (
-    <div className="drag-region flex min-h-screen items-center justify-center text-white">
+    <div className=" drag-region flex h-screen overflow-hidden items-center justify-center text-white">
       <div
-        className={`flex min-h-screen w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${
+        className={`flex h-full w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${
           isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
         }`}
       >
@@ -87,7 +87,7 @@ export default function MinimizedSessionBar({
           />
         ) : null}
 
-        <div className={isPromptOpen ? 'mt-3 flex items-center justify-center gap-2' : 'flex items-center justify-center gap-2'}>
+        <div className={isPromptOpen ? 'drag-region mt-3 flex items-center justify-center gap-2' : 'drag-region flex items-center justify-center gap-2'}>
           <button
             aria-label="Start prompt"
             className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300"

@@ -33,11 +33,13 @@ export default function MinimizedPromptPanel({
     setIsComposing(!isShowingResponse)
   }, [isShowingResponse])
 
+  console.log(latestStructuredResponse)
+
   if (isComposing) {
     return (
       <SessionPromptComposer
         autoFocus
-        className="no-drag flex items-center gap-2"
+        className="drag-region flex items-center gap-2"
         isSubmitting={isSubmitting}
         onSubmitPrompt={(text) => {
           onSubmitPrompt(text)
@@ -64,19 +66,19 @@ export default function MinimizedPromptPanel({
             <div className="flex h-full min-h-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200">
                 <div className="space-y-3">
-                  <div>
+                  {/* <div>
                     <p className="mt-1 whitespace-pre-wrap">{latestStructuredResponse.summary}</p>
-                  </div>
+                  </div> */}
                   <div>
                     <p className="mt-1 whitespace-pre-wrap">{latestStructuredResponse.answer}</p>
                   </div>
-                  <div>
+                  {/* <div>
                     <ul className="mt-1 space-y-1">
                       {latestStructuredResponse.key_points.map((point) => (
                         <li key={point}>{point}</li>
                       ))}
                     </ul>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
