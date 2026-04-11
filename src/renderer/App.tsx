@@ -125,7 +125,6 @@ export default function App() {
         text: trimmedText,
         presetId: 'lecture-slide',
       })
-      setStreamedText(`Prompt queued locally: "${trimmedText}"\n\nSidecar integration is not wired yet, so no response will stream yet.`)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to submit prompt.')
       setIsSubmitting(false)

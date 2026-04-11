@@ -1,27 +1,36 @@
-import { app, BrowserWindow } from 'electron'
-import { config } from 'dotenv'
-import { registerIpcHandlers } from './ipc/handlers'
-import { createOverlayWindow, setOverlayMode } from './overlay/overlayWindow'
-import { disconnectFromSidecar } from './sidecar/wsClient'
-import type { MinimizedOverlayVariant, OverlayMode, OverlayState, SessionMode } from '../shared/types'
+import { app, BrowserWindow } from "electron";
+import { config } from "dotenv";
+import { registerIpcHandlers } from "./ipc/handlers";
+import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
+import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
+import {
+  IPC_CHANNELS,
+  type MinimizedOverlayVariant,
+  type OverlayMode,
+  type OverlayState,
+  type SessionMode,
+} from "../shared/types";
 
-config() // load .env from repo root
+config(); // load .env from repo root
 
-let mainWindow: BrowserWindow | null = null
-let overlayMode: OverlayMode = 'expanded'
-let minimizedVariant: MinimizedOverlayVariant = 'compact'
-let sessionMode: SessionMode = 'home'
+let mainWindow: BrowserWindow | null = null;
+let overlayMode: OverlayMode = "expanded";
+let minimizedVariant: MinimizedOverlayVariant = "compact";
+let sessionMode: SessionMode = "home";
 
 function createWindow(mode: OverlayMode): BrowserWindow {
-  const window = createOverlayWindow(mode, minimizedVariant)
-  overlayMode = mode
-  mainWindow = window
-  window.on('closed', () => {
+  const window = createOverlayWindow(mode, minimizedVariant);
+  overlayMode = mode;
+  mainWindow = window;
+  window.webContents.once("did-finish-load", () => {
+    window.webContents.send(IPC_CHANNELS.SIDECAR_STATUS, getSidecarStatus());
+  });
+  window.on("closed", () => {
     if (mainWindow === window) {
-      mainWindow = null
+      mainWindow = null;
     }
-  })
-  return window
+  });
+  return window;
 }
 
 function getOverlayState(): OverlayState {
@@ -29,58 +38,63 @@ function getOverlayState(): OverlayState {
     overlayMode,
     minimizedVariant,
     sessionMode,
-  }
+  };
 }
 
 function setSessionMode(mode: SessionMode): void {
-  sessionMode = mode
+  sessionMode = mode;
 }
 
 function setMinimizedVariant(variant: MinimizedOverlayVariant): void {
-  minimizedVariant = variant
+  minimizedVariant = variant;
 }
 
 async function switchOverlayMode(mode: OverlayMode): Promise<void> {
-  if (overlayMode === mode && mainWindow !== null && !mainWindow.isDestroyed()) {
-    setOverlayMode(mainWindow, mode, minimizedVariant)
-    mainWindow.focus()
-    return
+  if (
+    overlayMode === mode &&
+    mainWindow !== null &&
+    !mainWindow.isDestroyed()
+  ) {
+    setOverlayMode(mainWindow, mode, minimizedVariant);
+    mainWindow.focus();
+    return;
   }
 
-  const previousWindow = mainWindow
-  const nextWindow = createWindow(mode)
+  const previousWindow = mainWindow;
+  const nextWindow = createWindow(mode);
 
   if (previousWindow !== null && !previousWindow.isDestroyed()) {
-    previousWindow.destroy()
+    previousWindow.destroy();
   }
 
-  nextWindow.focus()
+  nextWindow.focus();
 }
 
 app.whenReady().then(() => {
-  console.log('Screen Copilot started')
+  console.log("Screen Copilot started");
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
+    sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
     setMinimizedVariant,
     switchOverlayMode,
     setSessionMode,
-  })
+  });
 
-  mainWindow = createWindow('expanded')
+  mainWindow = createWindow("expanded");
 
-  app.on('activate', () => {
+  app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createWindow(overlayMode)
+      mainWindow = createWindow(overlayMode);
     }
-  })
-})
+  });
+});
 
-app.on('window-all-closed', () => {
-  mainWindow = null
-  disconnectFromSidecar()
+app.on("window-all-closed", () => {
+  mainWindow = null;
+  disconnectFromSidecar();
 
-  if (process.platform !== 'darwin') {
-    app.quit()
+  if (process.platform !== "darwin") {
+    app.quit();
   }
-})
+});
