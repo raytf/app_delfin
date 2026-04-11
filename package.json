@@ -5,7 +5,7 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "dev:sidecar": "cd sidecar && .venv/bin/uvicorn server:app --host 0.0.0.0 --port 8321",
+    "dev:sidecar": "cd sidecar && .venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8321",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "build": "electron-vite build",
     "preview": "electron-vite preview",

@@ -8,7 +8,7 @@ import re as _re
 from contextlib import asynccontextmanager
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,7 +17,7 @@ from inference.preprocess import resize_image_blob
 from prompts.presets import PRESETS
 from tts import TTSPipeline
 
-load_dotenv()
+load_dotenv(find_dotenv())
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
