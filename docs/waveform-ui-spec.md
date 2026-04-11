@@ -1,6 +1,15 @@
-# Waveform UI Feature Spec (Draft)
+# Waveform UI Feature Spec — Gate 1 Approved
 
-> Gate 1 spec for a reusable waveform component that visualizes user speech, AI speech, and non-speaking states in the renderer. This is a draft pending human approval and answers to the open questions below.
+> Gate 1 spec for a reusable waveform component that visualizes user speech, AI speech, and non-speaking states in the renderer. Gate 1 was approved by the human reviewer before implementation began, per the Feature Development Workflow in AGENTS.md.
+
+## Gate Resolution
+
+| Field | Value |
+|---|---|
+| **Status** | Gate 1 approved — implementation complete |
+| **Approval date** | 2026-04-11 |
+| **Approver** | Human reviewer (project lead) |
+| **Scoped changes confirmed at approval** | Placement: expanded + minimized overlay; fidelity: real-ish mic amplitude + stylized AI playback-tracking animation; idle and processing both orange with different motion intensity; waveform visible only when speech input is toggled on; reusable component; reduced motion deferred; colors use existing design tokens; no new IPC channels or WebSocket message shapes |
 
 ## Goal
 
