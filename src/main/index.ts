@@ -1,4 +1,15 @@
 import { app, BrowserWindow, session } from "electron";
+
+// ---------------------------------------------------------------------------
+// SharedArrayBuffer — must be re-enabled before app.whenReady().
+// Chromium disabled SAB by default (Spectre mitigation) and requires
+// cross-origin isolation (COOP + COEP headers) to re-enable it.
+// In Electron the header-based approach is unreliable across versions, so we
+// also force-enable it via the Chromium feature flag as a belt-and-suspenders
+// approach. The Vite dev server + webRequest handler still set the headers so
+// window.crossOriginIsolated is true (required by some browser APIs).
+// ---------------------------------------------------------------------------
+app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer");
 import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
@@ -107,7 +118,8 @@ app.whenReady().then(() => {
       headers[key] = value;
     }
     headers["Cross-Origin-Opener-Policy"] = ["same-origin"];
-    headers["Cross-Origin-Embedder-Policy"] = ["require-corp"];
+    // credentialless (not require-corp) — see comment in electron.vite.config.ts
+    headers["Cross-Origin-Embedder-Policy"] = ["credentialless"];
     callback({ responseHeaders: headers });
   });
 
