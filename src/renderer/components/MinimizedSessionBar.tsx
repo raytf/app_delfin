@@ -14,7 +14,8 @@ interface MinimizedSessionBarProps {
   onSetPromptOpen: (isOpen: boolean) => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
-  onToggleMute: () => void
+  onToggleVadListening: () => void
+  vadListeningEnabled: boolean
 }
 
 function PromptIcon() {
@@ -72,7 +73,8 @@ export default function MinimizedSessionBar({
   onSetPromptOpen,
   onSubmitPrompt,
   onStop,
-  onToggleMute,
+  onToggleVadListening,
+  vadListeningEnabled,
 }: MinimizedSessionBarProps) {
   const isPromptOpen = minimizedVariant !== 'compact'
 
@@ -96,8 +98,8 @@ export default function MinimizedSessionBar({
 
         <div className="mb-1 flex items-center justify-center gap-2 text-[10px] text-yellow-400">
           <span>{isMicListening ? (isMicMuted ? '🔇' : '🎙️') : '⏳'}</span>
-          <button className="no-drag underline opacity-70 hover:opacity-100" onClick={onToggleMute} type="button">
-            {isMicMuted ? 'unmute' : 'mute'}
+          <button className="no-drag underline opacity-70 hover:opacity-100" onClick={onToggleVadListening} type="button">
+            {vadListeningEnabled ? 'toggle speech off' : 'toggle speech on'}
           </button>
           {isAudioPlaying ? <span className="animate-pulse text-cyan-300">🔊 speaking</span> : null}
         </div>

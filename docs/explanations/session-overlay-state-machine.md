@@ -122,6 +122,8 @@ if (sessionMode === 'active' && overlayMode === 'minimized' && variant !== 'comp
 
 So when the model finishes streaming and there's a response, the pill automatically grows from `prompt-input` (120px tall) to `prompt-response` (420px tall) without any explicit user action.
 
+Voice turns add one extra rule in `App.tsx`: if the overlay is currently `compact` and a voice turn is actually submitted, the renderer immediately promotes the minimized window to `prompt-response` before the sidecar request is sent. That makes the loading state and streamed tokens visible during hands-free use instead of leaving the response hidden inside the compact pill.
+
 ---
 
 ## Where Each Variable Lives

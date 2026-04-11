@@ -8,6 +8,7 @@ interface SessionStoreState {
   messages: ChatMessage[]
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
+  vadListeningEnabled: boolean
   clearConversation: () => void
   beginPromptSubmission: (prompt: string) => void
   /** Like beginPromptSubmission but marks the user turn as a voice turn so the
@@ -17,6 +18,7 @@ interface SessionStoreState {
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
+  toggleVadListening: () => void
 }
 
 function createMessageId(): string {
@@ -31,6 +33,7 @@ export const useSessionStore = create<SessionStoreState>()(
       messages: [],
       sessionHistory: [],
       activeAssistantMessageId: null,
+      vadListeningEnabled: true,
 
       clearConversation: () =>
         set((state) => ({
@@ -39,6 +42,7 @@ export const useSessionStore = create<SessionStoreState>()(
           messages: [],
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
+          vadListeningEnabled: state.vadListeningEnabled,
         })),
 
       beginPromptSubmission: (prompt: string) =>
@@ -139,6 +143,11 @@ export const useSessionStore = create<SessionStoreState>()(
         set({
           sessionHistory: sessions,
         }),
+
+      toggleVadListening: () =>
+        set((state) => ({
+          vadListeningEnabled: !state.vadListeningEnabled,
+        })),
     }),
     {
       name: 'screen-copilot-active-session',
@@ -149,6 +158,7 @@ export const useSessionStore = create<SessionStoreState>()(
         messages: state.messages,
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
+        vadListeningEnabled: state.vadListeningEnabled,
       }),
     },
   ),

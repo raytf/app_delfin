@@ -6,7 +6,7 @@ The renderer has two kinds of state:
 
 | State | Held in | Persisted? |
 |---|---|---|
-| Conversation messages, submission status, session history | `sessionStore` (Zustand) | ✅ localStorage (survives hot reload) |
+| Conversation messages, submission status, session history, speech-listening preference | `sessionStore` (Zustand) | ✅ localStorage (survives hot reload) |
 | Session mode, overlay mode, window variant | `useState` in `App.tsx` | ❌ initialised from main process on mount |
 | Sidecar connection status, capture source label | `useState` in `App.tsx` | ❌ ephemeral |
 
@@ -24,9 +24,12 @@ isSubmitting               — true while waiting for a response
 errorMessage               — set when something goes wrong
 activeAssistantMessageId   — ID of the assistant bubble currently being filled
 sessionHistory[]           — list of past sessions (shown on HomeScreen)
+vadListeningEnabled        — persisted manual on/off switch for VAD listening
 ```
 
 It uses `zustand/middleware persist` to write to `localStorage` under the key `'screen-copilot-active-session'`. This means conversation state survives a hot-module-replacement reload during development.
+
+`App.tsx` reads `vadListeningEnabled` and synchronises it to the live `useVAD()` instance with `toggleMute()`, so the MicVAD runtime stays mounted while speech detection is paused/resumed from the UI.
 
 ---
 
@@ -141,4 +144,4 @@ const isSubmitting = useSessionStore((state) => state.isSubmitting)
 | UI-only, not needed outside App | Shared across multiple components |
 | Ephemeral (doesn't survive reload) | Needs to survive hot-reload |
 | Comes from main process on mount | Driven by sidecar events over time |
-| `sessionMode`, `overlayMode`, `sidecarStatus`, `captureSourceLabel` | `messages`, `isSubmitting`, `errorMessage`, `sessionHistory` |
+| `sessionMode`, `overlayMode`, `sidecarStatus`, `captureSourceLabel` | `messages`, `isSubmitting`, `errorMessage`, `sessionHistory`, `vadListeningEnabled` |

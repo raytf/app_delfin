@@ -17,9 +17,9 @@ interface ExpandedSessionViewProps {
   onMinimize: () => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
-  /** Toggle mic mute state. */
-  onToggleMute: () => void
+  onToggleVadListening: () => void
   sidecarStatus: SidecarStatus
+  vadListeningEnabled: boolean
 }
 
 export default function ExpandedSessionView({
@@ -33,8 +33,9 @@ export default function ExpandedSessionView({
   onMinimize,
   onSubmitPrompt,
   onStop,
-  onToggleMute,
+  onToggleVadListening,
   sidecarStatus,
+  vadListeningEnabled,
 }: ExpandedSessionViewProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_24%),radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_22%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-white">
@@ -55,13 +56,9 @@ export default function ExpandedSessionView({
           ) : (
             <span>⏳ Mic initialising…</span>
           )}
-          <button
-            className="no-drag ml-auto rounded border border-yellow-500/50 px-2 py-0.5 text-yellow-300 hover:bg-yellow-500/20"
-            onClick={onToggleMute}
-            type="button"
-          >
-            {isMicMuted ? 'Unmute' : 'Mute'}
-          </button>
+          <span className="ml-auto text-[11px] uppercase tracking-[0.18em] text-yellow-200/80">
+            {vadListeningEnabled ? 'Speech on' : 'Speech off'}
+          </span>
         </div>
 
         {isAudioPlaying ? (
@@ -106,8 +103,11 @@ export default function ExpandedSessionView({
           <ExpandedSessionSidebar
             captureSourceLabel={captureSourceLabel}
             errorMessage={errorMessage}
+            isMicListening={isMicListening}
             onMinimize={onMinimize}
             onStop={onStop}
+            onToggleVadListening={onToggleVadListening}
+            vadListeningEnabled={vadListeningEnabled}
           />
         </div>
       </div>

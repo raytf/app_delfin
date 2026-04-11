@@ -45,12 +45,15 @@ export default function App() {
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
+  const toggleVadListening = useSessionStore((state) => state.toggleVadListening)
+  const vadListeningEnabled = useSessionStore((state) => state.vadListeningEnabled)
   const latestAssistantMessage = getLatestAssistantMessage(messages)
   const latestResponseText = latestAssistantMessage?.content ?? null
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
   const audioStreamActiveRef = useRef(false)
+  const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -73,6 +76,16 @@ export default function App() {
       fallbackSpeechTimerRef.current = null
     }
   }, [])
+
+  const revealMinimizedVoiceResponse = useCallback(() => {
+    if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant !== 'compact') {
+      return
+    }
+
+    setIsMinimizedPromptComposing(false)
+    setMinimizedVariant('prompt-response')
+    void window.api.setMinimizedOverlayVariant('prompt-response')
+  }, [minimizedVariant, overlayMode, sessionMode])
 
   const cancelSpeechSynthesis = useCallback(() => {
     if ('speechSynthesis' in window) {
@@ -128,8 +141,10 @@ export default function App() {
         return
       }
 
+      aiStreamingStartedRef.current = false
       audioStartedForTurnRef.current = false
       clearFallbackSpeechTimer()
+      revealMinimizedVoiceResponse()
       beginVoiceTurn()
 
       window.api
@@ -143,18 +158,24 @@ export default function App() {
         })
     },
     onSpeechStart: () => {
-      if (
-        !useSessionStore.getState().isSubmitting &&
-        !isAudioPlayingRef.current &&
-        !audioStreamActiveRef.current &&
-        fallbackSpeechTimerRef.current === null
-      ) {
+      const isAssistantThinking = useSessionStore.getState().isSubmitting && !aiStreamingStartedRef.current
+      if (isAssistantThinking) {
+        return
+      }
+
+      const isAssistantSpeaking =
+        isAudioPlayingRef.current ||
+        audioStreamActiveRef.current ||
+        fallbackSpeechTimerRef.current !== null
+
+      if (!isAssistantSpeaking) {
         return
       }
 
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
+      aiStreamingStartedRef.current = false
       audioStreamActiveRef.current = false
       setAudioPlayingState(false)
       lowerThreshold()
@@ -166,6 +187,19 @@ export default function App() {
       }
     },
   })
+
+  useEffect(() => {
+    if (!voiceEnabled || sessionMode !== 'active' || !isListening) {
+      return
+    }
+
+    const shouldBeMuted = !vadListeningEnabled
+    if (isMuted === shouldBeMuted) {
+      return
+    }
+
+    toggleMute()
+  }, [isListening, isMuted, sessionMode, toggleMute, vadListeningEnabled, voiceEnabled])
 
   const finishAudioPlayback = useCallback(() => {
     audioStreamActiveRef.current = false
@@ -193,6 +227,7 @@ export default function App() {
       utterance.rate = 1.0
       utterance.pitch = 1.0
       utterance.onstart = () => {
+        aiStreamingStartedRef.current = true
         setAudioPlayingState(true)
         raiseThreshold()
       }
@@ -219,8 +254,10 @@ export default function App() {
     }
 
     pendingVoiceWavRef.current = null
+    aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearFallbackSpeechTimer()
+    revealMinimizedVoiceResponse()
     beginVoiceTurn()
 
     window.api
@@ -232,7 +269,7 @@ export default function App() {
       .catch((err: unknown) => {
         failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
       })
-  }, [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, sessionMode])
+  }, [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode])
 
   useEffect(() => {
     if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
@@ -284,6 +321,7 @@ export default function App() {
     })
 
     window.api.onSidecarToken((data) => {
+      aiStreamingStartedRef.current = true
       appendAssistantText(data.text)
     })
 
@@ -291,6 +329,7 @@ export default function App() {
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
+      aiStreamingStartedRef.current = true
       audioStartedForTurnRef.current = true
       audioStreamActiveRef.current = true
       setAudioPlayingState(true)
@@ -332,6 +371,7 @@ export default function App() {
     })
 
     window.api.onSidecarDone(() => {
+      aiStreamingStartedRef.current = false
       finishAssistantResponse()
 
       if (pendingVoiceWavRef.current !== null) {
@@ -344,6 +384,7 @@ export default function App() {
     })
 
     window.api.onSidecarError((data) => {
+      aiStreamingStartedRef.current = false
       failAssistantResponse(data.message)
 
       if (pendingVoiceWavRef.current !== null) {
@@ -382,6 +423,7 @@ export default function App() {
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
+    aiStreamingStartedRef.current = false
     setSessionHistory([])
     clearConversation()
     setIsMinimizedPromptComposing(false)
@@ -403,6 +445,7 @@ export default function App() {
 
   async function handleStopSession(): Promise<void> {
     pendingVoiceWavRef.current = null
+    aiStreamingStartedRef.current = false
     clearFallbackSpeechTimer()
     cancelSpeechSynthesis()
     stopScheduledAudioSources()
@@ -439,6 +482,7 @@ export default function App() {
     }
 
     pendingVoiceWavRef.current = null
+    aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearFallbackSpeechTimer()
 
@@ -491,7 +535,8 @@ export default function App() {
         onStop={() => {
           void handleStopSession()
         }}
-        onToggleMute={toggleMute}
+        onToggleVadListening={toggleVadListening}
+        vadListeningEnabled={vadListeningEnabled}
       />
     )
   }
@@ -515,8 +560,9 @@ export default function App() {
         onStop={() => {
           void handleStopSession()
         }}
-        onToggleMute={toggleMute}
+        onToggleVadListening={toggleVadListening}
         sidecarStatus={sidecarStatus}
+        vadListeningEnabled={vadListeningEnabled}
       />
     )
   }

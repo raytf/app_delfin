@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (vad-runtime regression check added and validated)
+> Last updated: 2026-04-11 (manual speech toggle, thinking-phase interrupt guard, and minimized voice-stream auto-open implemented)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -60,10 +60,11 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state; structured response removed |
+| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, and minimized voice-stream auto-open |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
-| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
-| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
+| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
+| `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
+| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand/end-session buttons, manual speech toggle, and live voice-response streaming when auto-opened |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
@@ -72,7 +73,7 @@
 | `src/renderer/components/StatusIndicator.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/StopButton.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/MinimizeToggle.tsx` | ⚠️ | Placeholder |
-| `src/renderer/stores/sessionStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/stores/sessionStore.ts` | ✅ | Persisted conversation state plus `vadListeningEnabled` toggle stored in localStorage |
 | `src/renderer/stores/settingsStore.ts` | ⚠️ | Placeholder — returns empty object |
 | `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder — returns empty object |
 
@@ -135,7 +136,7 @@
 | `src/shared/schemas.ts` — `audio` field in `wsOutboundMessageSchema` | ✅ | Zod schemas accept audio-bearing outbound/inbound WS messages |
 | `src/shared/constants.ts` — `VOICE_TURN_TEXT` constant | ✅ | `"Please respond to what the user just asked."` |
 | `src/main/ipc/sessionHandlers.ts` — pass `audio` to sidecar; relax empty-text guard | ✅ | Allows audio turns and forwards `audio` to the WS client |
-| `src/renderer/App.tsx` — `useVAD` wired; auto-starts when `sessionMode === 'active'` | ✅ | Auto-starts when `VOICE_ENABLED=true` and a session is active |
+| `src/renderer/App.tsx` — `useVAD` wired; auto-starts when `sessionMode === 'active'` | ✅ | Auto-starts when `VOICE_ENABLED=true`; persisted UI toggle pauses/resumes listening without destroying MicVAD |
 | `src/renderer/App.tsx` — `onSpeechEnd` → `submitSessionPrompt` with WAV | ✅ | Uses `VOICE_TURN_TEXT` plus captured WAV audio |
 | `VOICE_ENABLED` env var (`.env` / `.env.example`) | ✅ | `true` enables auto-start VAD on session start |
 
@@ -170,7 +171,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` — `handleVADSpeechStart` stops `AudioContext` + calls `sidecarInterrupt` | ✅ | Barge-in interrupts both playback and the current sidecar turn |
+| `src/renderer/App.tsx` — `handleVADSpeechStart` stops playback + conditionally calls `sidecarInterrupt` | ✅ | Barge-in still interrupts active speech playback, but thinking-phase speech is queued instead of killing the current turn |
 | Web Speech API fallback — `speechSynthesis.speak()` after `onSidecarDone` when no audio arrived | ✅ | Timed fallback via `speechSynthesis` when server audio is absent |
 
 ### Step 9 — UI indicators
@@ -178,8 +179,8 @@
 | Item | Status | Notes |
 |---|---|---|
 | `ExpandedSessionView` — 🔊 pulsing indicator while `isAudioPlaying` | ✅ | Inline speaking indicator shown during audio playback |
-| `ExpandedSessionView` — 🎙️ / 🔇 mic toggle button | ✅ | Mic status + mute toggle rendered above the conversation |
-| `MinimizedSessionBar` — same mic + speaker indicators | ✅ | Compact overlay shows mic/speaking state and mute control |
+| `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state and lets the user pause/resume VAD listening |
+| `MinimizedSessionBar` — mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay shows live mic/speaking state, auto-opens for voice turns, and streams text in-panel |
 
 ### Auto-refresh (deprioritised)
 
