@@ -77,8 +77,12 @@ export default function MinimizedSessionBar({
   }
 
   return (
-    <div className="drag-region flex min-h-screen items-center bg-slate-950 px-4 text-white">
-      <div className="w-full rounded-[1.75rem] border border-slate-800 bg-slate-900/80 p-3 shadow-2xl shadow-black/20">
+    <div className="drag-region flex min-h-screen items-center justify-center text-white">
+      <div
+        className={`flex min-h-screen w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${
+          isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
+        }`}
+      >
         {isPromptOpen ? (
           <div className="space-y-3">
             <form className="no-drag flex items-center gap-2" onSubmit={handleSubmit}>
@@ -112,7 +116,7 @@ export default function MinimizedSessionBar({
           </div>
         ) : null}
 
-        <div className={isPromptOpen ? 'mt-3 flex items-center justify-end gap-2' : 'flex items-center justify-end gap-2'}>
+        <div className={isPromptOpen ? 'mt-3 flex items-center justify-center gap-2' : 'flex items-center justify-center gap-2'}>
           <button
             aria-label="Start prompt"
             className="no-drag flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300"

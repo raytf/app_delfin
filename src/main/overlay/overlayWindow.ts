@@ -62,18 +62,20 @@ function loadRenderer(window: BrowserWindow): void {
 
 export function createOverlayWindow(mode: OverlayMode, minimizedVariant: MinimizedOverlayVariant): BrowserWindow {
   const initialBounds = getWindowBounds(mode, minimizedVariant);
+  const isMinimizedMode = mode === "minimized";
 
   const window = new BrowserWindow({
     ...initialBounds,
     frame: mode === "expanded",
-    alwaysOnTop: mode === "minimized",
+    alwaysOnTop: isMinimizedMode,
     resizable: mode === "expanded",
     maximizable: false,
     minimizable: mode === "expanded",
     fullscreenable: mode === "expanded",
-    skipTaskbar: mode === "minimized",
+    skipTaskbar: isMinimizedMode,
     show: false,
-    backgroundColor: "#111827",
+    transparent: isMinimizedMode,
+    backgroundColor: isMinimizedMode ? "#00000000" : "#111827",
     title: "Screen Copilot",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
