@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
-import type { MinimizedOverlayVariant } from '../../shared/types'
+import type { MinimizedOverlayVariant, StructuredResponse } from '../../shared/types'
+import MinimizedPromptPanel from './MinimizedPromptPanel'
 
 interface MinimizedSessionBarProps {
+  errorMessage: string | null
   isSubmitting: boolean
+  latestStructuredResponse: StructuredResponse | null
   minimizedVariant: MinimizedOverlayVariant
-  responseText: string
+  onAskAnother: () => void
   onOpen: () => void
   onSetPromptOpen: (isOpen: boolean) => void
   onSubmitPrompt: (text: string) => void
@@ -54,27 +56,17 @@ function EndIcon() {
 }
 
 export default function MinimizedSessionBar({
+  errorMessage,
   isSubmitting,
+  latestStructuredResponse,
   minimizedVariant,
-  responseText,
+  onAskAnother,
   onOpen,
   onSetPromptOpen,
   onSubmitPrompt,
   onStop,
 }: MinimizedSessionBarProps) {
-  const [promptValue, setPromptValue] = useState('')
-  const isPromptOpen = minimizedVariant === 'prompt'
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault()
-    const prompt = promptValue.trim()
-
-    if (prompt.length === 0) {
-      return
-    }
-
-    onSubmitPrompt(prompt)
-  }
+  const isPromptOpen = minimizedVariant !== 'compact'
 
   return (
     <div className="drag-region flex min-h-screen items-center justify-center text-white">
@@ -84,36 +76,15 @@ export default function MinimizedSessionBar({
         }`}
       >
         {isPromptOpen ? (
-          <div className="space-y-3">
-            <form className="no-drag flex items-center gap-2" onSubmit={handleSubmit}>
-              <input
-                autoFocus
-                className="h-11 flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
-                name="prompt"
-                onChange={(event) => {
-                  setPromptValue(event.target.value)
-                }}
-                placeholder="Ask about the current screen"
-                type="text"
-                value={promptValue}
-              />
-              <button
-                aria-label="Submit prompt"
-                className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting ? 'Sending…' : 'Send'}
-              </button>
-            </form>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Response</p>
-              <p className="mt-2 max-h-24 overflow-y-auto text-sm leading-6 text-slate-300">
-                {responseText.length > 0 ? responseText : 'Responses will appear here.'}
-              </p>
-            </div>
-          </div>
+          <MinimizedPromptPanel
+            errorMessage={errorMessage}
+            isSubmitting={isSubmitting}
+            isShowingResponse={minimizedVariant === 'prompt-response'}
+            latestStructuredResponse={latestStructuredResponse}
+            onAskAnother={onAskAnother}
+            onExpand={onOpen}
+            onSubmitPrompt={onSubmitPrompt}
+          />
         ) : null}
 
         <div className={isPromptOpen ? 'mt-3 flex items-center justify-center gap-2' : 'flex items-center justify-center gap-2'}>

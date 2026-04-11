@@ -1,27 +1,27 @@
-import type { SidecarStatus, StructuredResponse } from '../../shared/types'
+import type { ChatMessage, SidecarStatus } from '../../shared/types'
+import SessionConversation from './SessionConversation'
+import SessionPromptComposer from './SessionPromptComposer'
 
 interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
   errorMessage: string | null
   isSubmitting: boolean
+  messages: ChatMessage[]
   onMinimize: () => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
   sidecarStatus: SidecarStatus
-  streamedText: string
-  structuredResponse: StructuredResponse | null
 }
 
 export default function ExpandedSessionView({
   captureSourceLabel,
   errorMessage,
   isSubmitting,
+  messages,
   onMinimize,
   onSubmitPrompt,
   onStop,
   sidecarStatus,
-  streamedText,
-  structuredResponse,
 }: ExpandedSessionViewProps) {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white">
@@ -41,41 +41,25 @@ export default function ExpandedSessionView({
         </div>
 
         <div className="mt-10 grid flex-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6 shadow-2xl shadow-black/20">
+          <div className="flex min-h-0 rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6 shadow-2xl shadow-black/20">
+            <div className="flex min-h-0 flex-1 flex-col">
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Assistant</p>
-            <div className="mt-6 space-y-4">
-              <form
+            <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
+              <SessionConversation
+                className="min-h-[24rem] flex-1"
+                emptyMessage="Ask about the current screen to start the session conversation."
+                isSubmitting={isSubmitting}
+                messages={messages}
+              />
+
+              <SessionPromptComposer
                 className="rounded-[1.5rem] border border-slate-800 bg-slate-900/70 p-4"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const formData = new FormData(event.currentTarget)
-                  const prompt = formData.get('prompt')
-
-                  if (typeof prompt !== 'string') {
-                    return
-                  }
-
-                  onSubmitPrompt(prompt)
-                  event.currentTarget.reset()
-                }}
-              >
-                <label className="block text-xs uppercase tracking-[0.24em] text-slate-500" htmlFor="session-prompt">
-                  Prompt
-                </label>
-                <textarea
-                  className="mt-3 h-28 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
-                  id="session-prompt"
-                  name="prompt"
-                  placeholder="Summarize this slide"
-                />
-                <button
-                  className="mt-4 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting ? 'Sending…' : 'Ask'}
-                </button>
-              </form>
+                isSubmitting={isSubmitting}
+                multiline
+                onSubmitPrompt={onSubmitPrompt}
+                placeholder="Summarize this slide"
+                submitLabel="Ask"
+              />
 
               <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-300">
                 <div className="flex items-center justify-between gap-4">
@@ -89,39 +73,7 @@ export default function ExpandedSessionView({
                 </p>
                 {errorMessage !== null ? <p className="mt-3 text-red-300">{errorMessage}</p> : null}
               </div>
-
-              <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Structured Response</p>
-                {structuredResponse === null ? (
-                  <p className="mt-4 text-sm leading-7 text-slate-400">No structured response yet.</p>
-                ) : (
-                  <div className="mt-4 space-y-4 text-sm text-slate-200">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Summary</p>
-                      <p className="mt-2 leading-7">{structuredResponse.summary}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Answer</p>
-                      <p className="mt-2 leading-7">{structuredResponse.answer}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Key Points</p>
-                      <ul className="mt-2 space-y-2 text-slate-300">
-                        {structuredResponse.key_points.map((point) => (
-                          <li key={point}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/60 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Stream</p>
-                <p className="mt-4 min-h-24 text-sm leading-7 text-slate-300">
-                  {streamedText.length > 0 ? streamedText : 'Streaming output will appear here.'}
-                </p>
-              </div>
+            </div>
             </div>
           </div>
 

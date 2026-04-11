@@ -102,7 +102,7 @@ export interface SidecarStatus {
 }
 
 export type OverlayMode = 'expanded' | 'minimized'
-export type MinimizedOverlayVariant = 'compact' | 'prompt'
+export type MinimizedOverlayVariant = 'compact' | 'prompt-input' | 'prompt-response'
 export type SessionMode = 'home' | 'active'
 
 export interface OverlayState {

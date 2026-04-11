@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
+import { useSessionStore } from './stores/sessionStore'
 import {
+  type ChatMessage,
   MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
   type MinimizedOverlayVariant,
@@ -12,16 +14,64 @@ import {
   type StructuredResponse,
 } from '../shared/types'
 
+function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'assistant') {
+      return messages[index]
+    }
+  }
+
+  return null
+}
+
+function getLatestStructuredResponse(messages: ChatMessage[]): StructuredResponse | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const structuredData = messages[index]?.structuredData
+
+    if (structuredData !== undefined) {
+      return structuredData
+    }
+  }
+
+  return null
+}
+
 export default function App() {
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
+  const [isMinimizedPromptComposing, setIsMinimizedPromptComposing] = useState(false)
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
-  const [streamedText, setStreamedText] = useState('')
-  const [structuredResponse, setStructuredResponse] = useState<StructuredResponse | null>(null)
+  const clearConversation = useSessionStore((state) => state.clearConversation)
+  const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
+  const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
+  const setAssistantStructured = useSessionStore((state) => state.setAssistantStructured)
+  const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
+  const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const errorMessage = useSessionStore((state) => state.errorMessage)
+  const isSubmitting = useSessionStore((state) => state.isSubmitting)
+  const messages = useSessionStore((state) => state.messages)
+  const latestAssistantMessage = getLatestAssistantMessage(messages)
+  const latestStructuredResponse = getLatestStructuredResponse(messages)
+
+  useEffect(() => {
+    if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
+      return
+    }
+
+    const shouldShowResponse =
+      !isMinimizedPromptComposing &&
+      (errorMessage !== null || (!isSubmitting && latestStructuredResponse !== null))
+    const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
+
+    if (nextVariant === minimizedVariant) {
+      return
+    }
+
+    void window.api.setMinimizedOverlayVariant(nextVariant)
+    setMinimizedVariant(nextVariant)
+  }, [errorMessage, isMinimizedPromptComposing, isSubmitting, latestStructuredResponse, minimizedVariant, overlayMode, sessionMode])
 
   useEffect(() => {
     let cancelled = false
@@ -47,20 +97,19 @@ export default function App() {
     })
 
     window.api.onSidecarToken((data) => {
-      setStreamedText((current) => current + data.text)
+      appendAssistantText(data.text)
     })
 
     window.api.onSidecarStructured((data) => {
-      setStructuredResponse(data)
+      setAssistantStructured(data)
     })
 
     window.api.onSidecarDone(() => {
-      setIsSubmitting(false)
+      finishAssistantResponse()
     })
 
     window.api.onSidecarError((data) => {
-      setErrorMessage(data.message)
-      setIsSubmitting(false)
+      failAssistantResponse(data.message)
     })
 
     window.api.onSidecarStatus((status) => {
@@ -75,13 +124,16 @@ export default function App() {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
-  }, [])
+  }, [appendAssistantText, failAssistantResponse, finishAssistantResponse, setAssistantStructured])
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
+    clearConversation()
+    setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
     setMinimizedVariant('compact')
+    setIsMinimizedPromptComposing(false)
   }
 
   async function handleRestoreOverlay(): Promise<void> {
@@ -97,6 +149,8 @@ export default function App() {
 
   async function handleStopSession(): Promise<void> {
     await window.api.stopSession()
+    clearConversation()
+    setIsMinimizedPromptComposing(false)
     setSessionMode('home')
     setOverlayMode('expanded')
     setMinimizedVariant('compact')
@@ -106,6 +160,7 @@ export default function App() {
     await window.api.setMinimizedOverlayVariant(variant)
     setOverlayMode('minimized')
     setMinimizedVariant(variant)
+    setIsMinimizedPromptComposing(variant === 'prompt-input')
   }
 
   async function handleSubmitPrompt(text: string): Promise<void> {
@@ -115,10 +170,8 @@ export default function App() {
       return
     }
 
-    setErrorMessage(null)
-    setIsSubmitting(true)
-    setStreamedText('')
-    setStructuredResponse(null)
+    setIsMinimizedPromptComposing(false)
+    beginPromptSubmission(trimmedText)
 
     try {
       await window.api.submitSessionPrompt({
@@ -126,25 +179,26 @@ export default function App() {
         presetId: 'lecture-slide',
       })
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to submit prompt.')
-      setIsSubmitting(false)
+      failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
       return
     }
-
-    setIsSubmitting(false)
   }
 
   if (sessionMode === 'active' && overlayMode === 'minimized') {
     return (
       <MinimizedSessionBar
+        errorMessage={errorMessage}
         isSubmitting={isSubmitting}
+        latestStructuredResponse={latestStructuredResponse}
         minimizedVariant={minimizedVariant}
-        responseText={streamedText}
+        onAskAnother={() => {
+          void handleSetMinimizedVariant('prompt-input')
+        }}
         onOpen={() => {
           void handleRestoreOverlay()
         }}
         onSetPromptOpen={(isOpen) => {
-          void handleSetMinimizedVariant(isOpen ? 'prompt' : 'compact')
+          void handleSetMinimizedVariant(isOpen ? 'prompt-input' : 'compact')
         }}
         onSubmitPrompt={(text) => {
           void handleSubmitPrompt(text)
@@ -162,6 +216,7 @@ export default function App() {
         captureSourceLabel={captureSourceLabel}
         errorMessage={errorMessage}
         isSubmitting={isSubmitting}
+        messages={messages}
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}
@@ -172,8 +227,6 @@ export default function App() {
           void handleStopSession()
         }}
         sidecarStatus={sidecarStatus}
-        streamedText={streamedText}
-        structuredResponse={structuredResponse}
       />
     )
   }
