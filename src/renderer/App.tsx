@@ -49,6 +49,8 @@ export default function App() {
   const setAssistantStructured = useSessionStore((state) => state.setAssistantStructured)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const sessionHistory = useSessionStore((state) => state.sessionHistory)
+  const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
@@ -86,10 +88,18 @@ export default function App() {
       setMinimizedVariant(state.minimizedVariant)
     })
 
+    void window.api.listSessions().then((sessions) => {
+      if (cancelled) {
+        return
+      }
+
+      setSessionHistory(sessions)
+    })
+
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [setSessionHistory])
 
   useEffect(() => {
     window.api.onFrameCaptured((frame: CaptureFrame) => {
@@ -128,6 +138,7 @@ export default function App() {
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
+    setSessionHistory([])
     clearConversation()
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
@@ -149,6 +160,8 @@ export default function App() {
 
   async function handleStopSession(): Promise<void> {
     await window.api.stopSession()
+    const sessions = await window.api.listSessions()
+    setSessionHistory(sessions)
     clearConversation()
     setIsMinimizedPromptComposing(false)
     setSessionMode('home')
@@ -233,6 +246,7 @@ export default function App() {
 
   return (
     <HomeScreen
+      sessions={sessionHistory}
       onStartSession={() => {
         void handleStartSession()
       }}

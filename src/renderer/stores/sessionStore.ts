@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { ChatMessage, StructuredResponse } from '../../shared/types'
+import type { ChatMessage, SessionListItem, StructuredResponse } from '../../shared/types'
 
 interface SessionStoreState {
   errorMessage: string | null
   isSubmitting: boolean
   messages: ChatMessage[]
+  sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
   clearConversation: () => void
   beginPromptSubmission: (prompt: string) => void
@@ -13,6 +14,7 @@ interface SessionStoreState {
   setAssistantStructured: (response: StructuredResponse) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
+  setSessionHistory: (sessions: SessionListItem[]) => void
 }
 
 function createMessageId(): string {
@@ -25,15 +27,17 @@ export const useSessionStore = create<SessionStoreState>()(
       errorMessage: null,
       isSubmitting: false,
       messages: [],
+      sessionHistory: [],
       activeAssistantMessageId: null,
 
       clearConversation: () =>
-        set({
+        set((state) => ({
           errorMessage: null,
           isSubmitting: false,
           messages: [],
+          sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
-        }),
+        })),
 
       beginPromptSubmission: (prompt: string) =>
         set((state) => {
@@ -121,6 +125,11 @@ export const useSessionStore = create<SessionStoreState>()(
             activeAssistantMessageId: null,
           }
         }),
+
+      setSessionHistory: (sessions: SessionListItem[]) =>
+        set({
+          sessionHistory: sessions,
+        }),
     }),
     {
       name: 'screen-copilot-active-session',
@@ -129,6 +138,7 @@ export const useSessionStore = create<SessionStoreState>()(
         errorMessage: state.errorMessage,
         isSubmitting: state.isSubmitting,
         messages: state.messages,
+        sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
       }),
     },

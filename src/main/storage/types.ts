@@ -1,0 +1,34 @@
+import type { PresetId, StructuredResponse } from '../../shared/types'
+
+export type PersistedSessionStatus = 'active' | 'completed' | 'failed' | 'aborted'
+
+export interface SessionRecord {
+  id: string
+  startedAt: number
+  endedAt: number | null
+  status: PersistedSessionStatus
+  presetId: PresetId | null
+  sourceLabel: string | null
+  messageCount: number
+  lastUpdatedAt: number
+}
+
+export interface ConversationMessageRecord {
+  id: string
+  sessionId: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+  structuredData?: StructuredResponse
+  errorMessage?: string
+}
+
+export interface SessionStorage {
+  createSession(record: SessionRecord): Promise<void>
+  updateSession(sessionId: string, updates: Partial<SessionRecord>): Promise<void>
+  appendConversationMessage(message: ConversationMessageRecord): Promise<void>
+  replaceConversationMessage(messageId: string, message: ConversationMessageRecord): Promise<void>
+  getSession(sessionId: string): Promise<SessionRecord | null>
+  getConversation(sessionId: string): Promise<ConversationMessageRecord[]>
+  listSessions(): Promise<SessionRecord[]>
+}

@@ -9,6 +9,7 @@
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "test": "find src/main -name '*.test.ts' -print0 | xargs -0 node --test --experimental-transform-types --loader ./scripts/ts-test-loader.mjs",
     "setup:sidecar": "cd sidecar && python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   },
   "devDependencies": {

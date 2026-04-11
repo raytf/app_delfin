@@ -9,6 +9,7 @@ import type {
   OverlayState,
   SessionPromptRequest,
   MinimizedOverlayVariant,
+  SessionListItem,
 } from '../shared/types'
 
 const api: ElectronAPI = {
@@ -31,6 +32,9 @@ const api: ElectronAPI = {
 
   submitSessionPrompt: (request: SessionPromptRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request),
+
+  listSessions: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST) as Promise<SessionListItem[]>,
 
   minimizeOverlay: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_MINIMIZE),
 
