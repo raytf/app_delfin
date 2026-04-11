@@ -1,0 +1,43 @@
+import { ipcMain } from 'electron'
+import { captureForegroundWindow } from '../capture/captureService'
+import { sendToSidecar } from '../sidecar/wsClient'
+import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS, type SessionPromptRequest } from '../../shared/types'
+import type { RegisterIpcHandlersOptions } from './types'
+
+export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async () => {
+    options.setSessionMode('active')
+    options.setMinimizedVariant('compact')
+    await options.switchOverlayMode('minimized')
+  })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
+    options.setSessionMode('home')
+    options.setMinimizedVariant('compact')
+    await options.switchOverlayMode('expanded')
+  })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, request: SessionPromptRequest) => {
+    const mainWindow = options.getMainWindow()
+
+    if (mainWindow === null || mainWindow.isDestroyed()) {
+      throw new Error('Main window is not available.')
+    }
+
+    const text = request.text.trim()
+
+    if (text.length === 0) {
+      throw new Error('Prompt cannot be empty.')
+    }
+
+    const frame = await captureForegroundWindow()
+
+    mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
+
+    sendToSidecar({
+      image: frame.imageBase64,
+      text,
+      preset_id: request.presetId,
+    })
+  })
+}
