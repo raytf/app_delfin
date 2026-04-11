@@ -8,7 +8,9 @@ interface SessionStoreState {
   messages: ChatMessage[]
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
+  sessionStartTime: number | null
   clearConversation: () => void
+  startSession: () => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
@@ -29,6 +31,7 @@ export const useSessionStore = create<SessionStoreState>()(
       messages: [],
       sessionHistory: [],
       activeAssistantMessageId: null,
+      sessionStartTime: null,
 
       clearConversation: () =>
         set((state) => ({
@@ -37,6 +40,13 @@ export const useSessionStore = create<SessionStoreState>()(
           messages: [],
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
+          sessionStartTime: null,
+        })),
+
+      startSession: () =>
+        set((state) => ({
+          ...state,
+          sessionStartTime: state.sessionStartTime ?? Date.now(),
         })),
 
       beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
@@ -133,6 +143,7 @@ export const useSessionStore = create<SessionStoreState>()(
         messages: state.messages,
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
+        sessionStartTime: state.sessionStartTime,
       }),
     },
   ),

@@ -31,6 +31,7 @@ export default function App() {
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const clearConversation = useSessionStore((state) => state.clearConversation)
+  const startSession = useSessionStore((state) => state.startSession)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
@@ -122,10 +123,19 @@ export default function App() {
     await window.api.startSession()
     setSessionHistory([])
     clearConversation()
+    startSession()
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
     setMinimizedVariant('compact')
+  }
+
+  async function handleAskDelfin(): Promise<void> {
+    await window.api.minimizeOverlay()
+    await window.api.setMinimizedOverlayVariant('prompt-input')
+    setOverlayMode('minimized')
+    setMinimizedVariant('prompt-input')
+    setIsMinimizedPromptComposing(true)
   }
 
   async function handleRestoreOverlay(): Promise<void> {
@@ -223,13 +233,12 @@ export default function App() {
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}
-        onSubmitPrompt={(nextText) => {
-          void handleSubmitPrompt(nextText)
+        onAskDelfin={() => {
+          void handleAskDelfin()
         }}
         onStop={() => {
           void handleStopSession()
         }}
-        sidecarStatus={sidecarStatus}
       />
     )
   }
