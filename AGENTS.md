@@ -13,6 +13,7 @@ A local, privacy-first AI desktop sidebar (Electron + React) that captures the f
 ## Documentation Map
 
 ```
+STATUS.md                            ← Live feature status tracker. Update after every implementation change.
 docs/
 ├── SPEC.md                          ← Single source of truth. Read this first.
 ├── screen-copilot-implementation-plan.md  ← Team/parallel-stream view (secondary)
@@ -92,6 +93,7 @@ After the human approves the implementation, update **all** affected documentati
 
 | Doc | Update if… |
 |---|---|
+| `STATUS.md` | **Always** — update the status of every file or feature touched (✅ / ⚠️ / ❌) and bump the "Last updated" date |
 | `docs/SPEC.md` | New IPC channel, WebSocket message type, env var, or arch decision added |
 | Relevant `docs/phases/phase-N.md` | Verification checklist items completed; pseudocode drifted from reality |
 | `AGENTS.md` §Validated Technical Decisions | A new confirmed technical fact was established during implementation |
