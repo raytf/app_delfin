@@ -22,6 +22,7 @@ export default function MinimizedPromptPanel({
 }: MinimizedPromptPanelProps) {
   const [isComposing, setIsComposing] = useState(!isShowingResponse)
   const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
+  const isLoadingOnly = isSubmitting && !hasResponseText && errorMessage === null
 
   useEffect(() => {
     if (isSubmitting) {
@@ -45,6 +46,18 @@ export default function MinimizedPromptPanel({
         placeholder="Ask about the current screen"
         submitLabel="Send"
       />
+    )
+  }
+
+  if (isLoadingOnly) {
+    return (
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:0ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:150ms]" />
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:300ms]" />
+        </div>
+      </div>
     )
   }
 
@@ -119,12 +132,6 @@ function StreamingResponseBody({
           >
             <p className="whitespace-pre-wrap">{latestResponseText}</p>
           </div>
-        </div>
-      ) : isSubmitting && !hasResponseText ? (
-        <div className="flex h-full min-h-0 items-center justify-center gap-2">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:0ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:150ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-slate-500 [animation-delay:300ms]" />
         </div>
       ) : (
         <p className="text-sm leading-6 text-slate-400">
