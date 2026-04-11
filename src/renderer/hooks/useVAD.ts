@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MicVAD } from '@ricky0123/vad-web'
+import * as vadWeb from '@ricky0123/vad-web'
 import { float32ToWavBase64 } from '../utils/audioUtils'
 
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
@@ -55,7 +55,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
   const [isListening, setIsListening] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
-  const vadRef = useRef<MicVAD | null>(null)
+  const vadRef = useRef<vadWeb.MicVAD | null>(null)
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inGracePeriodRef = useRef(false)
 
@@ -73,7 +73,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
     async function init(): Promise<void> {
       try {
-        const vad = await MicVAD.new({
+        const vad = await vadWeb.MicVAD.new({
           model: 'v5',
           // Point at an app-owned asset directory populated by
           // vite-plugin-static-copy. Using a stable relative path keeps this
