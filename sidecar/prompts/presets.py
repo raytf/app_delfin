@@ -1,4 +1,9 @@
-# TODO (Phase 1): Preset registry mapping preset_id → system prompt + tools.
-# Placeholder — implemented in Phase 1.
+"""Registry mapping preset_id → system prompt string."""
 
-PRESETS: dict[str, dict] = {}
+from .lecture_slide import SYSTEM_PROMPT as LECTURE_PROMPT
+from .generic_screen import SYSTEM_PROMPT as GENERIC_PROMPT
+
+PRESETS: dict[str, str] = {
+    "lecture-slide": LECTURE_PROMPT,
+    "generic-screen": GENERIC_PROMPT,
+}

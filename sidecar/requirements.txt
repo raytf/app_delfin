@@ -1,6 +1,6 @@
 fastapi[standard]
 uvicorn[standard]
-litert-lm>=0.10.1
+litert-lm-api-nightly
 pillow
 numpy
 websockets
