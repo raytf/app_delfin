@@ -439,6 +439,19 @@ export default function App() {
     setMinimizedVariant(nextVariant)
   }, [errorMessage, isMinimizedPromptComposing, latestResponseText, minimizedVariant, overlayMode, sessionMode])
 
+  const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
+    clearMinimizedVoiceCollapseTimer()
+
+    if (variant !== 'prompt-response') {
+      clearLatestResponse()
+    }
+
+    await window.api.setMinimizedOverlayVariant(variant)
+    setOverlayMode('minimized')
+    setMinimizedVariant(variant)
+    setIsMinimizedPromptComposing(variant === 'prompt-input')
+  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer])
+
   useEffect(() => {
     const nextVariant = getVoiceTurnCompleteVariant({
       errorMessage,
@@ -688,19 +701,6 @@ export default function App() {
     setOverlayMode('expanded')
     setMinimizedVariant('compact')
   }
-
-  const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
-    clearMinimizedVoiceCollapseTimer()
-
-    if (variant !== 'prompt-response') {
-      clearLatestResponse()
-    }
-
-    await window.api.setMinimizedOverlayVariant(variant)
-    setOverlayMode('minimized')
-    setMinimizedVariant(variant)
-    setIsMinimizedPromptComposing(variant === 'prompt-input')
-  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer])
 
   async function handleSubmitPrompt(text: string): Promise<void> {
     const trimmedText = text.trim()
