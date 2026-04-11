@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { float32ToWavBase64 } from '../utils/audioUtils'
 
 const VAD_RUNTIME_ASSET_PATH = './vad-runtime/'
+const ORT_WASM_BASE_PATH = './'
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
 const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
 // Silero authors recommend negativeSpeechThreshold = positiveSpeechThreshold − 0.15
@@ -89,7 +90,10 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
           // working in both dev (http://localhost:5173/...) and production
           // (file://...) without depending on runtime node_modules URLs.
           baseAssetPath: VAD_RUNTIME_ASSET_PATH,
-          onnxWASMBasePath: VAD_RUNTIME_ASSET_PATH,
+          // ORT resolves wasmPaths relative to the already-loaded ort.min.js
+          // runtime. Since ort.min.js itself lives inside ./vad-runtime/, the
+          // correct base from ORT's perspective is './', not './vad-runtime/'.
+          onnxWASMBasePath: ORT_WASM_BASE_PATH,
           positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
           negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
           preSpeechPadMs: 300,
