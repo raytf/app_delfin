@@ -32,9 +32,11 @@ function ortWasmDevServePlugin(): Plugin {
 
 // Absolute paths — viteStaticCopy resolves 'src' relative to the Vite root,
 // which for the renderer in electron-vite is src/renderer, not the repo root.
-// Using resolve() from __dirname (repo root) avoids the mismatch.
-const vadDist = resolve('node_modules/@ricky0123/vad-web/dist')
-const ortDist = resolve('node_modules/onnxruntime-web/dist')
+// resolve() on Windows returns backslash paths; viteStaticCopy's glob engine
+// requires forward slashes, so we normalise after resolving.
+const fwd = (p: string) => p.replace(/\\/g, '/')
+const vadDist = fwd(resolve('node_modules/@ricky0123/vad-web/dist'))
+const ortDist = fwd(resolve('node_modules/onnxruntime-web/dist'))
 
 export default defineConfig({
   main: {
