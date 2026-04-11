@@ -184,7 +184,7 @@ export const useSessionStore = create<SessionStoreState>()(
         })),
     }),
     {
-      name: 'screen-copilot-active-session',
+      name: 'delfin-active-session',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         errorMessage: state.errorMessage,

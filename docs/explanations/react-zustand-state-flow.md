@@ -27,7 +27,7 @@ sessionHistory[]           — list of past sessions (shown on HomeScreen)
 vadListeningEnabled        — persisted manual on/off switch for VAD listening
 ```
 
-It uses `zustand/middleware persist` to write to `localStorage` under the key `'screen-copilot-active-session'`. This means conversation state survives a hot-module-replacement reload during development.
+It uses `zustand/middleware persist` to write to `localStorage` under the key `'delfin-active-session'`. This means conversation state survives a hot-module-replacement reload during development.
 
 `App.tsx` reads `vadListeningEnabled` and synchronises it to the live `useVAD()` instance with `toggleMute()`, so the MicVAD runtime stays mounted while speech detection is paused/resumed from the UI.
 

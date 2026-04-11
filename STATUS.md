@@ -1,6 +1,6 @@
-# Screen Copilot — Implementation Status
+# Delfin — Implementation Status
 
-> Last updated: 2026-04-11 (compact overlay resized/simplified and waveform upgraded to analyser-driven bars)
+> Last updated: 2026-04-11 (Parlor-style Kokoro TTS upgraded with MLX/ONNX backend selection, auto-download, richer audio metadata, and WSL2 espeak-ng fix)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,10 +11,12 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Read in both main process and sidecar |
-| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types; `StructuredResponse` removed |
+| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types, including `overlay:error`; `StructuredResponse` removed |
 | `src/shared/schemas.ts` | ✅ | Zod schemas for inbound/outbound WS messages; `structuredResponseSchema` removed |
 | `src/shared/constants.ts` | ✅ | Preset definitions, `DEFAULT_PRESET`, `SIDEBAR_WIDTH` |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar — tokens only (no structured message) |
+| `scripts/download-models.mjs` | ✅ | Downloads Kokoro model files via temp `.part` files, then renames on success to avoid partial final files blocking retries |
+| `scripts/download-models.test.mjs` | ✅ | Vitest coverage for atomic rename-on-success and temp-file cleanup-on-failure |
 | `scripts/setup-check.sh` | ✅ | Environment validation script |
 
 ---
@@ -35,7 +37,7 @@
 | `sidecar/prompts/lecture_slide.py` | ✅ | Answer-first plain prose; Key Points + conditional Hints sections; no tool-call instructions |
 | `sidecar/prompts/generic_screen.py` | ✅ | Description + Key Elements plain prose; no tool-call instructions |
 | `sidecar/prompts/presets.py` | ✅ | Registry: `preset_id → system prompt` |
-| `sidecar/tts.py` — TTS pipeline | ⚠️ | Placeholder — `generate()` returns empty array |
+| `sidecar/tts.py` — TTS pipeline | ✅ | Polymorphic MLX/ONNX pipeline with HF auto-download, env-configurable voice/speed, and Linux/WSL2 espeak-ng patch |
 | Conversation history trimming | ❌ | Not implemented (nice-to-have, Phase 6) |
 
 ---
@@ -44,13 +46,14 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, and resized compact bounds for waveform/status controls |
+| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, resized compact bounds, and larger prompt-open bounds for persistent voice headers |
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Returns `CaptureFrame` with base64 JPEG at quality 80 |
-| `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
+| `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Delfin" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
 | `src/main/ipc/handlers.ts` | ✅ | All IPC channels wired: capture, sidecar send/interrupt, overlay, session |
+| `src/main/ipc/overlayHandlers.ts` | ✅ | Overlay minimized-variant handler reverts on failure, logs, and forwards `overlay:error` to the renderer |
 | `src/main/index.ts` | ✅ | App entry, window lifecycle, overlay/session mode state machine |
-| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, and session methods |
+| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, and session methods plus `onOverlayError` |
 | `src/main/capture/autoRefresh.ts` | ⚠️ | Placeholder — `start/stop` are no-ops |
 | `src/main/sidecar/healthCheck.ts` | ⚠️ | Placeholder — polling not implemented |
 
@@ -60,16 +63,16 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice-stream auto-open, and analyser-driven waveform routing |
+| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice auto-open, delayed auto-collapse after speaking, analyser-driven waveform routing, and overlay-error resync |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
 | `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
-| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Simplified compact overlay with larger bounds, compact waveform/status chrome, voice toggle, and prompt/expand/end actions |
+| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Shared minimized voice chrome keeps waveform/status visible in compact, prompt-input, and prompt-response modes with streamlined actions |
 | `src/renderer/components/VoiceWaveform.tsx` | ✅ | Reusable canvas waveform that renders analyser-driven per-bar motion plus ambient idle/processing fallback |
-| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance and voice-turn auto-open decisions |
+| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance, voice-turn auto-open, and post-voice auto-collapse decisions |
 | `src/renderer/utils/waveformState.ts` | ✅ | Pure helper for waveform state priority, analyser-bin reduction, smoothing, and bar resampling |
-| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay voice auto-open and response-panel transitions |
-| `src/renderer/__tests__/minimizedSessionBar.test.ts` | ✅ | Vitest coverage for compact vs prompt-open minimized overlay rendering |
+| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay auto-open, prompt transitions, and post-voice collapse rules |
+| `src/renderer/__tests__/minimizedSessionBar.test.ts` | ✅ | Vitest coverage for waveform visibility in compact, prompt-input, and prompt-response minimized modes |
 | `src/renderer/__tests__/waveformState.test.ts` | ✅ | Vitest coverage for waveform state selection, helper smoothing/reduction, and component markup |
 | `package.json` — `npm test` script | ✅ | Runs Vitest renderer unit tests via `vitest run` |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
@@ -160,19 +163,21 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| `sidecar/tts.py` — real `TTSPipeline` (kokoro-onnx backend + `none` fallback) | ✅ | Kokoro backend implemented; falls back to renderer TTS when unavailable |
-| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ✅ | Reads configurable model + voices paths from env |
+| `sidecar/tts.py` — real `TTSPipeline` (MLX on Apple Silicon, ONNX elsewhere, `none` fallback) | ✅ | Auto-selects MLX on macOS arm64 and falls back to ONNX/web-speech as needed |
+| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ✅ | Supports local override paths and auto-downloads missing model files from HuggingFace |
+| `sidecar/tts.py` — `KOKORO_VOICE` / `KOKORO_SPEED` env vars | ✅ | Voice and speaking rate are configurable from `.env` |
 | `sidecar/server.py` — accumulate `full_text` during token stream | ✅ | Used to synthesize TTS after the token stream completes |
-| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` after `done` | ✅ | Streams sentence-sized audio chunks when server-side TTS is available |
-| `.env.example` — `KOKORO_MODEL_PATH`, `KOKORO_VOICES_PATH` | ✅ | Documented in `.env.example` |
+| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` before `done` | ✅ | Matches Parlor-style ordering so the turn only completes after audio finishes |
+| `sidecar/server.py` — audio metadata (`sample_rate`, `sentence_count`, `index`, `tts_time`) | ✅ | Sidecar now includes playback/perf metadata in TTS messages |
+| `.env.example` — Kokoro env vars | ✅ | Documents backend selection, voice/speed, and auto-download behavior |
 
 ### Step 7 — Web Audio API playback in renderer
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ✅ | Starts audio playback state and raises VAD threshold |
-| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ✅ | Decodes/schedules PCM chunks with Web Audio API |
-| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ✅ | Resets playback state and lowers VAD threshold |
+| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ✅ | Starts audio playback state, stores dynamic sample rate, and raises VAD threshold |
+| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ✅ | Decodes/schedules PCM chunks with server-provided sample rate metadata |
+| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ✅ | Resets playback state, lowers VAD threshold, and logs synthesis timing |
 | Audio IPC listeners cleaned up in `useEffect` return | ✅ | Removes all sidecar/capture listeners on cleanup |
 
 ### Step 8 — Barge-in + Web Speech fallback
@@ -188,7 +193,7 @@
 |---|---|---|
 | `ExpandedSessionView` — waveform + speech status | ✅ | Expanded session shows reusable analyser-driven waveform when speech input is enabled, with token-based colours for user/AI/idle/processing |
 | `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state, waveform visibility follows the speech toggle, and the user can pause/resume VAD listening |
-| `MinimizedSessionBar` — compact waveform + mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay uses a simplified larger layout that keeps the waveform, status row, and actions visible while speech is enabled |
+| `MinimizedSessionBar` — minimized waveform continuity | ✅ | Minimized overlay keeps the waveform/status visible while listening, processing, and AI speaking, then auto-returns to compact mode after playback completes |
 | Minimized overlay voice auto-open decision tests | ✅ | `src/renderer/__tests__/minimizedOverlay.test.ts` verifies compact→response reveal and existing auto-advance rules |
 
 ### Auto-refresh (deprioritised)

@@ -26,7 +26,7 @@ Create and export a function `createOverlayWindow()` that:
    - `webPreferences.preload`: path to preload script
    - `webPreferences.contextIsolation: true`
    - `webPreferences.nodeIntegration: false`
-   - `title: 'Screen Copilot'`
+   - `title: 'Delfin'`
 
 2. Load the Vite dev server URL (dev) or production HTML (prod)
 3. Return the window instance
@@ -126,7 +126,7 @@ declare global {
 Export `captureForegroundWindow(overlayWindowId: number): Promise<CaptureFrame>`
 
 1. Call `desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 1920, height: 1080 } })`
-2. Filter out sources whose `name` includes `'Screen Copilot'` (the overlay itself)
+2. Filter out sources whose `name` includes `'Delfin'` (the overlay itself)
 3. Take the first remaining source (this is the foreground window)
 4. Convert `source.thumbnail` to JPEG buffer: `source.thumbnail.toJPEG(80)`
 5. Convert to base64 string
@@ -297,12 +297,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
 - [ ] `npm run dev` opens a frameless 420px-wide window pinned to the right edge of the screen
 - [ ] The window is always-on-top
-- [ ] The window title is "Screen Copilot" (visible in task manager, not in window chrome)
+- [ ] The window title is "Delfin" (visible in task manager, not in window chrome)
 - [ ] The renderer shows the placeholder React content from Phase 0
 - [ ] With the mock sidecar running (`node scripts/mock-sidecar.js`): the main process connects and logs "Sidecar WebSocket connected"
 - [ ] Using Electron DevTools console: `window.electronAPI` is defined and has all expected methods
 - [ ] Calling `window.electronAPI.captureNow()` from DevTools results in a `frame:captured` event (verify by adding a temporary listener)
-- [ ] The captured frame does NOT include the Screen Copilot overlay window
+- [ ] The captured frame does NOT include the Delfin overlay window
 - [ ] Calling `window.electronAPI.sendToSidecar({text: "test", preset_id: "lecture-slide"})` sends a message to the mock sidecar (verify in mock sidecar console)
 - [ ] Mock sidecar responses arrive in the main process and are forwarded to renderer (verify with temporary IPC listener)
 - [ ] If the mock sidecar is stopped, the WebSocket client auto-reconnects after 2 seconds

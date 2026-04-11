@@ -88,7 +88,7 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 }
 
 app.whenReady().then(() => {
-  console.log("Screen Copilot started");
+  console.log("Delfin started");
 
   // ------------------------------------------------------------------
   // COOP/COEP headers — required for SharedArrayBuffer used by

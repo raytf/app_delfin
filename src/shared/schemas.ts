@@ -5,6 +5,10 @@ export const wsInboundMessageSchema = z.object({
   text: z.string().optional(),
   audio: z.string().optional(),
   message: z.string().optional(),
+  sample_rate: z.number().optional(),
+  sentence_count: z.number().optional(),
+  index: z.number().optional(),
+  tts_time: z.number().optional(),
 })
 
 export const wsOutboundMessageSchema = z.object({
