@@ -1,4 +1,4 @@
-export default function App(): React.ReactElement {
+export default function App() {
   return (
     <div className="flex h-screen items-center justify-center bg-gray-950 text-white">
       <div className="text-center">
@@ -8,3 +8,4 @@ export default function App(): React.ReactElement {
     </div>
   )
 }
+
