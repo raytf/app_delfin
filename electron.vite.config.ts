@@ -3,6 +3,32 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+import type { Plugin } from 'vite'
+
+/**
+ * Vite pre-bundles @ricky0123/vad-web and in doing so transforms ORT's
+ * dynamic import() calls, appending "?import" to the URL as a module-type
+ * hint (e.g. /ort-wasm-simd-threaded.mjs?import).
+ *
+ * viteStaticCopy serves the file without that query param, so the request
+ * returns 404. This middleware strips "?import" from any ORT WASM glue-
+ * module URL before it reaches the static file handler, making the lookup
+ * succeed. Only affects dev mode; production uses file:// which doesn't go
+ * through this server.
+ */
+function ortWasmDevServePlugin(): Plugin {
+  return {
+    name: 'ort-wasm-dev-serve',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url?.match(/ort-wasm[^?]*\.mjs\?/)) {
+          req.url = req.url.split('?')[0]
+        }
+        next()
+      })
+    },
+  }
+}
 
 // Relative to project root — consistent across all machines since npm always
 // installs packages under node_modules/ at the repo root.
@@ -52,6 +78,9 @@ export default defineConfig({
     plugins: [
       react(),
       tailwindcss(),
+      // Strips ?import query param from ORT .mjs dynamic-import URLs in dev mode.
+      // Vite appends ?import to dynamic imports; static copy serves without it → 404.
+      ortWasmDevServePlugin(),
       // Copies VAD worker + ONNX model files into the renderer output root so
       // @ricky0123/vad-web can load them via its asset-path resolution logic.
       // In dev mode the plugin serves them directly; in production they land in
