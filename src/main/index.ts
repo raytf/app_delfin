@@ -82,12 +82,30 @@ app.whenReady().then(() => {
   // ------------------------------------------------------------------
   // COOP/COEP headers — required for SharedArrayBuffer used by
   // @ricky0123/vad-web (Silero VAD runs in a SharedArrayBuffer-backed
-  // AudioWorklet). Must be applied before any window loads.
+  // AudioWorklet).
+  //
+  // Dev mode: the Vite server sets these headers itself (renderer.server.headers
+  // in electron.vite.config.ts) because webRequest fires after the initial
+  // document is already parsed.
+  //
+  // Production: file:// loads have no server, so we inject via webRequest here.
+  // We scrub any pre-existing COOP/COEP keys (case-insensitive) first to avoid
+  // duplicate conflicting headers from the app:// / file:// protocol handler.
   // ------------------------------------------------------------------
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const headers: Record<string, string[]> = {
-      ...details.responseHeaders as Record<string, string[]>,
-    };
+    const headers: Record<string, string[]> = {};
+    for (const [key, value] of Object.entries(
+      details.responseHeaders as Record<string, string[]>,
+    )) {
+      const lower = key.toLowerCase();
+      if (
+        lower === "cross-origin-opener-policy" ||
+        lower === "cross-origin-embedder-policy"
+      ) {
+        continue; // drop existing value — we set our own below
+      }
+      headers[key] = value;
+    }
     headers["Cross-Origin-Opener-Policy"] = ["same-origin"];
     headers["Cross-Origin-Embedder-Policy"] = ["require-corp"];
     callback({ responseHeaders: headers });

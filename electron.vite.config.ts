@@ -27,6 +27,15 @@ export default defineConfig({
     },
   },
   renderer: {
+    // In dev mode the renderer loads from the Vite HTTP server, so we must set
+    // COOP/COEP there directly — webRequest.onHeadersReceived fires too late for
+    // the initial document and SharedArrayBuffer stays undefined without this.
+    server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      },
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer'),
