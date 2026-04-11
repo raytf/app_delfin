@@ -47,6 +47,28 @@ if (Test-Path ".env") {
   Write-Host "⚠️  .env: missing (copy from .env.example)" -ForegroundColor Yellow
 }
 
+# .env key diff vs .env.example
+if ((Test-Path ".env") -and (Test-Path ".env.example")) {
+  $exampleKeys = Get-Content ".env.example" |
+    Where-Object { $_ -notmatch '^\s*#' -and $_ -match '=' } |
+    ForEach-Object { ($_ -split '=', 2)[0].Trim() } |
+    Where-Object { $_ -ne '' }
+  $envContent = Get-Content ".env"
+  $missingKeys = $exampleKeys | Where-Object {
+    $key = $_
+    -not ($envContent | Where-Object { $_ -match "^${key}=" })
+  }
+  if ($missingKeys.Count -eq 0) {
+    Write-Host "✅ .env: all keys from .env.example are present" -ForegroundColor Green
+  } else {
+    Write-Host "⚠️  .env is missing keys from .env.example:" -ForegroundColor Yellow
+    foreach ($key in $missingKeys) {
+      Write-Host "    - $key" -ForegroundColor Yellow
+    }
+    Write-Host "   (copy missing values from .env.example and adjust for your machine)" -ForegroundColor Yellow
+  }
+}
+
 # Kokoro TTS model files
 $kokoroModel = "kokoro-v1.0.onnx"
 $kokoroVoices = "voices-v1.0.bin"

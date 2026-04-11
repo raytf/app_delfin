@@ -48,6 +48,30 @@ else
   echo "⚠️  .env: missing (copy from .env.example)"
 fi
 
+# .env key diff vs .env.example
+if [ -f ".env" ] && [ -f ".env.example" ]; then
+  missing=()
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    key="${line%%=*}"
+    [[ -z "$key" ]] && continue
+    if ! grep -qE "^${key}=" .env 2>/dev/null; then
+      missing+=("$key")
+    fi
+  done < .env.example
+
+  if [ ${#missing[@]} -eq 0 ]; then
+    echo "✅ .env: all keys from .env.example are present"
+  else
+    echo "⚠️  .env is missing keys from .env.example:"
+    for key in "${missing[@]}"; do
+      echo "    - $key"
+    done
+    echo "   (copy missing values from .env.example and adjust for your machine)"
+  fi
+fi
+
 # Kokoro TTS model files
 KOKORO_MODEL=$(grep -E '^KOKORO_MODEL_PATH=' .env 2>/dev/null | cut -d= -f2)
 KOKORO_MODEL=${KOKORO_MODEL:-kokoro-v1.0.onnx}
