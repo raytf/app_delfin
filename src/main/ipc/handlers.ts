@@ -1,6 +1,10 @@
-// TODO (Phase 2): Register all IPC handlers for the main process.
-// Handles: capture:now, capture:auto-refresh, sidecar:send, sidecar:interrupt
+import { registerOverlayIpcHandlers } from './overlayHandlers'
+import { registerSessionIpcHandlers } from './sessionHandlers'
+import { registerSidecarBridge } from './sidecarBridge'
+import type { RegisterIpcHandlersOptions } from './types'
 
-export function registerIpcHandlers(): void {
-  // Placeholder — implemented in Phase 2
+export function registerIpcHandlers(options: RegisterIpcHandlersOptions): void {
+  registerSidecarBridge(options)
+  registerOverlayIpcHandlers(options)
+  registerSessionIpcHandlers(options)
 }
