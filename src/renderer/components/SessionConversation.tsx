@@ -41,11 +41,8 @@ export default function SessionConversation({
 
   return (
     <div className={`min-h-0 ${className ?? ''}`}>
-      <div
-        className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-slate-800 bg-slate-950/40 p-3"
-        ref={scrollContainerRef}
-      >
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-slate-800 bg-slate-950/40 p-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" ref={scrollContainerRef}>
           {messages.map((message) => {
             const isUser = message.role === 'user'
 
