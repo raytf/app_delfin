@@ -3,32 +3,6 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import type { Plugin } from 'vite'
-
-/**
- * Vite pre-bundles @ricky0123/vad-web and in doing so transforms ORT's
- * dynamic import() calls, appending "?import" to the URL as a module-type
- * hint (e.g. /ort-wasm-simd-threaded.mjs?import).
- *
- * viteStaticCopy serves the file without that query param, so the request
- * returns 404. This middleware strips "?import" from any ORT WASM glue-
- * module URL before it reaches the static file handler, making the lookup
- * succeed. Only affects dev mode; production uses file:// which doesn't go
- * through this server.
- */
-function ortWasmDevServePlugin(): Plugin {
-  return {
-    name: 'ort-wasm-dev-serve',
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        if (req.url?.match(/ort-wasm[^?]*\.mjs\?/)) {
-          req.url = req.url.split('?')[0]
-        }
-        next()
-      })
-    },
-  }
-}
 
 // Absolute paths — viteStaticCopy resolves 'src' relative to the Vite root,
 // which for the renderer in electron-vite is src/renderer, not the repo root.
@@ -56,13 +30,6 @@ export default defineConfig({
     },
   },
   renderer: {
-    optimizeDeps: {
-      // vad-web is CommonJS and should still be prebundled to browser-safe ESM.
-      // onnxruntime-web stays excluded because ORT's dynamic wasm-loader imports
-      // break when Vite rewrites them through node_modules/.vite/deps in dev.
-      include: ['@ricky0123/vad-web'],
-      exclude: ['onnxruntime-web'],
-    },
     // In dev mode the renderer loads from the Vite HTTP server, so we must set
     // COOP/COEP there directly — webRequest.onHeadersReceived fires too late for
     // the initial document and SharedArrayBuffer stays undefined without this.
@@ -88,25 +55,17 @@ export default defineConfig({
     plugins: [
       react(),
       tailwindcss(),
-      // Strips ?import query param from ORT .mjs dynamic-import URLs in dev mode.
-      // Vite appends ?import to dynamic imports; static copy serves without it → 404.
-      ortWasmDevServePlugin(),
-      // Copies VAD worker + ONNX model files into an app-owned vad-assets/
-      // directory. This avoids runtime dependence on node_modules/... paths and
-      // keeps dev/prod asset URLs stable.
+      // Copies the browser-ready VAD/ORT runtime into an app-owned vad-runtime/
+      // directory so the renderer can load it via local script tags instead of
+      // importing either package through Vite.
       viteStaticCopy({
         targets: [
-          // VAD AudioWorklet + Silero ONNX models
-          { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: 'vad-assets', rename: { stripBase: true } },
-          { src: `${vadDist}/silero_vad_v5.onnx`, dest: 'vad-assets', rename: { stripBase: true } },
-          { src: `${vadDist}/silero_vad_legacy.onnx`, dest: 'vad-assets', rename: { stripBase: true } },
-          // ONNX Runtime WASM binaries + JS glue modules required by onnxruntime-web.
-          // ORT dynamically imports the .mjs companion alongside the .wasm binary,
-          // so both must be served under the same stable vad-assets/ prefix.
-          { src: `${ortDist}/ort-wasm-simd-threaded.wasm`, dest: 'vad-assets', rename: { stripBase: true } },
-          { src: `${ortDist}/ort-wasm-simd-threaded.mjs`, dest: 'vad-assets', rename: { stripBase: true } },
-          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.wasm`, dest: 'vad-assets', rename: { stripBase: true } },
-          { src: `${ortDist}/ort-wasm-simd-threaded.asyncify.mjs`, dest: 'vad-assets', rename: { stripBase: true } },
+          { src: `${vadDist}/bundle.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${vadDist}/vad.worklet.bundle.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${vadDist}/silero_vad_v5.onnx`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${vadDist}/silero_vad_legacy.onnx`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${ortDist}/ort.min.js`, dest: 'vad-runtime', rename: { stripBase: true } },
+          { src: `${ortDist}/ort-wasm*`, dest: 'vad-runtime', rename: { stripBase: true } },
         ],
       }),
     ],

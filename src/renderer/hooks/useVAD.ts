@@ -1,5 +1,6 @@
 /**
- * useVAD — wraps @ricky0123/vad-web MicVAD for always-on voice detection.
+ * useVAD — wraps the locally hosted vad-web MicVAD runtime for always-on
+ * voice detection.
  *
  * When `enabled` is true the hook initialises a MicVAD instance on mount and
  * destroys it on unmount.  When the user finishes speaking, `onSpeechEnd` is
@@ -14,9 +15,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as vadWeb from '@ricky0123/vad-web'
 import { float32ToWavBase64 } from '../utils/audioUtils'
 
+const VAD_RUNTIME_ASSET_PATH = './vad-runtime/'
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
 const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
 // Silero authors recommend negativeSpeechThreshold = positiveSpeechThreshold − 0.15
@@ -55,7 +56,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
   const [isListening, setIsListening] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
-  const vadRef = useRef<vadWeb.MicVAD | null>(null)
+  const vadRef = useRef<VadMicVADInstance | null>(null)
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inGracePeriodRef = useRef(false)
 
@@ -73,14 +74,22 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
     async function init(): Promise<void> {
       try {
-        const vad = await vadWeb.MicVAD.new({
+        const vadRuntime = window.vad
+        if (window.ort == null) {
+          throw new Error('window.ort is unavailable. Check ./vad-runtime/ort.min.js.')
+        }
+        if (vadRuntime?.MicVAD == null) {
+          throw new Error('window.vad.MicVAD is unavailable. Check ./vad-runtime/bundle.min.js.')
+        }
+
+        const vad = await vadRuntime.MicVAD.new({
           model: 'v5',
-          // Point at an app-owned asset directory populated by
+          // Point at an app-owned runtime directory populated by
           // vite-plugin-static-copy. Using a stable relative path keeps this
           // working in both dev (http://localhost:5173/...) and production
           // (file://...) without depending on runtime node_modules URLs.
-          baseAssetPath: './vad-assets/',
-          onnxWASMBasePath: './vad-assets/',
+          baseAssetPath: VAD_RUNTIME_ASSET_PATH,
+          onnxWASMBasePath: VAD_RUNTIME_ASSET_PATH,
           positiveSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL,
           negativeSpeechThreshold: POSITIVE_SPEECH_THRESHOLD_NORMAL - NEGATIVE_DELTA,
           preSpeechPadMs: 300,
