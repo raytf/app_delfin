@@ -6,4 +6,5 @@ numpy
 websockets
 huggingface-hub
 python-dotenv
+requests
 kokoro-onnx
