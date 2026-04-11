@@ -1,6 +1,6 @@
 # Phase 0 — Project Scaffold
 
-> **Goal**: Create the repo structure, install all dependencies, write configuration files, and produce setup/verification scripts. At the end of this phase, `npm run dev` opens an empty Electron window and the sidecar starts (without a model loaded).
+> **Goal**: Create the repo structure, install all dependencies, write configuration files, and produce setup/verification scripts. At the end of this phase, `npm run dev:full` opens an empty Electron window and starts the sidecar together with a single command (the sidecar starts without a model loaded at this stage).
 
 ## 0.1 Scaffold the Electron project
 
@@ -104,7 +104,9 @@ devDependencies:
   @vitejs/plugin-react: ^4.x
   electron-vite: ^3.x
   @types/node: latest
+  @types/ws: latest
   tailwindcss: ^4.x
+  concurrently: ^9.x
 
 dependencies:
   react: ^19.x
@@ -115,7 +117,21 @@ dependencies:
   dotenv: ^16.x
 ```
 
-Also add `@types/ws` to devDependencies.
+### package.json — npm scripts
+
+Add the following scripts. `dev:full` is the primary development entry point — it starts the Python sidecar and the Electron + Vite dev server together with a single command:
+
+```json
+"scripts": {
+  "dev": "electron-vite dev",
+  "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"cd sidecar && uvicorn server:app --host 0.0.0.0 --port 8321\" \"npm run dev\"",
+  "build": "electron-vite build",
+  "preview": "electron-vite preview"
+}
+```
+
+- **`npm run dev:full`** — starts both processes simultaneously. `concurrently` labels and colour-codes their output in the same terminal. Ctrl-C kills both.
+- **`npm run dev`** — starts Electron + Vite only. Use this when the sidecar is already running (or when using the mock sidecar via `node scripts/mock-sidecar.js`).
 
 ### sidecar/requirements.txt
 
@@ -513,7 +529,8 @@ Save as JPEG or PNG. The sidecar will accept base64-encoded images.
 Run these checks after completing this phase. All must pass.
 
 - [ ] `npm install` completes without errors
-- [ ] `npm run dev` opens an Electron window showing "Screen Copilot" and "Status: Initialising..."
+- [ ] `npm run dev:full` opens an Electron window showing "Screen Copilot" and "Status: Initialising..." **and** starts the sidecar — both visible in the same terminal with labelled output
+- [ ] `npm run dev` (Electron only) also works independently, for use alongside the mock sidecar
 - [ ] `.env.example` exists with all 11 variables documented
 - [ ] `.env` is in `.gitignore`
 - [ ] `src/shared/types.ts` exports all interfaces listed above
@@ -521,7 +538,7 @@ Run these checks after completing this phase. All must pass.
 - [ ] `src/shared/constants.ts` exports `PRESETS` and `DEFAULT_PRESET`
 - [ ] All placeholder files exist in the directory structure (they can be empty/stub)
 - [ ] `cd sidecar && pip install -r requirements.txt` completes (in venv or with --break-system-packages)
-- [ ] `cd sidecar && uvicorn server:app --port 8321` starts and `curl http://localhost:8321/health` returns JSON with `status: "ok"`
+- [ ] `curl http://localhost:8321/health` (while `dev:full` is running) returns JSON with `status: "ok"`
 - [ ] `node scripts/mock-sidecar.js` starts and accepts a WebSocket connection on port 8321
 - [ ] `bash scripts/setup-check.sh` runs and prints check results
 - [ ] `git status` shows no untracked files that should be ignored (node_modules, .env, __pycache__)

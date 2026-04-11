@@ -79,10 +79,10 @@ If this produces a sensible description of the slide content, vision works. If i
 
 | # | Task | Owner | Time | Deliverable |
 |---|------|-------|------|-------------|
-| 0.3.1 | Scaffold Electron + electron-vite + React + TypeScript project | A1 | 30 min | `npm run dev` launches a blank Electron window |
+| 0.3.1 | Scaffold Electron + electron-vite + React + TypeScript project; add `concurrently` to devDependencies and wire the `dev:full` npm script | A1 | 30 min | `npm run dev:full` launches Electron window and sidecar together; `npm run dev` launches Electron only |
 | 0.3.2 | Verify `desktopCapturer` works — take a test screenshot from Electron, log it | A1 | 20 min | Console shows base64 image data |
 | 0.3.3 | **Windows only:** Verify WSL2 localhost port forwarding — run FastAPI in WSL2, `curl http://localhost:8321/health` from Windows PowerShell | A1 | 10 min | Health endpoint responds from Windows side |
-| 0.3.4 | Push scaffold to GitHub, confirm all teammates can clone and `npm install && npm run dev` | A1 | 10 min | Working dev environment for all |
+| 0.3.4 | Push scaffold to GitHub, confirm all teammates can clone and `npm install && npm run dev:full` | A1 | 10 min | Working dev environment for all |
 
 #### 0.4 — Decision Gate
 

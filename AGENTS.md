@@ -38,7 +38,7 @@ Complete phases in order and wait for human review before starting the next:
 
 | # | Phase doc | Gate |
 |---|---|---|
-| 0 | `docs/phases/phase-0-scaffold.md` | `npm run dev` opens Electron; `/health` returns JSON |
+| 0 | `docs/phases/phase-0-scaffold.md` | `npm run dev:full` starts Electron + sidecar; `/health` returns JSON |
 | 1 | `docs/phases/phase-1-sidecar.md` | WebSocket turn returns structured response via `wscat` |
 | 2 | `docs/phases/phase-2-electron.md` | Capture button grabs foreground window; mock sidecar responds |
 | 3 | `docs/phases/phase-3-ui.md` | Full sidebar UI renders against mock sidecar |
@@ -51,16 +51,18 @@ Complete phases in order and wait for human review before starting the next:
 ## Development Commands
 
 ```bash
-# Electron (from repo root)
-npm install
-npm run dev          # Start Electron + Vite dev server
+# Start EVERYTHING from one command (Electron + Vite dev server + Python sidecar)
+npm run dev:full
+
+# Electron + Vite only (when running sidecar separately or using mock)
+npm run dev
 
 # Mock sidecar (use while building Electron UI — no model needed)
 node scripts/mock-sidecar.js
 
-# Real sidecar (from repo root)
+# Real sidecar only (from repo root, inside a venv)
 cd sidecar
-pip install -r requirements.txt   # inside a venv
+pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8321
 
 # Environment check
