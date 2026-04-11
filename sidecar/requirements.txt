@@ -1,0 +1,9 @@
+fastapi[standard]
+uvicorn[standard]
+litert-lm>=0.10.1
+pillow
+numpy
+websockets
+huggingface-hub
+python-dotenv
+kokoro-onnx
