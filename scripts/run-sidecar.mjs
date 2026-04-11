@@ -28,6 +28,14 @@ const child = spawn(
   },
 )
 
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => {
+    if (!child.killed) {
+      child.kill(signal)
+    }
+  })
+}
+
 child.on('exit', (code, signal) => {
   if (signal !== null) {
     process.kill(process.pid, signal)

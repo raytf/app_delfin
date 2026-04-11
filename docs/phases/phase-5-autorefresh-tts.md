@@ -266,7 +266,9 @@ In the renderer, show a reusable waveform component that:
   - `--primary` (blue) for AI speech
   - `--warning` (orange) for processing and idle states
 - uses faster orange motion while processing and slower/subtler orange motion while idle
-- tracks live-ish mic activity for the user and playback-matched motion for AI TTS
+- tracks analyser-driven per-bar mic activity while listening is enabled, but only turns green once VAD classifies speech
+- routes streamed TTS chunks through a shared Web Audio analysis chain so blue playback bars stay visually continuous across chunk boundaries
+- keeps the compact minimized overlay large enough and simple enough that the waveform, status row, and actions do not clip
 
 ---
 
