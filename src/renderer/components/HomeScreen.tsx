@@ -1,4 +1,5 @@
 import type { SessionListItem } from '../../shared/types'
+import delfinLogo from '../assets/logo.png'
 import SessionHistoryCard from './SessionHistoryCard'
 
 interface HomeScreenProps {
@@ -43,13 +44,19 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-8 py-12">
         {/* Hero Section - Centered */}
         <main className="flex flex-1 flex-col items-center justify-center pb-8 pt-4 text-center">
-          {/* Title */}
-          <h1 className="font-display text-8xl font-bold tracking-tight text-[var(--primary)]">
-            Delfin
-          </h1>
+          <div className="flex items-center gap-4 sm:gap-5">
+            <img
+              alt="Delfin logo"
+              className="h-28 w-28 object-contain sm:h-32 sm:w-32 mb-1"
+              src={delfinLogo}
+            />
+            <h1 className="font-display text-8xl font-bold tracking-tight text-[var(--primary)]">
+              Delfin
+            </h1>
+          </div>
 
           {/* Tagline */}
-          <p className="mt-6 max-w-xl text-xl leading-relaxed text-[var(--text-secondary)]">
+          <p className="mt-5 max-w-xl text-xl leading-relaxed text-[var(--text-secondary)]">
             Your intelligent study companion that sees what you see.
             <br />
             <span className="text-[var(--text-muted)]">
