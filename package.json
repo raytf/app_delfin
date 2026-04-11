@@ -9,6 +9,7 @@
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "setup": "npm install && npm run setup:sidecar",
     "setup:sidecar": "cd sidecar && python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   },
   "devDependencies": {
