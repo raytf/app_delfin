@@ -35,6 +35,7 @@ export default function App() {
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
   const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
   const errorMessage = useSessionStore((state) => state.errorMessage)
@@ -163,13 +164,23 @@ export default function App() {
       return
     }
 
+    const messageId = crypto.randomUUID()
     setIsMinimizedPromptComposing(false)
-    beginPromptSubmission(trimmedText)
+    beginPromptSubmission({
+      messageId,
+      prompt: trimmedText,
+    })
 
     try {
-      await window.api.submitSessionPrompt({
+      const response = await window.api.submitSessionPrompt({
+        messageId,
         text: trimmedText,
         presetId: 'lecture-slide',
+      })
+
+      setUserMessageImagePath({
+        imagePath: response.imagePath,
+        messageId: response.messageId,
       })
     } catch (error) {
       failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')

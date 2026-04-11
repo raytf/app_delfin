@@ -46,16 +46,28 @@ export class SessionPersistenceService {
     return sessionId
   }
 
-  async recordUserPrompt(input: { text: string; presetId: PresetId; sourceLabel: string | null }): Promise<void> {
+  async recordUserPrompt(input: {
+    imageBase64: string
+    messageId: string
+    text: string
+    presetId: PresetId
+    sourceLabel: string | null
+  }): Promise<string> {
     const sessionId = this.requireActiveSessionId()
     const timestamp = Date.now()
+    const imagePath = await this.storage.persistCaptureImage({
+      imageBase64: input.imageBase64,
+      messageId: input.messageId,
+      sessionId,
+    })
 
     const userMessage: ConversationMessageRecord = {
-      id: crypto.randomUUID(),
+      id: input.messageId,
       sessionId,
       role: 'user',
       content: input.text,
       timestamp,
+      imagePath,
     }
 
     await this.storage.appendConversationMessage(userMessage)
@@ -86,6 +98,8 @@ export class SessionPersistenceService {
       messageCount: this.messageCount,
       lastUpdatedAt: timestamp,
     })
+
+    return imagePath
   }
 
   async appendAssistantToken(text: string): Promise<void> {
@@ -151,6 +165,10 @@ export class SessionPersistenceService {
 
   async listSessions(): Promise<SessionRecord[]> {
     return this.storage.listSessions()
+  }
+
+  async getCaptureImageDataUrl(relativePath: string): Promise<string> {
+    return this.storage.getCaptureImageDataUrl(relativePath)
   }
 
   private async persistAssistantDraft(timestamp: number): Promise<void> {

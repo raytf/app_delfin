@@ -1,7 +1,13 @@
 import { ipcMain } from 'electron'
 import { captureForegroundWindow } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
-import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS, type SessionPromptRequest } from '../../shared/types'
+import {
+  MAIN_TO_RENDERER_CHANNELS,
+  RENDERER_TO_MAIN_CHANNELS,
+  type SessionMessageImageRequest,
+  type SessionPromptRequest,
+  type SessionPromptResponse,
+} from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
@@ -19,7 +25,7 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     await options.switchOverlayMode('expanded')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, request: SessionPromptRequest) => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, request: SessionPromptRequest): Promise<SessionPromptResponse> => {
     const mainWindow = options.getMainWindow()
 
     if (mainWindow === null || mainWindow.isDestroyed()) {
@@ -36,7 +42,9 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
     mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
 
-    await options.sessionPersistence.recordUserPrompt({
+    const imagePath = await options.sessionPersistence.recordUserPrompt({
+      imageBase64: frame.imageBase64,
+      messageId: request.messageId,
       text,
       presetId: request.presetId,
       sourceLabel: frame.sourceLabel,
@@ -53,7 +61,16 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
       await options.sessionPersistence.failAssistantResponse(errorMessage)
       throw error
     }
+
+    return {
+      imagePath,
+      messageId: request.messageId,
+    }
   })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST, async () => options.sessionPersistence.listSessions())
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>
+    options.sessionPersistence.getCaptureImageDataUrl(request.imagePath),
+  )
 }

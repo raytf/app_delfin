@@ -19,7 +19,14 @@ export interface ConversationMessageRecord {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  imagePath?: string
   errorMessage?: string
+}
+
+export interface PersistCaptureImageInput {
+  imageBase64: string
+  messageId: string
+  sessionId: string
 }
 
 export interface SessionStorage {
@@ -30,4 +37,6 @@ export interface SessionStorage {
   getSession(sessionId: string): Promise<SessionRecord | null>
   getConversation(sessionId: string): Promise<ConversationMessageRecord[]>
   listSessions(): Promise<SessionRecord[]>
+  persistCaptureImage(input: PersistCaptureImageInput): Promise<string>
+  getCaptureImageDataUrl(relativePath: string): Promise<string>
 }

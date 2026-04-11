@@ -9,11 +9,12 @@ interface SessionStoreState {
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
   clearConversation: () => void
-  beginPromptSubmission: (prompt: string) => void
+  beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
+  setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
 }
 
 function createMessageId(): string {
@@ -38,12 +39,12 @@ export const useSessionStore = create<SessionStoreState>()(
           activeAssistantMessageId: null,
         })),
 
-      beginPromptSubmission: (prompt: string) =>
+      beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {
           const userMessage: ChatMessage = {
-            id: createMessageId(),
+            id: input.messageId,
             role: 'user',
-            content: prompt,
+            content: input.prompt,
             timestamp: Date.now(),
           }
 
@@ -110,6 +111,18 @@ export const useSessionStore = create<SessionStoreState>()(
         set({
           sessionHistory: sessions,
         }),
+
+      setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === input.messageId
+              ? {
+                  ...message,
+                  imagePath: input.imagePath,
+                }
+              : message,
+          ),
+        })),
     }),
     {
       name: 'screen-copilot-active-session',
