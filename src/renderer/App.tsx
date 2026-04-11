@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
+import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import {
   type ChatMessage,
@@ -12,6 +13,7 @@ import {
   type SessionMode,
   type SidecarStatus,
 } from '../shared/types'
+import { VOICE_TURN_TEXT } from '../shared/constants'
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -32,6 +34,7 @@ export default function App() {
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
+  const beginVoiceTurn = useSessionStore((state) => state.beginVoiceTurn)
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
@@ -42,6 +45,36 @@ export default function App() {
   const messages = useSessionStore((state) => state.messages)
   const latestAssistantMessage = getLatestAssistantMessage(messages)
   const latestResponseText = latestAssistantMessage?.content ?? null
+
+  // ---------------------------------------------------------------------------
+  // VAD — always-on mic when session is active and VOICE_ENABLED=true
+  // ---------------------------------------------------------------------------
+  const voiceEnabled = window.api.voiceEnabled
+
+  const handleVoiceSpeechEnd = useCallback(
+    (wavBase64: string) => {
+      // Read isSubmitting directly from store state to avoid stale closure
+      if (useSessionStore.getState().isSubmitting) return
+
+      beginVoiceTurn()
+
+      window.api
+        .submitSessionPrompt({
+          text: VOICE_TURN_TEXT,
+          presetId: 'lecture-slide',
+          audio: wavBase64,
+        })
+        .catch((err: unknown) => {
+          failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
+        })
+    },
+    [beginVoiceTurn, failAssistantResponse],
+  )
+
+  const { isListening, isMuted, toggleMute } = useVAD({
+    enabled: voiceEnabled && sessionMode === 'active',
+    onSpeechEnd: handleVoiceSpeechEnd,
+  })
 
   useEffect(() => {
     if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
@@ -181,6 +214,8 @@ export default function App() {
       <MinimizedSessionBar
         errorMessage={errorMessage}
         isSubmitting={isSubmitting}
+        isMicListening={isListening}
+        isMicMuted={isMuted}
         latestResponseText={latestResponseText}
         minimizedVariant={minimizedVariant}
         onAskAnother={() => {
@@ -198,6 +233,7 @@ export default function App() {
         onStop={() => {
           void handleStopSession()
         }}
+        onToggleMute={toggleMute}
       />
     )
   }
@@ -208,6 +244,8 @@ export default function App() {
         captureSourceLabel={captureSourceLabel}
         errorMessage={errorMessage}
         isSubmitting={isSubmitting}
+        isMicListening={isListening}
+        isMicMuted={isMuted}
         messages={messages}
         onMinimize={() => {
           void handleMinimizeOverlay()
@@ -218,6 +256,7 @@ export default function App() {
         onStop={() => {
           void handleStopSession()
         }}
+        onToggleMute={toggleMute}
         sidecarStatus={sidecarStatus}
       />
     )

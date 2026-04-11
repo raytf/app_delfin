@@ -8,10 +8,16 @@ interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
   errorMessage: string | null
   isSubmitting: boolean
+  /** True once MicVAD is running and listening (VAD initialised). */
+  isMicListening: boolean
+  /** True if the user manually muted the mic. */
+  isMicMuted: boolean
   messages: ChatMessage[]
   onMinimize: () => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
+  /** Toggle mic mute state. */
+  onToggleMute: () => void
   sidecarStatus: SidecarStatus
 }
 
@@ -19,10 +25,13 @@ export default function ExpandedSessionView({
   captureSourceLabel,
   errorMessage,
   isSubmitting,
+  isMicListening,
+  isMicMuted,
   messages,
   onMinimize,
   onSubmitPrompt,
   onStop,
+  onToggleMute,
   sidecarStatus,
 }: ExpandedSessionViewProps) {
   return (
@@ -32,6 +41,27 @@ export default function ExpandedSessionView({
           messages={messages}
           sidecarStatus={sidecarStatus}
         />
+
+        {/* ── [TEST] VAD mic status indicator ── */}
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-300">
+          <span className="font-semibold uppercase tracking-widest text-yellow-500">[TEST]</span>
+          {isMicListening ? (
+            isMicMuted ? (
+              <span>🔇 Mic muted</span>
+            ) : (
+              <span>🎙️ Mic active — listening for speech</span>
+            )
+          ) : (
+            <span>⏳ Mic initialising…</span>
+          )}
+          <button
+            className="no-drag ml-auto rounded border border-yellow-500/50 px-2 py-0.5 text-yellow-300 hover:bg-yellow-500/20"
+            onClick={onToggleMute}
+            type="button"
+          >
+            {isMicMuted ? 'Unmute' : 'Mute'}
+          </button>
+        </div>
 
         <div className="mt-6 grid flex-1 gap-6 lg:grid-cols-[minmax(0,1.45fr)_20rem]">
           <section className="flex min-h-0 flex-col rounded-[2rem] border border-slate-800 bg-slate-950/72 p-6 shadow-2xl shadow-black/20">

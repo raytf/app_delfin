@@ -12,6 +12,10 @@ import type {
 } from '../shared/types'
 
 const api: ElectronAPI = {
+  // Evaluated once at preload time (Node.js context has access to process.env).
+  // Defaults to true so voice is on when the env var is absent.
+  voiceEnabled: process.env.VOICE_ENABLED !== 'false',
+
   captureNow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.CAPTURE_NOW),
 
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) =>

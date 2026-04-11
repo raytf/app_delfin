@@ -4,6 +4,8 @@ import MinimizedPromptPanel from './MinimizedPromptPanel'
 interface MinimizedSessionBarProps {
   errorMessage: string | null
   isSubmitting: boolean
+  isMicListening: boolean
+  isMicMuted: boolean
   latestResponseText: string | null
   minimizedVariant: MinimizedOverlayVariant
   onAskAnother: () => void
@@ -11,6 +13,7 @@ interface MinimizedSessionBarProps {
   onSetPromptOpen: (isOpen: boolean) => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
+  onToggleMute: () => void
 }
 
 function PromptIcon() {
@@ -58,6 +61,8 @@ function EndIcon() {
 export default function MinimizedSessionBar({
   errorMessage,
   isSubmitting,
+  isMicListening,
+  isMicMuted,
   latestResponseText,
   minimizedVariant,
   onAskAnother,
@@ -65,15 +70,15 @@ export default function MinimizedSessionBar({
   onSetPromptOpen,
   onSubmitPrompt,
   onStop,
+  onToggleMute,
 }: MinimizedSessionBarProps) {
   const isPromptOpen = minimizedVariant !== 'compact'
 
   return (
     <div className=" drag-region flex h-screen overflow-hidden items-center justify-center text-white">
       <div
-        className={`flex h-full w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${
-          isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
-        }`}
+        className={`flex h-full w-full flex-col overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl shadow-black/20 ${isPromptOpen ? 'p-3' : 'items-center justify-center px-3 py-2'
+          }`}
       >
         {isPromptOpen ? (
           <MinimizedPromptPanel
@@ -86,6 +91,14 @@ export default function MinimizedSessionBar({
             onSubmitPrompt={onSubmitPrompt}
           />
         ) : null}
+
+        {/* ── [TEST] compact mic indicator ── */}
+        <div className="mb-1 flex items-center justify-center gap-1 text-[10px] text-yellow-400">
+          <span>{isMicListening ? (isMicMuted ? '🔇' : '🎙️') : '⏳'}</span>
+          <button className="no-drag underline opacity-70 hover:opacity-100" onClick={onToggleMute} type="button">
+            {isMicMuted ? 'unmute' : 'mute'}
+          </button>
+        </div>
 
         <div className={isPromptOpen ? 'drag-region mt-3 flex items-center justify-center gap-2' : 'drag-region flex items-center justify-center gap-2'}>
           <button

@@ -27,8 +27,11 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     }
 
     const text = request.text.trim()
+    const isVoiceTurn = Boolean(request.audio)
 
-    if (text.length === 0) {
+    // Allow submission when audio is present even if text is the voice constant.
+    // Block only genuinely empty, non-audio submissions.
+    if (text.length === 0 && !isVoiceTurn) {
       throw new Error('Prompt cannot be empty.')
     }
 
@@ -47,6 +50,7 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
         image: frame.imageBase64,
         text,
         preset_id: request.presetId,
+        ...(request.audio !== undefined ? { audio: request.audio } : {}),
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send prompt to sidecar.'

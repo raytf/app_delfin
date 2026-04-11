@@ -11,6 +11,7 @@ export const wsOutboundMessageSchema = z.object({
   image: z.string().optional(),
   text: z.string(),
   preset_id: z.string(),
+  audio: z.string().optional(), // base64 WAV — present on voice turns
 })
 
 export const wsInterruptMessageSchema = z.object({

@@ -10,6 +10,9 @@ interface SessionStoreState {
   activeAssistantMessageId: string | null
   clearConversation: () => void
   beginPromptSubmission: (prompt: string) => void
+  /** Like beginPromptSubmission but marks the user turn as a voice turn so the
+   *  UI renders a 🎙️ icon instead of the raw VOICE_TURN_TEXT constant. */
+  beginVoiceTurn: () => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
@@ -63,6 +66,32 @@ export const useSessionStore = create<SessionStoreState>()(
           }
         }),
 
+      beginVoiceTurn: () =>
+        set((state) => {
+          const userMessage: ChatMessage = {
+            id: createMessageId(),
+            role: 'user',
+            content: '🎙️ Voice input',
+            timestamp: Date.now(),
+            isVoiceTurn: true,
+          }
+
+          const assistantMessageId = createMessageId()
+          const assistantMessage: ChatMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+          }
+
+          return {
+            errorMessage: null,
+            isSubmitting: true,
+            messages: [...state.messages, userMessage, assistantMessage],
+            activeAssistantMessageId: assistantMessageId,
+          }
+        }),
+
       appendAssistantText: (text: string) =>
         set((state) => {
           if (state.activeAssistantMessageId === null) {
@@ -90,13 +119,13 @@ export const useSessionStore = create<SessionStoreState>()(
             state.activeAssistantMessageId === null
               ? state.messages
               : state.messages.map((entry) =>
-                  entry.id === state.activeAssistantMessageId
-                    ? {
-                        ...entry,
-                        content: message,
-                      }
-                    : entry,
-                )
+                entry.id === state.activeAssistantMessageId
+                  ? {
+                    ...entry,
+                    content: message,
+                  }
+                  : entry,
+              )
 
           return {
             errorMessage: message,
