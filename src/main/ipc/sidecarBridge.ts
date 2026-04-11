@@ -1,5 +1,9 @@
 import { ipcMain } from "electron";
 import {
+  wsInterruptMessageSchema,
+  wsOutboundMessageSchema,
+} from "../../shared/schemas";
+import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
 } from "../../shared/types";
@@ -18,7 +22,8 @@ export function registerSidecarBridge(
 
   ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, (_event, message) => {
     try {
-      sendToSidecar(message);
+      const parsed = wsOutboundMessageSchema.parse(message);
+      sendToSidecar(parsed);
     } catch (error) {
       const mainWindow = options.getMainWindow();
       if (mainWindow !== null && !mainWindow.isDestroyed()) {
@@ -34,7 +39,8 @@ export function registerSidecarBridge(
 
   ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, () => {
     try {
-      sendToSidecar({ type: "interrupt" });
+      const parsed = wsInterruptMessageSchema.parse({ type: "interrupt" });
+      sendToSidecar(parsed);
     } catch (error) {
       const mainWindow = options.getMainWindow();
       if (mainWindow !== null && !mainWindow.isDestroyed()) {

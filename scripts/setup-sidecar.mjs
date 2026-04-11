@@ -21,16 +21,33 @@ function run(command, args, cwd = rootDir) {
   return spawnSync(command, args, { cwd, stdio: 'inherit' })
 }
 
-function isAvailable(command, prefixArgs) {
-  const result = spawnSync(command, [...prefixArgs, '--version'], { stdio: 'ignore' })
-  return result.status === 0
+function isPythonVersionSufficient(command, prefixArgs) {
+  const result = spawnSync(command, [...prefixArgs, '--version'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  if (result.status !== 0) return false
+  const output = (result.stdout + result.stderr).trim()
+  const match = output.match(/Python ([0-9]+)\.([0-9]+)\.([0-9]+)/)
+  if (!match) return false
+  const [, maj, min] = match.map(Number)
+  return maj > 3 || (maj === 3 && min >= 12)
 }
 
 function resolveBootstrapPython() {
-  for (const candidate of pythonCandidates) {
-    if (isAvailable(candidate.command, candidate.prefixArgs)) {
-      return candidate
+  for (const { command, prefixArgs } of pythonCandidates) {
+    const probe = spawnSync(command, [...prefixArgs, '--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    if (probe.status !== 0) continue
+    const detected = (probe.stdout + probe.stderr).trim()
+    if (isPythonVersionSufficient(command, prefixArgs)) {
+      return { command, prefixArgs }
     }
+    console.warn(
+      `[setup-sidecar] Skipping "${command}" — detected ${detected}, need Python >= 3.12.0`,
+    )
   }
 
   return null

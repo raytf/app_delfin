@@ -26,6 +26,10 @@ import {
   WAVEFORM_BAR_COUNT,
 } from './utils/waveformState'
 
+// Serialises audio-chunk processing so concurrent IPC callbacks cannot race on
+// ensureAudioContext(), audioNextStartTimeRef, or audioSourceNodesRef.
+let lastAudioChunkPromise: Promise<void> = Promise.resolve()
+
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'assistant') {
@@ -472,34 +476,34 @@ export default function App() {
     })
 
     window.api.onSidecarAudioChunk((data) => {
-      void (async () => {
-        const audioContext = await ensureAudioContext()
-        if (audioContext === null) {
-          return
-        }
-
-        const audioBuffer = decodeAudioChunk(data.audio, audioContext)
-        const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
-        const sourceNode = audioContext.createBufferSource()
-        sourceNode.buffer = audioBuffer
-        if (assistantGainNodeRef.current !== null) {
-          sourceNode.connect(assistantGainNodeRef.current)
-        } else {
-          sourceNode.connect(audioContext.destination)
-        }
-        sourceNode.onended = () => {
-          sourceNode.disconnect()
-          audioSourceNodesRef.current.delete(sourceNode)
-          if (!audioStreamActiveRef.current && audioSourceNodesRef.current.size === 0) {
-            finishAudioPlayback()
+      lastAudioChunkPromise = lastAudioChunkPromise
+        .then(async () => {
+          const audioContext = await ensureAudioContext()
+          if (audioContext === null) {
+            return
           }
-        }
 
-        audioSourceNodesRef.current.add(sourceNode)
-        sourceNode.start(startAt)
-        audioNextStartTimeRef.current = startAt + audioBuffer.duration
-        startAssistantWaveformLoop()
-      })()
+          const audioBuffer = decodeAudioChunk(data.audio, audioContext)
+          const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
+          const sourceNode = audioContext.createBufferSource()
+          sourceNode.buffer = audioBuffer
+          sourceNode.connect(audioContext.destination)
+          if (assistantAnalyserRef.current !== null) {
+            sourceNode.connect(assistantAnalyserRef.current)
+          }
+          sourceNode.onended = () => {
+            sourceNode.disconnect()
+            audioSourceNodesRef.current.delete(sourceNode)
+            if (!audioStreamActiveRef.current && audioSourceNodesRef.current.size === 0) {
+              finishAudioPlayback()
+            }
+          }
+
+          audioSourceNodesRef.current.add(sourceNode)
+          sourceNode.start(startAt)
+          audioNextStartTimeRef.current = startAt + audioBuffer.duration
+        })
+        .catch(() => {})
     })
 
     window.api.onSidecarAudioEnd(() => {
@@ -524,11 +528,13 @@ export default function App() {
 
     window.api.onSidecarError((data) => {
       aiStreamingStartedRef.current = false
+      audioStartedForTurnRef.current = false
+      stopScheduledAudioSources()
+      cancelSpeechSynthesis()
+      clearFallbackSpeechTimer()
+      finishAudioPlayback()
+      pendingVoiceWavRef.current = null
       failAssistantResponse(data.message)
-
-      if (pendingVoiceWavRef.current !== null) {
-        submitPendingVoiceTurn()
-      }
     })
 
     window.api.onSidecarStatus((status) => {
