@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { User } from 'lucide-react'
+import { User, Layers3 } from 'lucide-react'
 import type { ChatMessage } from '../../shared/types'
 
 interface SessionConversationProps {
@@ -117,14 +117,15 @@ export default function SessionConversation({
 
                 {isUser && message.imagePath !== undefined && (
                   <button
-                    className="mt-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
                     disabled={loadingImageMessageId === message.id}
                     onClick={() => {
                       void handleViewCapture(message)
                     }}
                     type="button"
                   >
-                    {loadingImageMessageId === message.id ? 'Loading...' : 'View Screenshot'}
+                    <Layers3 size={12} />
+                    {loadingImageMessageId === message.id ? 'Loading...' : 'Context'}
                   </button>
                 )}
               </div>
@@ -144,9 +145,9 @@ export default function SessionConversation({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 py-3">
-              <p className="text-sm font-medium text-[var(--text-primary)]">Screenshot</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Question Context</p>
               <button
-                className="rounded-lg px-3 py-1 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--bg-surface-2)]"
+                className="cursor-pointer rounded-lg px-3 py-1 text-sm text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
                 onClick={() => setSelectedImage(null)}
                 type="button"
               >
@@ -155,7 +156,7 @@ export default function SessionConversation({
             </div>
             <div className="max-h-[80vh] overflow-auto bg-[var(--bg-surface-2)] p-4">
               <img
-                alt="Captured screenshot"
+                alt="Visual context for the selected question"
                 className="mx-auto h-auto max-w-full rounded-lg"
                 src={selectedImage.src}
               />

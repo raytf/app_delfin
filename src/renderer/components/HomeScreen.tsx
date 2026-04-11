@@ -102,7 +102,7 @@ export default function HomeScreen({ onStartSession, sessions }: HomeScreenProps
         <section className="pb-8">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
-              Continue Studying
+              Recent Sessions
             </h2>
             {sessions.length > 6 && (
               <button
