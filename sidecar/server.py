@@ -53,6 +53,52 @@ def _clean_tool_result(result: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tool call parsing — extract and invoke tool calls from model output
+# ---------------------------------------------------------------------------
+
+def _parse_and_invoke_tool(text: str, tool_result: dict, respond_to_user: callable) -> bool:
+    """Try to parse and invoke respond_to_user tool from text.
+
+    Returns True if a tool was called, False otherwise.
+    """
+    # Look for Gemma tool call format: <|tool_call>call:respond_to_user{...}<tool_call|>
+    pattern = r'<\|tool_call>call:respond_to_user\{(.*?)\}<tool_call\|>'
+    match = _re.search(pattern, text, _re.DOTALL)
+    if not match:
+        return False
+
+    try:
+        args_str = match.group(1)
+
+        # Simple JSON-like parser for Gemma's format (handles <|"|> tokens)
+        def extract_quoted_value(s: str) -> str:
+            """Extract text between <|"|> markers."""
+            parts = _re.findall(r'<\|\"\|>([^<]*)<\|\"\|>', s)
+            return ''.join(parts)
+
+        summary = extract_quoted_value(_re.search(r'summary:(.+?)(?:,answer:|$)', args_str, _re.DOTALL).group(1) if _re.search(r'summary:', args_str) else "")
+        answer = extract_quoted_value(_re.search(r'answer:(.+?)(?:,key_points:|$)', args_str, _re.DOTALL).group(1) if _re.search(r'answer:', args_str) else "")
+
+        # Parse key_points array — need to find the closing <|"|>] pattern
+        # because key points may contain brackets like [...]
+        kp_match = _re.search(r'key_points:\[(.*?)<\|\"\|>\]', args_str, _re.DOTALL)
+        key_points = []
+        if kp_match:
+            kp_str = kp_match.group(1) + '<|"|>'  # Add back the closing quote
+            for item in _re.findall(r'<\|\"\|>([^<]*?)<\|\"\|>', kp_str):
+                clean = item.strip()
+                if clean and clean != ',':
+                    key_points.append(clean)
+
+        logger.info("Tool parsed: respond_to_user(summary=%s..., answer=%s..., key_points=%d items)", summary[:40], answer[:40], len(key_points))
+        respond_to_user(summary, answer, key_points)
+        return True
+    except Exception as e:
+        logger.warning("Tool parse failed: %s", e)
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Structured-text extraction fallback
 # ---------------------------------------------------------------------------
 
@@ -99,6 +145,7 @@ async def handle_turn(
     conversation: Any,
     msg: dict,
     tool_result: dict,
+    interrupted: asyncio.Event,
 ) -> None:
     tool_result.clear()
 
@@ -110,29 +157,51 @@ async def handle_turn(
 
     try:
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: conversation.send_message({"role": "user", "content": content}),
-        )
+        chunk_queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
 
+        def _run_stream() -> None:
+            try:
+                stream = conversation.send_message_async({"role": "user", "content": content})
+                for chunk in stream:
+                    if interrupted.is_set():
+                        break
+                    for item in chunk.get("content", []):
+                        if item.get("type") == "text" and item.get("text"):
+                            text = item["text"]
+                            asyncio.run_coroutine_threadsafe(chunk_queue.put(text), loop)
+                asyncio.run_coroutine_threadsafe(chunk_queue.put(None), loop)  # sentinel
+            except Exception as exc:
+                logger.exception("Stream error: %s", exc)
+                asyncio.run_coroutine_threadsafe(chunk_queue.put(exc), loop)
+
+        executor_fut = loop.run_in_executor(None, _run_stream)
+
+        accumulated_text = ""
+        while True:
+            if interrupted.is_set():
+                break
+            item = await chunk_queue.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+            accumulated_text += item
+            await ws.send_json({"type": "token", "text": item})
+
+        await executor_fut
+
+        # After all tokens, try to parse and invoke tool from accumulated text
+        tool_called = _parse_and_invoke_tool(accumulated_text, tool_result, respond_to_user)
+
+        # Send structured response
         if tool_result:
-            # Primary path: model called the respond_to_user tool
+            # Tool was called (via parsing)
             await ws.send_json({"type": "structured", "data": _clean_tool_result(dict(tool_result))})
         else:
-            # Fallback 1: try to extract structure from raw text
-            raw_text: str = ""
-            if isinstance(result, dict):
-                items = result.get("content", [])
-                raw_text = items[0].get("text", "") if items else ""
-            else:
-                raw_text = str(result)
-
-            extracted = _extract_structured_from_text(raw_text)
+            # Fallback: try to extract structure from raw text
+            extracted = _extract_structured_from_text(accumulated_text)
             if extracted:
                 await ws.send_json({"type": "structured", "data": extracted})
-            else:
-                # Fallback 2: plain token
-                await ws.send_json({"type": "token", "text": raw_text})
 
         await ws.send_json({"type": "done"})
 
@@ -204,9 +273,10 @@ async def ws_endpoint(ws: WebSocket) -> None:
     preset_id = "lecture-slide"
     system_prompt = PRESETS[preset_id]
 
+    # Note: tools parameter intentionally omitted — we stream tokens and handle tool calls manually
+    # This allows us to send individual tokens over WebSocket as they're generated
     conversation = engine.create_conversation(
         messages=[{"role": "system", "content": [{"type": "text", "text": system_prompt}]}],
-        tools=[respond_to_user],
     )
     conversation.__enter__()
 
@@ -241,7 +311,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
             if msg is None:
                 break
             interrupted.clear()
-            await handle_turn(ws, conversation, msg, tool_result)
+            await handle_turn(ws, conversation, msg, tool_result, interrupted)
     finally:
         recv_task.cancel()
         conversation.__exit__(None, None, None)
