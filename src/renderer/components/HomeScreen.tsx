@@ -1,41 +1,10 @@
 import type { SessionListItem } from '../../shared/types'
+import SessionHistoryCard from './SessionHistoryCard'
 
 interface HomeScreenProps {
   onStartSession: () => void
+  onViewAllSessions: () => void
   sessions: SessionListItem[]
-}
-
-function formatDuration(startedAt: number, endedAt: number | null): string {
-  const end = endedAt ?? Date.now()
-  const durationMs = end - startedAt
-  const minutes = Math.floor(durationMs / 60000)
-
-  if (minutes < 60) {
-    return `${minutes}m`
-  }
-
-  const hours = Math.floor(minutes / 60)
-  const remainingMins = minutes % 60
-  return `${hours}h ${remainingMins}m`
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days}d ago`
-
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 // Dolphin wave SVG for decorative element
@@ -64,7 +33,7 @@ function WaveDecoration() {
   )
 }
 
-export default function HomeScreen({ onStartSession, sessions }: HomeScreenProps) {
+export default function HomeScreen({ onStartSession, onViewAllSessions, sessions }: HomeScreenProps) {
   const recentSessions = sessions.slice(0, 6)
 
   return (
@@ -104,9 +73,10 @@ export default function HomeScreen({ onStartSession, sessions }: HomeScreenProps
             <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
               Recent Sessions
             </h2>
-            {sessions.length > 6 && (
+            {sessions.length > 0 && (
               <button
-                className="text-sm font-medium text-[var(--primary)] transition hover:text-[var(--primary-hover)]"
+                className="cursor-pointer text-sm font-medium text-[var(--primary)] transition hover:text-[var(--primary-hover)]"
+                onClick={onViewAllSessions}
                 type="button"
               >
                 View All Sessions
@@ -117,47 +87,7 @@ export default function HomeScreen({ onStartSession, sessions }: HomeScreenProps
           {recentSessions.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {recentSessions.map((session) => (
-                <div
-                  className="session-card cursor-pointer rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5 shadow-sm"
-                  key={session.id}
-                >
-                  {/* Session Title */}
-                  <h3 className="font-display text-base font-semibold text-[var(--text-primary)]">
-                    {session.sourceLabel ?? 'Untitled Session'}
-                  </h3>
-
-                  {/* Session Meta */}
-                  <div className="mt-4 flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                    {/* Message Count */}
-                    <div className="flex items-center gap-1.5">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-                        />
-                      </svg>
-                      <span>{session.messageCount}</span>
-                    </div>
-
-                    {/* Duration */}
-                    <div className="flex items-center gap-1.5">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>{formatDuration(session.startedAt, session.endedAt)}</span>
-                    </div>
-                  </div>
-
-                  {/* Time ago */}
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    {formatRelativeTime(session.lastUpdatedAt)}
-                  </p>
-                </div>
+                <SessionHistoryCard key={session.id} session={session} />
               ))}
             </div>
           ) : (

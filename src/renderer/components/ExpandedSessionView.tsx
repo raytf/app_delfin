@@ -102,7 +102,7 @@ export default function ExpandedSessionView({
           <div className="min-h-0 flex-1 overflow-hidden">
             <SessionConversation
               className="h-full"
-              emptyMessage="Start a conversation with Delfin about what's on your screen."
+              emptyMessage="Start a conversation with Delfin."
               isSubmitting={isSubmitting}
               messages={messages}
             />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AllSessionsPage from './components/AllSessionsPage'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
@@ -13,6 +14,7 @@ import {
 } from '../shared/types'
 
 export default function App() {
+  const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
@@ -117,6 +119,7 @@ export default function App() {
     setSessionHistory([])
     clearConversation()
     startSession()
+    setHomeView('landing')
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
@@ -148,6 +151,7 @@ export default function App() {
     const sessions = await window.api.listSessions()
     setSessionHistory(sessions)
     clearConversation()
+    setHomeView('landing')
     setIsMinimizedPromptComposing(false)
     setSessionMode('home')
     setOverlayMode('expanded')
@@ -241,8 +245,22 @@ export default function App() {
     )
   }
 
+  if (sessionMode === 'home' && homeView === 'all-sessions') {
+    return (
+      <AllSessionsPage
+        onBack={() => {
+          setHomeView('landing')
+        }}
+        sessions={sessionHistory}
+      />
+    )
+  }
+
   return (
     <HomeScreen
+      onViewAllSessions={() => {
+        setHomeView('all-sessions')
+      }}
       sessions={sessionHistory}
       onStartSession={() => {
         void handleStartSession()

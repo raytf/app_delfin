@@ -44,7 +44,7 @@ export default function MinimizedPromptPanel({
         onSubmitPrompt={(text) => {
           onSubmitPrompt(text)
         }}
-        placeholder="Ask about what's on screen..."
+        placeholder="Ask Delfin"
         submitLabel="Send"
       />
     )
