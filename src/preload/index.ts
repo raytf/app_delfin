@@ -6,6 +6,9 @@ import type {
   StructuredResponse,
   SidecarStatus,
   ElectronAPI,
+  OverlayState,
+  SessionPromptRequest,
+  MinimizedOverlayVariant,
 } from '../shared/types'
 
 const api: ElectronAPI = {
@@ -14,9 +17,27 @@ const api: ElectronAPI = {
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) =>
     ipcRenderer.send(IPC_CHANNELS.CAPTURE_AUTO_REFRESH, config),
 
-  sidecarSend: (msg: WsOutboundMessage) => ipcRenderer.send(IPC_CHANNELS.SIDECAR_SEND, msg),
+  sidecarSend: (msg: WsOutboundMessage) =>
+    ipcRenderer.send(IPC_CHANNELS.SIDECAR_SEND, msg),
 
   sidecarInterrupt: () => ipcRenderer.send(IPC_CHANNELS.SIDECAR_INTERRUPT),
+
+  getOverlayState: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_GET_STATE) as Promise<OverlayState>,
+
+  startSession: () => ipcRenderer.invoke(IPC_CHANNELS.SESSION_START),
+
+  stopSession: () => ipcRenderer.invoke(IPC_CHANNELS.SESSION_STOP),
+
+  submitSessionPrompt: (request: SessionPromptRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_SUBMIT_PROMPT, request),
+
+  minimizeOverlay: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_MINIMIZE),
+
+  restoreOverlay: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_RESTORE),
+
+  setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) =>
+    ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SET_MINIMIZED_VARIANT, variant),
 
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(IPC_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
@@ -31,7 +52,9 @@ const api: ElectronAPI = {
     ipcRenderer.on(IPC_CHANNELS.SIDECAR_AUDIO_START, () => cb()),
 
   onSidecarAudioChunk: (cb: (data: { audio: string }) => void) =>
-    ipcRenderer.on(IPC_CHANNELS.SIDECAR_AUDIO_CHUNK, (_event, data) => cb(data)),
+    ipcRenderer.on(IPC_CHANNELS.SIDECAR_AUDIO_CHUNK, (_event, data) =>
+      cb(data),
+    ),
 
   onSidecarAudioEnd: (cb: () => void) =>
     ipcRenderer.on(IPC_CHANNELS.SIDECAR_AUDIO_END, () => cb()),
@@ -45,7 +68,8 @@ const api: ElectronAPI = {
   onSidecarStatus: (cb: (data: SidecarStatus) => void) =>
     ipcRenderer.on(IPC_CHANNELS.SIDECAR_STATUS, (_event, data) => cb(data)),
 
-  removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
+  removeAllListeners: (channel: string) =>
+    ipcRenderer.removeAllListeners(channel),
 }
 
 contextBridge.exposeInMainWorld('api', api)
