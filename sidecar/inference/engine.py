@@ -3,11 +3,11 @@
 import logging
 import os
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from huggingface_hub import hf_hub_download
 import litert_lm
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 logger = logging.getLogger(__name__)
 
