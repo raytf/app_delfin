@@ -63,7 +63,7 @@ export default function MinimizedPromptPanel({
           {errorMessage !== null ? (
             <p className="text-sm leading-6 text-red-300">{errorMessage}</p>
           ) : latestStructuredResponse !== null ? (
-            <div className="flex h-full min-h-0 flex-col">
+            <div className="no-drag flex h-full min-h-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-6 text-slate-200">
                 <div className="space-y-3">
                   {/* <div>
