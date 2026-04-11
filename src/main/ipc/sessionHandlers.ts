@@ -6,12 +6,14 @@ import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async () => {
+    await options.sessionPersistence.startSession()
     options.setSessionMode('active')
     options.setMinimizedVariant('compact')
     await options.switchOverlayMode('minimized')
   })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
+    await options.sessionPersistence.stopSession('completed')
     options.setSessionMode('home')
     options.setMinimizedVariant('compact')
     await options.switchOverlayMode('expanded')
@@ -34,10 +36,24 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
     mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
 
-    sendToSidecar({
-      image: frame.imageBase64,
+    await options.sessionPersistence.recordUserPrompt({
       text,
-      preset_id: request.presetId,
+      presetId: request.presetId,
+      sourceLabel: frame.sourceLabel,
     })
+
+    try {
+      sendToSidecar({
+        image: frame.imageBase64,
+        text,
+        preset_id: request.presetId,
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send prompt to sidecar.'
+      await options.sessionPersistence.failAssistantResponse(errorMessage)
+      throw error
+    }
   })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST, async () => options.sessionPersistence.listSessions())
 }
