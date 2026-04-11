@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (streaming-only refactor)
+> Last updated: 2026-04-11 (env validation implemented)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -91,22 +91,101 @@
 | Health check polling (`healthCheck.ts`) | ⚠️ | Placeholder — model/backend info not fetched |
 | Latency tracking (time-to-first-token) | ❌ | Not implemented (Phase 4.5) |
 | Stop/interrupt mid-stream | ❌ | IPC channel exists in preload; `StopButton` is a placeholder |
-| `.env` validation on startup | ❌ | Not implemented (Phase 4.6) |
+| `.env` validation on startup | ✅ | `src/main/envValidation.ts` — warns on missing file, bad `SIDECAR_WS_URL`, invalid boolean/enum vars; never throws |
 
 ---
 
-## Phase 5 — Auto-Refresh + TTS
+## Phase 5 — Voice Pipeline + TTS
 
-| Feature | Status | Notes |
+> **Approach revised (2026-04-11):** Voice is now the *default* input mode. When a session starts, always-on VAD (Silero via `@ricky0123/vad-web`) listens for speech. On speech end, a WAV blob + screen capture are sent to the sidecar. Gemma 4 processes audio natively. TTS streams response audio back as chunks. Manual text entry remains alongside. Auto-refresh remains a lower-priority stretch goal.
+
+### Step 1 — Dependencies + WASM asset serving
+
+| Item | Status | Notes |
 |---|---|---|
-| `AutoRefreshManager` with rolling-hash diffing | ⚠️ | Placeholder in `autoRefresh.ts` |
-| Auto-refresh IPC wiring (`capture:auto-refresh`) | ❌ | IPC channel defined, handler not wired to manager |
-| Auto-refresh UI toggle | ❌ | Not implemented |
-| `TTSPipeline` (kokoro-onnx / mlx-audio) | ⚠️ | Placeholder in `tts.py` |
-| TTS wired into `handle_turn` in `server.py` | ❌ | Not implemented |
-| Web Audio API playback in renderer | ❌ | Not implemented |
-| Web Speech API fallback | ❌ | Not implemented |
-| TTS speaker indicator in UI | ❌ | Not implemented |
+| `@ricky0123/vad-web` npm package | ❌ | Not installed |
+| `vite-plugin-static-copy` dev dep | ❌ | Not installed |
+| Vite renderer config — copy VAD WASM/worker files | ❌ | `electron.vite.config.ts` not updated |
+| Electron main — COOP/COEP headers (`session.webRequest`) | ❌ | Required for `SharedArrayBuffer` used by Silero WASM |
+| Electron main — `media` permission handler (`getUserMedia`) | ❌ | Not added to `src/main/index.ts` |
+
+### Step 2 — Audio utilities
+
+| Item | Status | Notes |
+|---|---|---|
+| `src/renderer/utils/audioUtils.ts` — `float32ToWavBase64()` | ❌ | RIFF header, 16 kHz, 16-bit mono |
+| `src/renderer/utils/audioUtils.ts` — `decodeAudioChunk()` | ❌ | base64 int16 PCM → `AudioBuffer` |
+
+### Step 3 — VAD hook
+
+| Item | Status | Notes |
+|---|---|---|
+| `src/renderer/hooks/useVAD.ts` | ❌ | Wraps `MicVAD`; exposes `isListening`, `isMuted`, `toggleMute`, `raiseThreshold`, `lowerThreshold` |
+| Barge-in threshold management (0.50 normal / 0.92 while AI speaks) | ❌ | Inside `useVAD` |
+| Barge-in grace period (`BARGE_IN_GRACE_MS = 800`) | ❌ | Inside `useVAD` |
+| WAV conversion on `onSpeechEnd` (`float32ToWavBase64`) | ❌ | Inside `useVAD` |
+
+### Step 4 — Types, IPC wiring, session auto-start
+
+| Item | Status | Notes |
+|---|---|---|
+| `src/shared/types.ts` — `audio?: string` on `SessionPromptRequest` + `WsOutboundMessage` | ❌ | |
+| `src/shared/schemas.ts` — `audio` field in `wsOutboundMessageSchema` | ❌ | |
+| `src/shared/constants.ts` — `VOICE_TURN_TEXT` constant | ❌ | `"Please respond to what the user just asked."` |
+| `src/main/ipc/sessionHandlers.ts` — pass `audio` to sidecar; relax empty-text guard | ❌ | |
+| `src/renderer/App.tsx` — `useVAD` wired; auto-starts when `sessionMode === 'active'` | ❌ | |
+| `src/renderer/App.tsx` — `onSpeechEnd` → `submitSessionPrompt` with WAV | ❌ | |
+| `VOICE_ENABLED` env var (`.env` / `.env.example`) | ❌ | `true` enables auto-start VAD on session start |
+
+### Step 5 — Sidecar: audio blob + configurable audio backend
+
+| Item | Status | Notes |
+|---|---|---|
+| `sidecar/server.py` `handle_turn` — prepend `{type:"audio", blob:...}` when present | ❌ | |
+| `sidecar/inference/engine.py` — `LITERT_AUDIO_BACKEND` env var (replaces hardcoded CPU) | ❌ | |
+| `.env.example` — `LITERT_AUDIO_BACKEND=CPU` | ❌ | |
+
+### Step 6 — TTS pipeline + wire into `handle_turn`
+
+| Item | Status | Notes |
+|---|---|---|
+| `sidecar/tts.py` — real `TTSPipeline` (kokoro-onnx backend + `none` fallback) | ⚠️ | Placeholder exists; kokoro model files not yet downloaded |
+| `sidecar/tts.py` — `KOKORO_MODEL_PATH` / `KOKORO_VOICES_PATH` env vars | ❌ | Download: see `.env.example` instructions |
+| `sidecar/server.py` — accumulate `full_text` during token stream | ❌ | |
+| `sidecar/server.py` — sentence split → `audio_start` / `audio_chunk` / `audio_end` after `done` | ❌ | |
+| `.env.example` — `KOKORO_MODEL_PATH`, `KOKORO_VOICES_PATH` | ❌ | |
+
+### Step 7 — Web Audio API playback in renderer
+
+| Item | Status | Notes |
+|---|---|---|
+| `src/renderer/App.tsx` — `onSidecarAudioStart` listener (init `AudioContext`, set `isAudioPlaying`) | ❌ | |
+| `src/renderer/App.tsx` — `onSidecarAudioChunk` listener (`streamNextTime` gap-free scheduling) | ❌ | |
+| `src/renderer/App.tsx` — `onSidecarAudioEnd` listener (clear `isAudioPlaying`) | ❌ | |
+| Audio IPC listeners cleaned up in `useEffect` return | ❌ | |
+
+### Step 8 — Barge-in + Web Speech fallback
+
+| Item | Status | Notes |
+|---|---|---|
+| `src/renderer/App.tsx` — `handleVADSpeechStart` stops `AudioContext` + calls `sidecarInterrupt` | ❌ | |
+| Web Speech API fallback — `speechSynthesis.speak()` after `onSidecarDone` when no audio arrived | ❌ | |
+
+### Step 9 — UI indicators
+
+| Item | Status | Notes |
+|---|---|---|
+| `ExpandedSessionView` — 🔊 pulsing indicator while `isAudioPlaying` | ❌ | |
+| `ExpandedSessionView` — 🎙️ / 🔇 mic toggle button | ❌ | |
+| `MinimizedSessionBar` — same mic + speaker indicators | ❌ | |
+
+### Auto-refresh (deprioritised)
+
+| Item | Status | Notes |
+|---|---|---|
+| `AutoRefreshManager` with rolling-hash diffing | ⚠️ | Placeholder in `autoRefresh.ts`; deferred past voice pipeline |
+| Auto-refresh IPC wiring | ❌ | Deferred |
+| Auto-refresh UI toggle | ❌ | Deferred |
 
 ---
 

@@ -3,6 +3,7 @@ import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
+import { validateEnv } from "./envValidation";
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type MinimizedOverlayVariant,
@@ -12,6 +13,7 @@ import {
 } from "../shared/types";
 
 config(); // load .env from repo root
+validateEnv(); // warn on missing / invalid env vars — never throws
 
 let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
