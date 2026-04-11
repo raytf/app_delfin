@@ -1,4 +1,4 @@
-# Screen Copilot — Implementation Status
+# Delfin — Implementation Status
 
 > Last updated: 2026-04-11 (Parlor-style Kokoro TTS upgraded with MLX/ONNX backend selection, auto-download, richer audio metadata, and WSL2 espeak-ng fix)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
@@ -48,7 +48,7 @@
 |---|---|---|
 | `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, resized compact bounds, and larger prompt-open bounds for persistent voice headers |
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Returns `CaptureFrame` with base64 JPEG at quality 80 |
-| `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
+| `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Delfin" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
 | `src/main/ipc/handlers.ts` | ✅ | All IPC channels wired: capture, sidecar send/interrupt, overlay, session |
 | `src/main/ipc/overlayHandlers.ts` | ✅ | Overlay minimized-variant handler reverts on failure, logs, and forwards `overlay:error` to the renderer |

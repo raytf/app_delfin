@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== Screen Copilot Setup Check ==="
+echo "=== Delfin Setup Check ==="
 echo ""
 
 # Node.js

@@ -26,13 +26,13 @@ The fix is a single predicate in `focusDetector.ts`:
 
 ```typescript
 function isCapturableSource(source: DesktopCapturerSource): boolean {
-  return source.name.trim().length > 0 && !source.name.includes('Screen Copilot')
+  return source.name.trim().length > 0 && !source.name.includes('Delfin')
 }
 ```
 
-Any window whose title contains `'Screen Copilot'` is excluded. The first source that passes this filter is taken as the foreground window.
+Any window whose title contains `'Delfin'` is excluded. The first source that passes this filter is taken as the foreground window.
 
-> **This is why the window title matters.** The `title: 'Screen Copilot'` property set in `overlayWindow.ts` is not just cosmetic — the capture filter depends on it.
+> **This is why the window title matters.** The `title: 'Delfin'` property set in `overlayWindow.ts` is not just cosmetic — the capture filter depends on it.
 
 ---
 
@@ -103,7 +103,7 @@ return {
 
 ```
 desktopCapturer.getSources({ types: ['window'] })
-  → filter: exclude 'Screen Copilot', exclude empty names
+  → filter: exclude 'Delfin', exclude empty names
   → if empty → getSources({ types: ['screen'] })   [WSL2 fallback]
   → isThumbnailBlank()  →  throw if all-black       [WSL2 pixel readback guard]
   → thumbnail.toJPEG(80).toString('base64')

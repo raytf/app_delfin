@@ -7,7 +7,7 @@
 Use `electron-vite` to create a new project:
 
 ```bash
-npm create @electron-vite/create@latest screen-copilot -- --template react-ts
+npm create @electron-vite/create@latest delfin -- --template react-ts
 ```
 
 If the scaffolding tool asks for options: select React, TypeScript, Tailwind CSS.
@@ -17,7 +17,7 @@ After scaffolding, the directory structure should roughly match the layout below
 ### Target directory structure
 
 ```
-screen-copilot/
+delfin/
 ├── .env.example
 ├── .gitignore
 ├── package.json
@@ -278,7 +278,7 @@ Create this file with all variables documented:
 
 ```env
 # ============================================================
-# Screen Copilot — Environment Configuration
+# Delfin — Environment Configuration
 # Copy this file to .env and adjust for your machine.
 # ============================================================
 
@@ -337,7 +337,7 @@ A bash script (Linux/macOS) that checks the development environment:
 #!/usr/bin/env bash
 set -e
 
-echo "=== Screen Copilot Setup Check ==="
+echo "=== Delfin Setup Check ==="
 echo ""
 
 # Node.js
@@ -490,7 +490,7 @@ async def health():
 A minimal Electron main process that:
 1. Creates a BrowserWindow (default size, not the overlay yet — that's Phase 2)
 2. Loads the Vite dev server URL (or production HTML)
-3. Logs "Screen Copilot started" to console
+3. Logs "Delfin started" to console
 
 This is just to verify the scaffold works. Overlay window, IPC, and capture come in Phase 2.
 
@@ -498,7 +498,7 @@ This is just to verify the scaffold works. Overlay window, IPC, and capture come
 
 A minimal React component that renders:
 ```
-Screen Copilot
+Delfin
 Status: Initialising...
 ```
 
@@ -529,7 +529,7 @@ Save as JPEG or PNG. The sidecar will accept base64-encoded images.
 Run these checks after completing this phase. All must pass.
 
 - [ ] `npm install` completes without errors
-- [ ] `npm run dev:full` opens an Electron window showing "Screen Copilot" and "Status: Initialising..." **and** starts the sidecar — both visible in the same terminal with labelled output
+- [ ] `npm run dev:full` opens an Electron window showing "Delfin" and "Status: Initialising..." **and** starts the sidecar — both visible in the same terminal with labelled output
 - [ ] `npm run dev` (Electron only) also works independently, for use alongside the mock sidecar
 - [ ] `.env.example` exists with all 11 variables documented
 - [ ] `.env` is in `.gitignore`

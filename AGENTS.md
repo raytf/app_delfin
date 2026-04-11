@@ -1,10 +1,10 @@
-# AGENTS.md — Screen Copilot
+# AGENTS.md — Delfin
 
 > **For AI coding agents.** Read this file first. It tells you what to build, where the specs live, and what rules to follow.
 
 ---
 
-## What Is Screen Copilot?
+## What Is Delfin?
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
@@ -16,7 +16,7 @@ A local, privacy-first AI desktop sidebar (Electron + React) that captures the f
 STATUS.md                            ← Live feature status tracker. Update after every implementation change.
 docs/
 ├── SPEC.md                          ← Single source of truth. Read this first.
-├── screen-copilot-implementation-plan.md  ← Team/parallel-stream view (secondary)
+├── delfin-implementation-plan.md           ← Team/parallel-stream view (secondary)
 └── phases/
     ├── phase-0-scaffold.md          ← Repo structure, deps, .env, setup scripts
     ├── phase-1-sidecar.md           ← FastAPI sidecar, LiteRT-LM, tool calling

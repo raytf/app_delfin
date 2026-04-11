@@ -1,5 +1,5 @@
-# Screen Copilot Setup Check (PowerShell)
-Write-Host "=== Screen Copilot Setup Check ===" -ForegroundColor Cyan
+# Delfin Setup Check (PowerShell)
+Write-Host "=== Delfin Setup Check ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Node.js

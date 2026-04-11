@@ -1,8 +1,8 @@
-# Screen Copilot — Implementation Spec
+# Delfin — Implementation Spec
 
-> **Purpose**: This spec is the single source of truth for an AI coding agent building Screen Copilot from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
+> **Purpose**: This spec is the single source of truth for an AI coding agent building Delfin from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
 
-## What is Screen Copilot?
+## What is Delfin?
 
 A desktop AI sidebar that captures your screen, sends the image to a local LLM (Gemma 4 via LiteRT-LM), and displays a structured explanation — all running on-device with no cloud, no login, and no API costs. The primary demo is a **Lecture Slide Explainer** that summarises slides, explains jargon, and generates quiz questions.
 
