@@ -39,8 +39,12 @@ export interface UseVADOptions {
 export interface UseVADReturn {
   /** True once the MicVAD instance is running and listening. */
   isListening: boolean
+  /** True while the VAD is inside an active detected speech segment. */
+  isUserSpeaking: boolean
   /** True if the user has manually muted the mic via toggleMute(). */
   isMuted: boolean
+  /** Smoothed microphone activity level, normalized to 0..1 during speech. */
+  userAudioLevel: number
   /** Toggle mic on/off without destroying the VAD instance. */
   toggleMute: () => void
   /**
@@ -57,11 +61,19 @@ export interface UseVADReturn {
 
 export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): UseVADReturn {
   const [isListening, setIsListening] = useState(false)
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
+  const [userAudioLevel, setUserAudioLevel] = useState(0)
 
   const vadRef = useRef<VadMicVADInstance | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inGracePeriodRef = useRef(false)
+  const levelAnimationFrameRef = useRef<number | null>(null)
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const smoothedLevelRef = useRef(0)
 
   // Keep callback refs current so we never need to recreate the VAD instance
   // just because the parent re-rendered with a new inline function.
@@ -75,6 +87,33 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
     let destroyed = false
 
+    const stopUserLevelLoop = (): void => {
+      if (levelAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(levelAnimationFrameRef.current)
+        levelAnimationFrameRef.current = null
+      }
+      smoothedLevelRef.current = 0
+      setUserAudioLevel(0)
+    }
+
+    const cleanupAudioResources = (): void => {
+      stopUserLevelLoop()
+      for (const track of micStreamRef.current?.getTracks() ?? []) {
+        track.stop()
+      }
+      if (micSourceRef.current !== null) {
+        micSourceRef.current.disconnect()
+        micSourceRef.current = null
+      }
+      if (audioContextRef.current !== null) {
+        void audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+      analyserRef.current = null
+      micStreamRef.current = null
+      setIsUserSpeaking(false)
+    }
+
     async function init(): Promise<void> {
       try {
         const vadRuntime = window.vad
@@ -86,8 +125,61 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         }
 
         const runtimeBaseUrl = getVadRuntimeBaseUrl()
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            autoGainControl: true,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        })
+        const audioContext = new AudioContext()
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume().catch(() => undefined)
+        }
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 256
+        analyser.smoothingTimeConstant = 0.76
+
+        const micSource = audioContext.createMediaStreamSource(micStream)
+        micSource.connect(analyser)
+
+        micStreamRef.current = micStream
+        audioContextRef.current = audioContext
+        analyserRef.current = analyser
+        micSourceRef.current = micSource
+
+        const startUserLevelLoop = (): void => {
+          if (levelAnimationFrameRef.current !== null) {
+            return
+          }
+
+          const sample = () => {
+            const activeAnalyser = analyserRef.current
+            if (activeAnalyser === null) {
+              stopUserLevelLoop()
+              return
+            }
+
+            const data = new Uint8Array(activeAnalyser.frequencyBinCount)
+            activeAnalyser.getByteFrequencyData(data)
+            let sum = 0
+            for (const value of data) {
+              sum += value
+            }
+
+            const average = data.length === 0 ? 0 : sum / data.length
+            const normalized = Math.min(1, average / 96)
+            const smoothed = smoothedLevelRef.current * 0.72 + normalized * 0.28
+            smoothedLevelRef.current = smoothed
+            setUserAudioLevel(smoothed)
+            levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+          }
+
+          levelAnimationFrameRef.current = window.requestAnimationFrame(sample)
+        }
 
         const vad = await vadRuntime.MicVAD.new({
+          getStream: async () => micStream,
           model: 'v5',
           // Follow the upstream browser contract closely: serve the VAD worklet,
           // ONNX model, and ORT wasm/mjs files from one absolute base URL. Using
@@ -102,11 +194,15 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
           onSpeechStart: () => {
             if (inGracePeriodRef.current) return
+            setIsUserSpeaking(true)
+            startUserLevelLoop()
             onSpeechStartRef.current?.()
           },
 
           onSpeechEnd: (audio: Float32Array) => {
             if (inGracePeriodRef.current) return
+            setIsUserSpeaking(false)
+            stopUserLevelLoop()
             const wavBase64 = float32ToWavBase64(audio)
             onSpeechEndRef.current(wavBase64)
           },
@@ -125,6 +221,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         await vad.start()
         setIsListening(true)
       } catch (err) {
+        cleanupAudioResources()
         console.error('[useVAD] Failed to initialise MicVAD:', err)
       }
     }
@@ -138,6 +235,7 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         graceTimerRef.current = null
       }
       vadRef.current?.destroy().catch(() => undefined)
+      cleanupAudioResources()
       vadRef.current = null
       setIsListening(false)
     }
@@ -148,6 +246,13 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
       const next = !prev
       if (vadRef.current !== null) {
         if (next) {
+          if (levelAnimationFrameRef.current !== null) {
+            window.cancelAnimationFrame(levelAnimationFrameRef.current)
+            levelAnimationFrameRef.current = null
+          }
+          smoothedLevelRef.current = 0
+          setIsUserSpeaking(false)
+          setUserAudioLevel(0)
           void vadRef.current.pause()
         } else {
           void vadRef.current.start()
@@ -178,5 +283,5 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
     })
   }, [])
 
-  return { isListening, isMuted, toggleMute, raiseThreshold, lowerThreshold }
+  return { isListening, isUserSpeaking, isMuted, userAudioLevel, toggleMute, raiseThreshold, lowerThreshold }
 }

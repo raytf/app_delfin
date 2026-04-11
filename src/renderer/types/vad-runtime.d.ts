@@ -7,6 +7,7 @@ declare global {
   interface VadMicVADOptions extends VadFrameProcessorOptions {
     model?: 'v5' | 'legacy'
     baseAssetPath?: string
+    getStream?: () => Promise<MediaStream>
     onnxWASMBasePath?: string
     preSpeechPadMs?: number
     minSpeechMs?: number

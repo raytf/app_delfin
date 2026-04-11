@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (voice overlay tests added and final voice UX review completed)
+> Last updated: 2026-04-11 (waveform UI implemented for expanded and minimized voice views)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -65,8 +65,11 @@
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
 | `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand/end-session buttons, manual speech toggle, and live voice-response streaming when auto-opened |
+| `src/renderer/components/VoiceWaveform.tsx` | ✅ | Reusable canvas waveform for user, AI, processing, and idle voice states |
 | `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance and voice-turn auto-open decisions |
+| `src/renderer/utils/waveformState.ts` | ✅ | Pure helper that resolves waveform state/level priority for renderer views |
 | `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay voice auto-open and response-panel transitions |
+| `src/renderer/__tests__/waveformState.test.ts` | ✅ | Vitest coverage for waveform state selection and component markup |
 | `package.json` — `npm test` script | ✅ | Runs Vitest renderer unit tests via `vitest run` |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
@@ -79,6 +82,7 @@
 | `src/renderer/stores/sessionStore.ts` | ✅ | Persisted conversation state plus `vadListeningEnabled` toggle stored in localStorage |
 | `src/renderer/stores/settingsStore.ts` | ⚠️ | Placeholder — returns empty object |
 | `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/types/assets.d.ts` | ✅ | Renderer asset module declarations for strict TypeScript imports |
 
 ---
 
@@ -125,7 +129,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| `src/renderer/hooks/useVAD.ts` | ✅ | Uses global `window.vad.MicVAD`; exposes `isListening`, `isMuted`, `toggleMute`, `raiseThreshold`, `lowerThreshold` |
+| `src/renderer/hooks/useVAD.ts` | ✅ | Uses global `window.vad.MicVAD`; exposes listening/mute state, `isUserSpeaking`, `userAudioLevel`, and threshold controls |
 | `src/renderer/types/vad-runtime.d.ts` | ✅ | Minimal ambient types for `window.vad` and `window.ort` in strict TS |
 | Barge-in threshold management (0.50 normal / 0.92 while AI speaks) | ✅ | Inside `useVAD` |
 | Barge-in grace period (`BARGE_IN_GRACE_MS = 800`) | ✅ | Inside `useVAD` |
@@ -181,9 +185,9 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| `ExpandedSessionView` — 🔊 pulsing indicator while `isAudioPlaying` | ✅ | Inline speaking indicator shown during audio playback |
-| `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state and lets the user pause/resume VAD listening |
-| `MinimizedSessionBar` — mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay shows live mic/speaking state, auto-opens for voice turns, and streams text in-panel |
+| `ExpandedSessionView` — waveform + speech status | ✅ | Expanded session shows reusable waveform when speech input is enabled, with token-based colours for user/AI/idle/processing |
+| `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state, waveform visibility follows the speech toggle, and the user can pause/resume VAD listening |
+| `MinimizedSessionBar` — compact waveform + mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay shows the reusable waveform when speech is enabled, plus live mic/speaking state and streamed text |
 | Minimized overlay voice auto-open decision tests | ✅ | `src/renderer/__tests__/minimizedOverlay.test.ts` verifies compact→response reveal and existing auto-advance rules |
 
 ### Auto-refresh (deprioritised)

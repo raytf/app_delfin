@@ -1,6 +1,8 @@
 import { MessageCircle, Maximize2, Square, ChevronDown } from 'lucide-react'
 import type { MinimizedOverlayVariant } from '../../shared/types'
+import type { WaveformVisualState } from '../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
+import VoiceWaveform from './VoiceWaveform'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null
@@ -16,7 +18,10 @@ interface MinimizedSessionBarProps {
   onSubmitPrompt: (text: string) => void
   onStop: () => void
   onToggleVadListening: () => void
+  showVoiceWaveform: boolean
   vadListeningEnabled: boolean
+  waveformLevel: number
+  waveformState: WaveformVisualState
 }
 
 export default function MinimizedSessionBar({
@@ -33,7 +38,10 @@ export default function MinimizedSessionBar({
   onSubmitPrompt,
   onStop,
   onToggleVadListening,
+  showVoiceWaveform,
   vadListeningEnabled,
+  waveformLevel,
+  waveformState,
 }: MinimizedSessionBarProps) {
   const isPromptOpen = minimizedVariant !== 'compact'
 
@@ -55,6 +63,17 @@ export default function MinimizedSessionBar({
           />
         ) : null}
 
+        {showVoiceWaveform ? (
+          <div className={`no-drag ${isPromptOpen ? 'mt-2' : 'mb-2 w-32'}`}>
+            <VoiceWaveform
+              compact
+              label={`Compact speech waveform in ${waveformState} mode`}
+              level={waveformLevel}
+              state={waveformState}
+            />
+          </div>
+        ) : null}
+
         <div className={`no-drag flex items-center justify-center gap-2 text-[10px] ${isPromptOpen ? 'mt-2 text-[var(--text-muted)]' : 'mb-1 text-[var(--text-muted)]'}`}>
           <span>{isMicListening ? (isMicMuted ? '🔇' : '🎙️') : '⏳'}</span>
           <button
@@ -74,8 +93,8 @@ export default function MinimizedSessionBar({
           <button
             aria-label={isPromptOpen ? "Collapse" : "Ask Delfin"}
             className={`no-drag flex cursor-pointer items-center gap-2 rounded-full font-medium transition ${isPromptOpen
-                ? 'h-10 w-10 justify-center border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
-                : 'bg-[var(--primary)] px-4 py-2.5 text-sm text-white hover:bg-[var(--primary-hover)]'
+              ? 'h-10 w-10 justify-center border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+              : 'bg-[var(--primary)] px-4 py-2.5 text-sm text-white hover:bg-[var(--primary-hover)]'
               }`}
             onClick={() => onSetPromptOpen(!isPromptOpen)}
             type="button"

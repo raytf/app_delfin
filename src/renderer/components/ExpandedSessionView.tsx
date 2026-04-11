@@ -3,8 +3,10 @@ import { Clock, Minimize2, Square } from 'lucide-react'
 import type { ChatMessage, SidecarStatus } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import { useSessionStore } from '../stores/sessionStore'
+import type { WaveformVisualState } from '../utils/waveformState'
 import SessionConversation from './SessionConversation'
 import SessionPromptComposer from './SessionPromptComposer'
+import VoiceWaveform from './VoiceWaveform'
 
 interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
@@ -18,8 +20,11 @@ interface ExpandedSessionViewProps {
   onStop: () => void
   onSubmitPrompt: (text: string) => void
   onToggleVadListening: () => void
+  showVoiceWaveform: boolean
   sidecarStatus: SidecarStatus
   vadListeningEnabled: boolean
+  waveformLevel: number
+  waveformState: WaveformVisualState
 }
 
 function formatElapsedTime(startTime: number | null): string {
@@ -72,8 +77,11 @@ export default function ExpandedSessionView({
   onStop,
   onSubmitPrompt,
   onToggleVadListening,
+  showVoiceWaveform,
   sidecarStatus,
   vadListeningEnabled,
+  waveformLevel,
+  waveformState,
 }: ExpandedSessionViewProps) {
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
   const sessionName = captureSourceLabel ?? 'Study Session'
@@ -144,6 +152,15 @@ export default function ExpandedSessionView({
                 <span className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-[var(--primary)]">Speaking</span>
               ) : null}
             </div>
+            {showVoiceWaveform ? (
+              <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)] px-3 py-2">
+                <VoiceWaveform
+                  label={`Speech waveform in ${waveformState} mode`}
+                  level={waveformLevel}
+                  state={waveformState}
+                />
+              </div>
+            ) : null}
           </section>
 
           <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5 shadow-sm">

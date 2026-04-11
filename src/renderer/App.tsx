@@ -17,6 +17,7 @@ import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import { decodeAudioChunk } from './utils/audioUtils'
 import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
+import { resolveWaveformPresentation } from './utils/waveformState'
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -37,6 +38,7 @@ export default function App() {
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
+  const [assistantAudioLevel, setAssistantAudioLevel] = useState(0)
 
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
@@ -62,11 +64,13 @@ export default function App() {
       : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
 
   const audioContextRef = useRef<AudioContext | null>(null)
+  const assistantAnalyserRef = useRef<AnalyserNode | null>(null)
   const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const audioNextStartTimeRef = useRef(0)
   const audioStreamActiveRef = useRef(false)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
+  const assistantLevelAnimationFrameRef = useRef<number | null>(null)
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingVoiceWavRef = useRef<string | null>(null)
@@ -116,6 +120,10 @@ export default function App() {
       if (audioContext === null || audioContext.state === 'closed') {
         audioContext = new AudioContext({ sampleRate: 24_000 })
         audioContextRef.current = audioContext
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 256
+        analyser.smoothingTimeConstant = 0.8
+        assistantAnalyserRef.current = analyser
       }
 
       if (audioContext.state === 'suspended') {
@@ -131,6 +139,7 @@ export default function App() {
 
   const finishAudioPlayback = useCallback(() => {
     audioStreamActiveRef.current = false
+    setAssistantAudioLevel(0)
     setAudioPlayingState(false)
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
@@ -200,7 +209,7 @@ export default function App() {
     submitVoiceTurn(pendingWav)
   }, [sessionMode, submitVoiceTurn])
 
-  const { raiseThreshold, lowerThreshold, isListening, isMuted, toggleMute } = useVAD({
+  const { raiseThreshold, lowerThreshold, isListening, isMuted, isUserSpeaking, toggleMute, userAudioLevel } = useVAD({
     enabled: voiceEnabled && sessionMode === 'active',
     onSpeechEnd: (wavBase64: string) => {
       if (sessionMode !== 'active') {
@@ -246,6 +255,63 @@ export default function App() {
   })
 
   lowerThresholdRef.current = lowerThreshold
+
+  const showVoiceWaveform = voiceEnabled && vadListeningEnabled
+  const waveformPresentation = resolveWaveformPresentation({
+    assistantAudioLevel,
+    isAssistantSpeaking: isAudioPlaying,
+    isProcessing: isSubmitting,
+    isUserSpeaking,
+    userAudioLevel,
+  })
+
+  useEffect(() => {
+    if (!isAudioPlaying) {
+      if (assistantLevelAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
+        assistantLevelAnimationFrameRef.current = null
+      }
+      setAssistantAudioLevel(0)
+      return
+    }
+
+    const sampleAssistantLevel = () => {
+      const analyser = assistantAnalyserRef.current
+
+      if (analyser === null) {
+        assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
+        return
+      }
+
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      analyser.getByteFrequencyData(data)
+
+      let sum = 0
+      for (const value of data) {
+        sum += value
+      }
+
+      const average = data.length === 0 ? 0 : sum / data.length
+      const normalized = Math.min(1, average / 112)
+
+      setAssistantAudioLevel((previousLevel) => {
+        const nextLevel = previousLevel * 0.68 + normalized * 0.32
+        return Math.abs(nextLevel - previousLevel) < 0.01 ? previousLevel : nextLevel
+      })
+
+      assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
+    }
+
+    assistantLevelAnimationFrameRef.current = window.requestAnimationFrame(sampleAssistantLevel)
+
+    return () => {
+      if (assistantLevelAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
+        assistantLevelAnimationFrameRef.current = null
+      }
+      setAssistantAudioLevel(0)
+    }
+  }, [isAudioPlaying])
 
   useEffect(() => {
     if (!voiceEnabled || sessionMode !== 'active' || !isListening) {
@@ -376,6 +442,9 @@ export default function App() {
         const sourceNode = audioContext.createBufferSource()
         sourceNode.buffer = audioBuffer
         sourceNode.connect(audioContext.destination)
+        if (assistantAnalyserRef.current !== null) {
+          sourceNode.connect(assistantAnalyserRef.current)
+        }
         sourceNode.onended = () => {
           sourceNode.disconnect()
           audioSourceNodesRef.current.delete(sourceNode)
@@ -441,10 +510,19 @@ export default function App() {
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
 
+      if (assistantLevelAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(assistantLevelAnimationFrameRef.current)
+        assistantLevelAnimationFrameRef.current = null
+      }
+
+      setAssistantAudioLevel(0)
+
       if (audioContextRef.current !== null) {
         void audioContextRef.current.close()
         audioContextRef.current = null
       }
+
+      assistantAnalyserRef.current = null
     }
   }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, stopScheduledAudioSources])
 
@@ -583,6 +661,9 @@ export default function App() {
         }}
         onToggleVadListening={toggleVadListening}
         vadListeningEnabled={vadListeningEnabled}
+        showVoiceWaveform={showVoiceWaveform}
+        waveformLevel={waveformPresentation.level}
+        waveformState={waveformPresentation.state}
       />
     )
   }
@@ -609,6 +690,9 @@ export default function App() {
         onToggleVadListening={toggleVadListening}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
+        showVoiceWaveform={showVoiceWaveform}
+        waveformLevel={waveformPresentation.level}
+        waveformState={waveformPresentation.state}
       />
     )
   }
