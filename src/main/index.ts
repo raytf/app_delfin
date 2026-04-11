@@ -1,17 +1,19 @@
 import { app, BrowserWindow } from 'electron'
 import { config } from 'dotenv'
 import { registerIpcHandlers } from './ipc/handlers'
-import { createOverlayWindow } from './overlay/overlayWindow'
-import type { OverlayMode, OverlayState, SessionMode } from '../shared/types'
+import { createOverlayWindow, setOverlayMode } from './overlay/overlayWindow'
+import { disconnectFromSidecar } from './sidecar/wsClient'
+import type { MinimizedOverlayVariant, OverlayMode, OverlayState, SessionMode } from '../shared/types'
 
 config() // load .env from repo root
 
 let mainWindow: BrowserWindow | null = null
 let overlayMode: OverlayMode = 'expanded'
+let minimizedVariant: MinimizedOverlayVariant = 'compact'
 let sessionMode: SessionMode = 'home'
 
 function createWindow(mode: OverlayMode): BrowserWindow {
-  const window = createOverlayWindow(mode)
+  const window = createOverlayWindow(mode, minimizedVariant)
   overlayMode = mode
   mainWindow = window
   window.on('closed', () => {
@@ -25,6 +27,7 @@ function createWindow(mode: OverlayMode): BrowserWindow {
 function getOverlayState(): OverlayState {
   return {
     overlayMode,
+    minimizedVariant,
     sessionMode,
   }
 }
@@ -33,8 +36,13 @@ function setSessionMode(mode: SessionMode): void {
   sessionMode = mode
 }
 
+function setMinimizedVariant(variant: MinimizedOverlayVariant): void {
+  minimizedVariant = variant
+}
+
 async function switchOverlayMode(mode: OverlayMode): Promise<void> {
   if (overlayMode === mode && mainWindow !== null && !mainWindow.isDestroyed()) {
+    setOverlayMode(mainWindow, mode, minimizedVariant)
     mainWindow.focus()
     return
   }
@@ -53,6 +61,8 @@ app.whenReady().then(() => {
   console.log('Screen Copilot started')
   registerIpcHandlers({
     getOverlayState,
+    getMainWindow: () => mainWindow,
+    setMinimizedVariant,
     switchOverlayMode,
     setSessionMode,
   })
@@ -68,6 +78,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   mainWindow = null
+  disconnectFromSidecar()
 
   if (process.platform !== 'darwin') {
     app.quit()

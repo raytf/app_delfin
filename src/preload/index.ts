@@ -7,6 +7,8 @@ import type {
   SidecarStatus,
   ElectronAPI,
   OverlayState,
+  SessionPromptRequest,
+  MinimizedOverlayVariant,
 } from '../shared/types'
 
 const api: ElectronAPI = {
@@ -27,9 +29,15 @@ const api: ElectronAPI = {
 
   stopSession: () => ipcRenderer.invoke(IPC_CHANNELS.SESSION_STOP),
 
+  submitSessionPrompt: (request: SessionPromptRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SESSION_SUBMIT_PROMPT, request),
+
   minimizeOverlay: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_MINIMIZE),
 
   restoreOverlay: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_RESTORE),
+
+  setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) =>
+    ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SET_MINIMIZED_VARIANT, variant),
 
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(IPC_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
