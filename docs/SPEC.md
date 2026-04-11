@@ -193,5 +193,6 @@ This means `done` represents the end of the full turn, not just the end of token
 | Main → Renderer | `sidecar:audio_chunk` | `{ audio: string, index?: number }` |
 | Main → Renderer | `sidecar:audio_end` | `{ ttsTime: number }` |
 | Main → Renderer | `sidecar:done` | — |
+| Main → Renderer | `overlay:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:status` | `{ connected: boolean, backend?: string, model?: string }` |

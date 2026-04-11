@@ -239,6 +239,21 @@ export default function App() {
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
 
+  const syncOverlayStateFromMain = useCallback(async (): Promise<void> => {
+    try {
+      const state = await window.api.getOverlayState()
+      clearMinimizedVoiceCollapseTimer()
+      setSessionMode(state.sessionMode)
+      setOverlayMode(state.overlayMode)
+      setMinimizedVariant(state.minimizedVariant)
+      setIsMinimizedPromptComposing(
+        state.overlayMode === 'minimized' && state.minimizedVariant === 'prompt-input',
+      )
+    } catch (error) {
+      console.error('[App] Failed to sync overlay state after IPC error:', error)
+    }
+  }, [clearMinimizedVoiceCollapseTimer])
+
   const revealMinimizedVoiceResponse = useCallback(() => {
     const nextVariant = getVoiceTurnRevealVariant({
       minimizedVariant,
@@ -457,15 +472,21 @@ export default function App() {
   const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
     clearMinimizedVoiceCollapseTimer()
 
-    if (variant !== 'prompt-response') {
-      clearLatestResponse()
-    }
+    try {
+      await window.api.setMinimizedOverlayVariant(variant)
 
-    await window.api.setMinimizedOverlayVariant(variant)
-    setOverlayMode('minimized')
-    setMinimizedVariant(variant)
-    setIsMinimizedPromptComposing(variant === 'prompt-input')
-  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer])
+      if (variant !== 'prompt-response') {
+        clearLatestResponse()
+      }
+
+      setOverlayMode('minimized')
+      setMinimizedVariant(variant)
+      setIsMinimizedPromptComposing(variant === 'prompt-input')
+    } catch (error) {
+      console.error('[App] Failed to set minimized overlay variant:', error)
+      void syncOverlayStateFromMain()
+    }
+  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer, syncOverlayStateFromMain])
 
   useEffect(() => {
     const nextVariant = getVoiceTurnCompleteVariant({
@@ -533,6 +554,11 @@ export default function App() {
   useEffect(() => {
     window.api.onFrameCaptured((frame: CaptureFrame) => {
       setCaptureSourceLabel(frame.sourceLabel)
+    })
+
+    window.api.onOverlayError((data) => {
+      console.error('[App] Overlay IPC error:', data.message)
+      void syncOverlayStateFromMain()
     })
 
     window.api.onSidecarToken((data) => {
@@ -637,6 +663,7 @@ export default function App() {
 
     return () => {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK)
@@ -645,7 +672,7 @@ export default function App() {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
-  }, [appendAssistantText, cancelSpeechSynthesis, clearFallbackSpeechTimer, ensureAudioContext, failAssistantResponse, finishAudioPlayback, finishAssistantResponse, raiseThreshold, setAudioPlayingState, speakWithWebSpeech, stopScheduledAudioSources, submitPendingVoiceTurn])
+  }, [appendAssistantText, cancelSpeechSynthesis, clearFallbackSpeechTimer, ensureAudioContext, failAssistantResponse, finishAudioPlayback, finishAssistantResponse, raiseThreshold, setAudioPlayingState, speakWithWebSpeech, stopScheduledAudioSources, submitPendingVoiceTurn, syncOverlayStateFromMain])
 
   useEffect(() => {
     return () => {
