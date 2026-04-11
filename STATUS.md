@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (local VAD runtime contract fix confirmed working)
+> Last updated: 2026-04-11 (vad-runtime regression check added and validated)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -106,6 +106,7 @@
 | `@ricky0123/vad-web` npm package | ✅ | Installed; renderer loads the self-hosted browser bundle from `vad-runtime/` |
 | `vite-plugin-static-copy` dev dep | ✅ | Installed; copies browser bundles, ONNX models, and all required `ort-wasm*` files |
 | Vite renderer config — copy VAD WASM/worker files | ✅ | `electron.vite.config.ts` serves a stable local `vad-runtime/` asset directory |
+| `npm run check:vad-runtime` build-output validator | ✅ | Verifies required `vad-runtime` files, checks wasm magic bytes, and confirms `index.html` references `ort.wasm.min.js` |
 | Electron main — COOP/COEP headers (`session.webRequest`) | ✅ | `src/main/index.ts` sets `same-origin` + `credentialless` to preserve `SharedArrayBuffer` |
 | Electron main — `media` permission handler (`getUserMedia`) | ✅ | `src/main/index.ts` grants `media` / `microphone` permission requests |
 

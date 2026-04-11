@@ -8,6 +8,7 @@
     "dev:sidecar": "node scripts/run-sidecar.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "build": "electron-vite build",
+    "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
     "preview": "electron-vite preview",
     "setup": "npm install && npm run setup:sidecar",
     "setup:sidecar": "node scripts/setup-sidecar.mjs"
