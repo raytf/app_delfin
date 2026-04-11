@@ -30,10 +30,11 @@ function ortWasmDevServePlugin(): Plugin {
   }
 }
 
-// Relative to project root — consistent across all machines since npm always
-// installs packages under node_modules/ at the repo root.
-const vadDist = 'node_modules/@ricky0123/vad-web/dist'
-const ortDist = 'node_modules/onnxruntime-web/dist'
+// Absolute paths — viteStaticCopy resolves 'src' relative to the Vite root,
+// which for the renderer in electron-vite is src/renderer, not the repo root.
+// Using resolve() from __dirname (repo root) avoids the mismatch.
+const vadDist = resolve('node_modules/@ricky0123/vad-web/dist')
+const ortDist = resolve('node_modules/onnxruntime-web/dist')
 
 export default defineConfig({
   main: {
