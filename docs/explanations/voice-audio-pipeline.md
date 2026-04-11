@@ -21,19 +21,106 @@ Every layer is connected by the same WebSocket + IPC bus used for normal text pr
 
 **What is VAD?** Voice Activity Detection. It listens to the microphone continuously and tells you when someone *starts* and *stops* speaking. The library used is [`@ricky0123/vad-web`](https://github.com/ricky0123/vad), which runs the **Silero** ONNX model entirely in the browser — no cloud needed.
 
+### What is Silero VAD?
+
+Silero VAD is a small (~2 MB) neural network trained to answer one binary question per audio frame: *"Is this speech or silence?"* It is **not** speech recognition — it never transcribes words. Its only output is a probability score between 0.0 and 1.0 indicating how likely the current audio frame contains human speech. That narrow scope is what makes it fast enough to run in real-time on every frame while the user is talking.
+
+The model is distributed as an ONNX file (`silero_vad_v5.onnx`). ONNX (Open Neural Network Exchange) is a portable format that can be executed by any compatible runtime — including **ONNX Runtime Web**, which runs in the browser via WebAssembly.
+
+### What is WebAssembly (WASM) and why does Silero need it?
+
+**WebAssembly (WASM)** is a binary instruction format that browsers (and Electron's Chromium runtime) can execute at near-native CPU speed. It lets code originally written in C++, Rust, or similar languages run inside the browser's sandbox — something JavaScript alone cannot do efficiently for compute-heavy tasks.
+
+Running a neural network in real-time means doing matrix multiplications on every ~96 ms audio frame. JavaScript is too slow for this. The solution is **ONNX Runtime Web** (`onnxruntime-web`), which is compiled to WASM and therefore can do those calculations at native speed. The project copies the required WASM binaries into the renderer build output via Vite's static-copy plugin:
+
+```
+ort-wasm-simd-threaded.wasm      ← the WASM binary (SIMD + threaded, for performance)
+ort-wasm-simd-threaded.mjs       ← JS glue that loads and initialises the WASM binary
+ort-wasm-simd-threaded.asyncify.wasm  ← async variant used for certain ORT operations
+ort-wasm-simd-threaded.asyncify.mjs   ← JS glue for the asyncify variant
+```
+
+`simd-threaded` indicates two performance features are active:
+- **SIMD** — vectorised CPU instructions that process multiple values in one operation (critical for matrix math)
+- **Threaded** — WASM workers run in parallel threads rather than blocking the main thread
+
+### Why WASM threading needs SharedArrayBuffer
+
+WASM threads work by spawning Web Workers that **share a region of memory** rather than copying data between them. The browser API for shared memory is `SharedArrayBuffer`. Without it, every audio frame would have to be copied across the worker boundary — far too slow for real-time operation.
+
+**The security constraint:** `SharedArrayBuffer` was disabled by default in Chromium after the Spectre/Meltdown CPU vulnerabilities (2018). Shared memory combined with high-resolution timers creates a potential side-channel that lets malicious pages read memory they shouldn't. Chromium only re-enables it when the page is **cross-origin isolated**, which is proved by two HTTP response headers:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: credentialless
+```
+
+In Electron, there is no real HTTP server for production builds (files load via `file://`), so `src/main/index.ts` injects these headers on every response using Electron's request interception API. As a belt-and-suspenders measure it also forces the feature flag directly via a Chromium command-line switch:
+
+```typescript
+app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer");
+// ...
+headers["Cross-Origin-Opener-Policy"] = ["same-origin"];
+headers["Cross-Origin-Embedder-Policy"] = ["credentialless"];
+```
+
+In development mode, the Vite dev server sets the same headers itself (via `renderer.server.headers` in `electron.vite.config.ts`) because Electron's `webRequest` fires after the initial document is already parsed.
+
+### How `@ricky0123/vad-web` works internally
+
+`vad-web` is the library that connects the microphone, the WASM runtime, and the Silero model. It has three internal layers:
+
+**Layer 1 — AudioWorklet (runs on the audio thread)**
+
+The browser's `AudioContext` runs a dedicated low-latency audio processing thread separate from the main JS thread. `vad-web` installs `vad.worklet.bundle.min.js` as an `AudioWorkletProcessor` on this thread. Its job is to:
+- Receive raw PCM frames from the microphone at 16 kHz
+- Buffer them into fixed-size chunks (the size Silero expects, roughly every 96 ms)
+- Post each chunk to the main thread or a dedicated Worker
+
+**Layer 2 — ONNX Runtime inference (runs in a Worker via WASM)**
+
+Each buffered audio chunk is fed into the Silero ONNX model through `onnxruntime-web`. The model processes the chunk and returns a single float: the probability that this frame contains speech. This runs in a background Worker thread so it never blocks the UI.
+
+**Layer 3 — State machine (inside `vad-web`)**
+
+`vad-web` accumulates the per-frame scores and applies a **hysteresis state machine** using two configurable thresholds:
+
+| Threshold | Value (normal) | Value (barge-in) | Meaning |
+|---|---|---|---|
+| `positiveSpeechThreshold` | 0.50 | 0.92 | Score above this counts as a "speech" frame |
+| `negativeSpeechThreshold` | 0.35 | 0.77 | Score below this counts as a "silence" frame |
+
+The gap between the two thresholds prevents rapid flickering between states when the score hovers near the boundary. The state machine transitions work like this:
+
+```
+SILENCE → SPEECH:  enough consecutive frames score above positiveSpeechThreshold
+SPEECH → SILENCE:  enough consecutive frames score below negativeSpeechThreshold
+                   → fires onSpeechEnd(Float32Array) with all accumulated PCM samples
+```
+
+`minSpeechMs: 250` discards segments shorter than 250 ms (prevents clicks and taps from triggering), and `preSpeechPadMs: 300` prepends 300 ms of audio before the detected speech start so the first syllable is never clipped.
+
+### Why the model must run locally
+
+There are three alternatives and why each was rejected:
+
+| Alternative | Problem |
+|---|---|
+| Cloud VAD API | Adds round-trip latency, requires internet, violates the project's privacy-first constraint — audio leaves the machine |
+| Browser's built-in `SpeechRecognition` | Chrome's implementation sends audio to Google's servers — unacceptable for a local-first app |
+| Simple amplitude threshold | Cannot distinguish speech from background noise (fans, music, ambient sound) reliably; too many false positives and false negatives |
+
+Silero running locally via WASM is the only option that is simultaneously **private** (no data leaves the machine), **accurate** (a trained neural network, not a volume gate), and **fast enough** (SIMD-threaded WASM executes in real-time on consumer hardware).
+
 ### What happens on speech end
 
-When the user stops speaking, the VAD fires `onSpeechEnd` with a raw `Float32Array` of audio samples at 16 kHz. The hook:
+When the VAD fires `onSpeechEnd`, the `useVAD` hook in `src/renderer/hooks/useVAD.ts` receives a raw `Float32Array` of all accumulated audio samples at 16 kHz. The hook:
 
 1. Converts the float samples → a proper **WAV file** (RIFF header + 16-bit mono PCM) encoded as a base64 string using `float32ToWavBase64()` in `src/renderer/utils/audioUtils.ts`
 2. Takes a screenshot of the foreground window at the same moment
 3. Calls `window.api.submitSessionPrompt({ text: VOICE_TURN_TEXT, audio: wavBase64 })` — the text field is always the fixed string `"Please respond to what the user just asked."` so the model knows it has audio to process
 
 > **Why a fixed text string?** The `sessionHandlers.ts` IPC handler has an empty-text guard that rejects blank prompts. The fixed string satisfies that guard and also gives the model a clear instruction about its role when it receives an audio blob.
-
-### SharedArrayBuffer requirement
-
-Silero WASM needs `SharedArrayBuffer`, which browsers lock behind two security headers: `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. In Electron, these are injected on every response via `session.defaultSession.webRequest.onHeadersReceived` in `src/main/index.ts`.
 
 ---
 
