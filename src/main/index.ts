@@ -1,36 +1,75 @@
 import { app, BrowserWindow } from 'electron'
-import { join } from 'path'
 import { config } from 'dotenv'
+import { registerIpcHandlers } from './ipc/handlers'
+import { createOverlayWindow } from './overlay/overlayWindow'
+import type { OverlayMode, OverlayState, SessionMode } from '../shared/types'
 
 config() // load .env from repo root
 
-function createWindow(): void {
-  const win = new BrowserWindow({
-    width: 900,
-    height: 670,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-    },
-  })
+let mainWindow: BrowserWindow | null = null
+let overlayMode: OverlayMode = 'expanded'
+let sessionMode: SessionMode = 'home'
 
-  // In dev mode electron-vite sets ELECTRON_RENDERER_URL
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+function createWindow(mode: OverlayMode): BrowserWindow {
+  const window = createOverlayWindow(mode)
+  overlayMode = mode
+  mainWindow = window
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null
+    }
+  })
+  return window
+}
+
+function getOverlayState(): OverlayState {
+  return {
+    overlayMode,
+    sessionMode,
   }
+}
+
+function setSessionMode(mode: SessionMode): void {
+  sessionMode = mode
+}
+
+async function switchOverlayMode(mode: OverlayMode): Promise<void> {
+  if (overlayMode === mode && mainWindow !== null && !mainWindow.isDestroyed()) {
+    mainWindow.focus()
+    return
+  }
+
+  const previousWindow = mainWindow
+  const nextWindow = createWindow(mode)
+
+  if (previousWindow !== null && !previousWindow.isDestroyed()) {
+    previousWindow.destroy()
+  }
+
+  nextWindow.focus()
 }
 
 app.whenReady().then(() => {
   console.log('Screen Copilot started')
-  createWindow()
+  registerIpcHandlers({
+    getOverlayState,
+    switchOverlayMode,
+    setSessionMode,
+  })
+
+  mainWindow = createWindow('expanded')
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createWindow(overlayMode)
+    }
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  mainWindow = null
+
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
 })

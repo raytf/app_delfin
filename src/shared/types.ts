@@ -58,6 +58,11 @@ export const IPC_CHANNELS = {
   CAPTURE_AUTO_REFRESH: 'capture:auto-refresh',
   SIDECAR_SEND: 'sidecar:send',
   SIDECAR_INTERRUPT: 'sidecar:interrupt',
+  OVERLAY_GET_STATE: 'overlay:get-state',
+  OVERLAY_MINIMIZE: 'overlay:minimize',
+  OVERLAY_RESTORE: 'overlay:restore',
+  SESSION_START: 'session:start',
+  SESSION_STOP: 'session:stop',
   FRAME_CAPTURED: 'frame:captured',
   SIDECAR_TOKEN: 'sidecar:token',
   SIDECAR_STRUCTURED: 'sidecar:structured',
@@ -86,12 +91,25 @@ export interface SidecarStatus {
   visionTokens?: string
 }
 
+export type OverlayMode = 'expanded' | 'minimized'
+export type SessionMode = 'home' | 'active'
+
+export interface OverlayState {
+  overlayMode: OverlayMode
+  sessionMode: SessionMode
+}
+
 // Electron API exposed via contextBridge (window.api)
 export interface ElectronAPI {
   captureNow: () => Promise<void>
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) => void
   sidecarSend: (msg: WsOutboundMessage) => void
   sidecarInterrupt: () => void
+  getOverlayState: () => Promise<OverlayState>
+  startSession: () => Promise<void>
+  stopSession: () => Promise<void>
+  minimizeOverlay: () => Promise<void>
+  restoreOverlay: () => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
   onSidecarStructured: (cb: (data: StructuredResponse) => void) => void
