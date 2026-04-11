@@ -16,7 +16,11 @@ import MinimizedSessionBar from './components/MinimizedSessionBar'
 import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
 import { decodeAudioChunk } from './utils/audioUtils'
-import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from './utils/minimizedOverlay'
+import {
+  getAutoAdvanceMinimizedVariant,
+  getVoiceTurnCompleteVariant,
+  getVoiceTurnRevealVariant,
+} from './utils/minimizedOverlay'
 import {
   createWaveformBars,
   getWaveformActivityLevel,
@@ -29,6 +33,8 @@ import {
 // Serialises audio-chunk processing so concurrent IPC callbacks cannot race on
 // ensureAudioContext(), audioNextStartTimeRef, or audioSourceNodesRef.
 let lastAudioChunkPromise: Promise<void> = Promise.resolve()
+
+const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
 
 function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -88,6 +94,7 @@ export default function App() {
   const assistantWaveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const minimizedVoiceCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingVoiceWavRef = useRef<string | null>(null)
   const lowerThresholdRef = useRef<(() => void) | null>(null)
 
@@ -164,6 +171,13 @@ export default function App() {
     if (fallbackSpeechTimerRef.current !== null) {
       clearTimeout(fallbackSpeechTimerRef.current)
       fallbackSpeechTimerRef.current = null
+    }
+  }, [])
+
+  const clearMinimizedVoiceCollapseTimer = useCallback(() => {
+    if (minimizedVoiceCollapseTimerRef.current !== null) {
+      clearTimeout(minimizedVoiceCollapseTimerRef.current)
+      minimizedVoiceCollapseTimerRef.current = null
     }
   }, [])
 
@@ -249,6 +263,7 @@ export default function App() {
 
       aiStreamingStartedRef.current = false
       audioStartedForTurnRef.current = false
+      clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
       revealMinimizedVoiceResponse()
       beginVoiceTurn({ messageId })
@@ -270,7 +285,7 @@ export default function App() {
           failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
         })
     },
-    [beginVoiceTurn, clearFallbackSpeechTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
+    [beginVoiceTurn, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
   )
 
   const submitPendingVoiceTurn = useCallback(() => {
@@ -425,6 +440,43 @@ export default function App() {
   }, [errorMessage, isMinimizedPromptComposing, latestResponseText, minimizedVariant, overlayMode, sessionMode])
 
   useEffect(() => {
+    const nextVariant = getVoiceTurnCompleteVariant({
+      errorMessage,
+      hasResponseText: latestResponseText !== null && latestResponseText.trim().length > 0,
+      isAudioPlaying,
+      isSubmitting,
+      minimizedVariant,
+      overlayMode,
+      sessionMode,
+    })
+
+    clearMinimizedVoiceCollapseTimer()
+
+    if (nextVariant === null) {
+      return
+    }
+
+    minimizedVoiceCollapseTimerRef.current = window.setTimeout(() => {
+      minimizedVoiceCollapseTimerRef.current = null
+      void handleSetMinimizedVariant(nextVariant)
+    }, MINIMIZED_VOICE_COLLAPSE_DELAY_MS)
+
+    return () => {
+      clearMinimizedVoiceCollapseTimer()
+    }
+  }, [
+    clearMinimizedVoiceCollapseTimer,
+    errorMessage,
+    handleSetMinimizedVariant,
+    isAudioPlaying,
+    isSubmitting,
+    latestResponseText,
+    minimizedVariant,
+    overlayMode,
+    sessionMode,
+  ])
+
+  useEffect(() => {
     let cancelled = false
 
     void window.api.getOverlayState().then((state) => {
@@ -503,7 +555,7 @@ export default function App() {
           sourceNode.start(startAt)
           audioNextStartTimeRef.current = startAt + audioBuffer.duration
         })
-        .catch(() => {})
+        .catch(() => { })
     })
 
     window.api.onSidecarAudioEnd(() => {
@@ -555,6 +607,7 @@ export default function App() {
 
   useEffect(() => {
     return () => {
+      clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
       stopScheduledAudioSources()
@@ -569,11 +622,12 @@ export default function App() {
       assistantGainNodeRef.current = null
       assistantAnalyserRef.current = null
     }
-  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
+  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
 
   async function handleStartSession(): Promise<void> {
     await window.api.startSession()
     aiStreamingStartedRef.current = false
+    clearMinimizedVoiceCollapseTimer()
     stopAssistantWaveformLoop()
     resetAssistantWaveform()
     setSessionHistory([])
@@ -587,18 +641,21 @@ export default function App() {
   }
 
   async function handleRestoreOverlay(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     setOverlayMode('expanded')
     clearLatestResponse()
     await window.api.restoreOverlay()
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     await window.api.minimizeOverlay()
     setOverlayMode('minimized')
     setMinimizedVariant('compact')
   }
 
   async function handleStopSession(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     clearFallbackSpeechTimer()
@@ -632,7 +689,9 @@ export default function App() {
     setMinimizedVariant('compact')
   }
 
-  async function handleSetMinimizedVariant(variant: MinimizedOverlayVariant): Promise<void> {
+  const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
+    clearMinimizedVoiceCollapseTimer()
+
     if (variant !== 'prompt-response') {
       clearLatestResponse()
     }
@@ -641,7 +700,7 @@ export default function App() {
     setOverlayMode('minimized')
     setMinimizedVariant(variant)
     setIsMinimizedPromptComposing(variant === 'prompt-input')
-  }
+  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer])
 
   async function handleSubmitPrompt(text: string): Promise<void> {
     const trimmedText = text.trim()
@@ -655,6 +714,7 @@ export default function App() {
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
+    clearMinimizedVoiceCollapseTimer()
     clearFallbackSpeechTimer()
 
     if (isAudioPlayingRef.current || audioStreamActiveRef.current) {

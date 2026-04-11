@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (compact overlay resized/simplified and waveform upgraded to analyser-driven bars)
+> Last updated: 2026-04-11 (minimized waveform continuity restored across processing/TTS with automatic return to compact mode)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -44,7 +44,7 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, and resized compact bounds for waveform/status controls |
+| `src/main/overlay/overlayWindow.ts` | ✅ | Expanded + minimized modes (compact/prompt variants), always-on-top, transparent, resized compact bounds, and larger prompt-open bounds for persistent voice headers |
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Returns `CaptureFrame` with base64 JPEG at quality 80 |
 | `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
@@ -60,16 +60,16 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice-stream auto-open, and analyser-driven waveform routing |
+| `src/renderer/App.tsx` | ✅ | Session/overlay routing, IPC listeners, persisted VAD toggle sync, thinking-phase voice queueing/interrupt guards, minimized voice auto-open, delayed auto-collapse after speaking, and analyser-driven waveform routing |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box, and persisted speech-listening status |
 | `src/renderer/components/ExpandedSessionSidebar.tsx` | ✅ | Session controls include manual `Toggle Speech` action plus listening-state copy |
-| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Simplified compact overlay with larger bounds, compact waveform/status chrome, voice toggle, and prompt/expand/end actions |
+| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Shared minimized voice chrome keeps waveform/status visible in compact, prompt-input, and prompt-response modes with streamlined actions |
 | `src/renderer/components/VoiceWaveform.tsx` | ✅ | Reusable canvas waveform that renders analyser-driven per-bar motion plus ambient idle/processing fallback |
-| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance and voice-turn auto-open decisions |
+| `src/renderer/utils/minimizedOverlay.ts` | ✅ | Pure helper for minimized overlay auto-advance, voice-turn auto-open, and post-voice auto-collapse decisions |
 | `src/renderer/utils/waveformState.ts` | ✅ | Pure helper for waveform state priority, analyser-bin reduction, smoothing, and bar resampling |
-| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay voice auto-open and response-panel transitions |
-| `src/renderer/__tests__/minimizedSessionBar.test.ts` | ✅ | Vitest coverage for compact vs prompt-open minimized overlay rendering |
+| `src/renderer/__tests__/minimizedOverlay.test.ts` | ✅ | Vitest coverage for minimized overlay auto-open, prompt transitions, and post-voice collapse rules |
+| `src/renderer/__tests__/minimizedSessionBar.test.ts` | ✅ | Vitest coverage for waveform visibility in compact, prompt-input, and prompt-response minimized modes |
 | `src/renderer/__tests__/waveformState.test.ts` | ✅ | Vitest coverage for waveform state selection, helper smoothing/reduction, and component markup |
 | `package.json` — `npm test` script | ✅ | Runs Vitest renderer unit tests via `vitest run` |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
@@ -188,7 +188,7 @@
 |---|---|---|
 | `ExpandedSessionView` — waveform + speech status | ✅ | Expanded session shows reusable analyser-driven waveform when speech input is enabled, with token-based colours for user/AI/idle/processing |
 | `ExpandedSessionView` + `ExpandedSessionSidebar` — speech status + `Toggle Speech` button | ✅ | Expanded session shows persisted speech state, waveform visibility follows the speech toggle, and the user can pause/resume VAD listening |
-| `MinimizedSessionBar` — compact waveform + mic/speaker indicators + `Toggle Speech` button | ✅ | Compact overlay uses a simplified larger layout that keeps the waveform, status row, and actions visible while speech is enabled |
+| `MinimizedSessionBar` — minimized waveform continuity | ✅ | Minimized overlay keeps the waveform/status visible while listening, processing, and AI speaking, then auto-returns to compact mode after playback completes |
 | Minimized overlay voice auto-open decision tests | ✅ | `src/renderer/__tests__/minimizedOverlay.test.ts` verifies compact→response reveal and existing auto-advance rules |
 
 ### Auto-refresh (deprioritised)

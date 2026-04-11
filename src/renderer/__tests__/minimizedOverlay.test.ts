@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getAutoAdvanceMinimizedVariant, getVoiceTurnRevealVariant } from '../utils/minimizedOverlay'
+import {
+  getAutoAdvanceMinimizedVariant,
+  getVoiceTurnCompleteVariant,
+  getVoiceTurnRevealVariant,
+} from '../utils/minimizedOverlay'
 
 describe('getVoiceTurnRevealVariant', () => {
   it('reveals prompt-response for a voice turn from minimized compact mode', () => {
@@ -57,6 +61,48 @@ describe('getAutoAdvanceMinimizedVariant', () => {
         isMinimizedPromptComposing: false,
         latestResponseText: 'Answer should not auto-open compact mode here',
         minimizedVariant: 'compact',
+        overlayMode: 'minimized',
+        sessionMode: 'active',
+      }),
+    ).toBeNull()
+  })
+})
+
+describe('getVoiceTurnCompleteVariant', () => {
+  it('collapses prompt-response back to compact once processing and playback are complete', () => {
+    expect(
+      getVoiceTurnCompleteVariant({
+        errorMessage: null,
+        hasResponseText: true,
+        isAudioPlaying: false,
+        isSubmitting: false,
+        minimizedVariant: 'prompt-response',
+        overlayMode: 'minimized',
+        sessionMode: 'active',
+      }),
+    ).toBe('compact')
+  })
+
+  it('does not collapse while the assistant is still thinking or speaking', () => {
+    expect(
+      getVoiceTurnCompleteVariant({
+        errorMessage: null,
+        hasResponseText: true,
+        isAudioPlaying: true,
+        isSubmitting: false,
+        minimizedVariant: 'prompt-response',
+        overlayMode: 'minimized',
+        sessionMode: 'active',
+      }),
+    ).toBeNull()
+
+    expect(
+      getVoiceTurnCompleteVariant({
+        errorMessage: null,
+        hasResponseText: true,
+        isAudioPlaying: false,
+        isSubmitting: true,
+        minimizedVariant: 'prompt-response',
         overlayMode: 'minimized',
         sessionMode: 'active',
       }),

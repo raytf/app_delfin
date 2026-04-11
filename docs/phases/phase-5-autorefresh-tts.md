@@ -269,6 +269,8 @@ In the renderer, show a reusable waveform component that:
 - tracks analyser-driven per-bar mic activity while listening is enabled, but only turns green once VAD classifies speech
 - routes streamed TTS chunks through a shared Web Audio analysis chain so blue playback bars stay visually continuous across chunk boundaries
 - keeps the compact minimized overlay large enough and simple enough that the waveform, status row, and actions do not clip
+- keeps a persistent minimized voice header in prompt-input / prompt-response so the overlay does not fall back to a text-only view during processing or TTS
+- automatically returns minimized voice turns to compact mode after assistant playback/response completion
 
 ---
 
@@ -286,5 +288,6 @@ In the renderer, show a reusable waveform component that:
 - [ ] With `TTS_ENABLED=false`: no audio plays at all
 - [ ] The waveform appears in expanded and minimized session views while speech is enabled
 - [ ] User speech drives the waveform green, AI speech drives it blue, and idle/processing show orange motion with different intensity
+- [ ] In minimized voice turns, the waveform remains visible during processing and assistant playback instead of disappearing in response mode
 - [ ] Audio playback does not block the UI (main thread stays responsive)
 - [ ] Auto-refresh + TTS combined: advance a slide → auto-capture → auto-summarise (if enabled) → TTS reads the summary

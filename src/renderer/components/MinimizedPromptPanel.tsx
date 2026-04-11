@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Maximize2 } from 'lucide-react'
 import SessionPromptComposer from './SessionPromptComposer'
 
 interface MinimizedPromptPanelProps {
@@ -7,8 +6,6 @@ interface MinimizedPromptPanelProps {
   isSubmitting: boolean
   isShowingResponse: boolean
   latestResponseText: string | null
-  onAskAnother: () => void
-  onExpand: () => void
   onSubmitPrompt: (text: string) => void
 }
 
@@ -17,8 +14,6 @@ export default function MinimizedPromptPanel({
   isSubmitting,
   isShowingResponse,
   latestResponseText,
-  onAskAnother,
-  onExpand,
   onSubmitPrompt,
 }: MinimizedPromptPanelProps) {
   const [isComposing, setIsComposing] = useState(!isShowingResponse)
@@ -52,46 +47,27 @@ export default function MinimizedPromptPanel({
 
   if (isLoadingOnly) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)] [animation-delay:150ms]" />
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:300ms]" />
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)] [animation-delay:150ms]" />
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:300ms]" />
+          </div>
+          <p className="text-sm font-medium text-[var(--text-secondary)]">Thinking about what you asked…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
       <StreamingResponseBody
         errorMessage={errorMessage}
         hasResponseText={hasResponseText}
         isSubmitting={isSubmitting}
         latestResponseText={latestResponseText}
       />
-
-      {!isSubmitting || hasResponseText ? (
-        <div className="no-drag flex items-center gap-2">
-          <button
-            className="flex-1 cursor-pointer rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-            onClick={() => {
-              onAskAnother()
-            }}
-            type="button"
-          >
-            Ask Another
-          </button>
-          <button
-            className="flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
-            onClick={onExpand}
-            type="button"
-          >
-            <Maximize2 size={16} />
-            Expand
-          </button>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -123,7 +99,7 @@ function StreamingResponseBody({
   }, [latestResponseText, scrollContainer])
 
   return (
-    <div className="min-h-[12rem] flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+    <div className="min-h-[10rem] flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
       {errorMessage !== null ? (
         <p className="text-sm leading-6 text-[var(--danger)]">{errorMessage}</p>
       ) : latestResponseText !== null && latestResponseText.length > 0 ? (
