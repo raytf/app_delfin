@@ -172,6 +172,13 @@ interface WsInboundMessage {
 | Renderer → Main | `capture:auto-refresh` | `{ enabled: boolean, intervalMs: number }` |
 | Renderer → Main | `sidecar:send` | `WsOutboundMessage` |
 | Renderer → Main | `sidecar:interrupt` | — |
+| Renderer → Main | `session:start` | — |
+| Renderer → Main | `session:stop` | — |
+| Renderer → Main | `session:submit-prompt` | `SessionPromptRequest` |
+| Renderer → Main | `session:list` | — |
+| Renderer → Main | `session:get-detail` | `{ sessionId: string }` |
+| Renderer → Main | `session:delete` | `{ sessionId: string }` |
+| Renderer → Main | `session:get-message-image` | `{ imagePath: string }` |
 | Main → Renderer | `frame:captured` | `CaptureFrame` |
 | Main → Renderer | `sidecar:token` | `{ text: string }` |
 | Main → Renderer | `sidecar:structured` | `{ summary, answer, key_points }` |

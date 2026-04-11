@@ -43,6 +43,10 @@ export interface SessionDetailRequest {
   sessionId: string
 }
 
+export interface SessionDeleteRequest {
+  sessionId: string
+}
+
 export interface WsInterruptMessage {
   type: 'interrupt'
 }
@@ -78,6 +82,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
   SESSION_LIST: 'session:list',
   SESSION_GET_DETAIL: 'session:get-detail',
+  SESSION_DELETE: 'session:delete',
   SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
 } as const
 
@@ -149,6 +154,7 @@ export interface ElectronAPI {
   submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>
   getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>
+  deleteSession: (request: SessionDeleteRequest) => Promise<void>
   getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
   minimizeOverlay: () => Promise<void>
   restoreOverlay: () => Promise<void>

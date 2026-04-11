@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { Focus } from 'lucide-react'
 import type { SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionHistoryCard from './SessionHistoryCard'
 
 interface HomeScreenProps {
+  onDeleteSession: (sessionId: string) => void
   onStartSession: (sessionName: string) => void
   onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
   sessions: SessionListItem[]
+  userName: string | null
 }
 
 // Dolphin wave SVG for decorative element
@@ -113,7 +114,14 @@ function StartSessionModal({ isOpen, onClose, onStart }: StartSessionModalProps)
   )
 }
 
-export default function HomeScreen({ onStartSession, onSelectSession, onViewAllSessions, sessions }: HomeScreenProps) {
+export default function HomeScreen({
+  onDeleteSession,
+  onStartSession,
+  onSelectSession,
+  onViewAllSessions,
+  sessions,
+  userName,
+}: HomeScreenProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const recentSessions = sessions.slice(0, 6)
 
@@ -142,7 +150,7 @@ export default function HomeScreen({ onStartSession, onSelectSession, onViewAllS
 
           {/* Tagline */}
           <p className="mt-5 max-w-xl text-xl leading-relaxed text-[var(--text-secondary)]">
-            Your intelligent study companion that sees what you see.
+            {userName !== null ? `Welcome back, ${userName}.` : 'Your intelligent study companion that sees what you see.'}
             <br />
             <span className="text-[var(--text-muted)]">
               Ask questions, get explanations, and learn faster together.
@@ -181,6 +189,9 @@ export default function HomeScreen({ onStartSession, onSelectSession, onViewAllS
               {recentSessions.map((session) => (
                 <SessionHistoryCard
                   key={session.id}
+                  onDelete={() => {
+                    onDeleteSession(session.id)
+                  }}
                   onClick={() => {
                     onSelectSession(session.id)
                   }}

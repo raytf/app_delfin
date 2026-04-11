@@ -1,6 +1,6 @@
 # Screen Copilot — Implementation Status
 
-> Last updated: 2026-04-11 (env validation implemented)
+> Last updated: 2026-04-12 (past session deletion implemented)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,7 +11,7 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Read in both main process and sidecar |
-| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types; `StructuredResponse` removed |
+| `src/shared/types.ts` | ✅ | All IPC, WebSocket, overlay, and session types, including `session:delete`; `StructuredResponse` removed |
 | `src/shared/schemas.ts` | ✅ | Zod schemas for inbound/outbound WS messages; `structuredResponseSchema` removed |
 | `src/shared/constants.ts` | ✅ | Preset definitions, `DEFAULT_PRESET`, `SIDEBAR_WIDTH` |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar — tokens only (no structured message) |
@@ -48,9 +48,9 @@
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Returns `CaptureFrame` with base64 JPEG at quality 80 |
 | `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Filters out "Screen Copilot" window |
 | `src/main/sidecar/wsClient.ts` | ✅ | Persistent WS, 2s auto-reconnect, Zod-validated inbound messages |
-| `src/main/ipc/handlers.ts` | ✅ | All IPC channels wired: capture, sidecar send/interrupt, overlay, session |
+| `src/main/ipc/handlers.ts` | ✅ | All IPC channels wired: capture, sidecar send/interrupt, overlay, session, and session deletion |
 | `src/main/index.ts` | ✅ | App entry, window lifecycle, overlay/session mode state machine |
-| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, and session methods |
+| `src/preload/index.ts` | ✅ | Full `contextBridge` API: all capture, sidecar, overlay, session, and delete methods |
 | `src/main/capture/autoRefresh.ts` | ⚠️ | Placeholder — `start/stop` are no-ops |
 | `src/main/sidecar/healthCheck.ts` | ⚠️ | Placeholder — polling not implemented |
 
@@ -60,8 +60,8 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state; structured response removed |
-| `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button |
+| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state, and past-session deletion flow |
+| `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button and recent-session deletion |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
@@ -72,7 +72,7 @@
 | `src/renderer/components/StatusIndicator.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/StopButton.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/MinimizeToggle.tsx` | ⚠️ | Placeholder |
-| `src/renderer/stores/sessionStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/stores/sessionStore.ts` | ✅ | Active conversation state plus persisted session history updates, including deletion |
 | `src/renderer/stores/settingsStore.ts` | ⚠️ | Placeholder — returns empty object |
 | `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder — returns empty object |
 
@@ -84,6 +84,7 @@
 |---|---|---|
 | Sidecar WS → IPC → renderer message routing | ✅ | `token`, `audio_*`, `done`, `error` all forwarded; `structured` removed |
 | `SESSION_SUBMIT_PROMPT` — capture + send to sidecar | ✅ | Captures foreground window, sends image + text over WS |
+| `SESSION_DELETE` — remove persisted past session | ✅ | Deletes session index entry, conversation file, capture files, and renderer-cached history |
 | Session start/stop ↔ overlay mode transitions | ✅ | `home ↔ active`, `expanded ↔ minimized` fully wired |
 | Streaming token display in renderer | ✅ | `App.tsx` accumulates tokens into `streamedText`; chat box auto-scrolls with typing indicator |
 | Structured response display in renderer | ❌ | Removed — model now streams plain prose directly |

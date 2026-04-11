@@ -4,11 +4,17 @@ import SessionHistoryCard from './SessionHistoryCard'
 
 interface AllSessionsPageProps {
   onBack: () => void
+  onDeleteSession: (sessionId: string) => void
   onSelectSession: (sessionId: string) => void
   sessions: SessionListItem[]
 }
 
-export default function AllSessionsPage({ onBack, onSelectSession, sessions }: AllSessionsPageProps) {
+export default function AllSessionsPage({
+  onBack,
+  onDeleteSession,
+  onSelectSession,
+  sessions,
+}: AllSessionsPageProps) {
   return (
     <div className="ocean-gradient relative min-h-screen text-[var(--text-primary)]">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-8 py-10">
@@ -56,6 +62,9 @@ export default function AllSessionsPage({ onBack, onSelectSession, sessions }: A
               {sessions.map((session) => (
                 <SessionHistoryCard
                   key={session.id}
+                  onDelete={() => {
+                    onDeleteSession(session.id)
+                  }}
                   onClick={() => {
                     onSelectSession(session.id)
                   }}

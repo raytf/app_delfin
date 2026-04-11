@@ -192,6 +192,14 @@ export class SessionPersistenceService {
     return this.storage.getCaptureImageDataUrl(relativePath)
   }
 
+  async deleteSession(sessionId: string): Promise<void> {
+    if (sessionId === this.activeSessionId) {
+      throw new Error('Cannot delete the active session.')
+    }
+
+    await this.storage.deleteSession(sessionId)
+  }
+
   private async persistAssistantDraft(timestamp: number): Promise<void> {
     const draft = this.activeAssistantDraft
 

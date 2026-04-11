@@ -1,4 +1,4 @@
-import { ArrowLeft, Clock } from 'lucide-react'
+import { ArrowLeft, Clock, Trash2 } from 'lucide-react'
 import type { ChatMessage, SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionConversation from './SessionConversation'
@@ -6,6 +6,7 @@ import SessionConversation from './SessionConversation'
 interface PastSessionViewProps {
   messages: ChatMessage[]
   onBack: () => void
+  onDelete: () => void
   session: SessionListItem
 }
 
@@ -37,6 +38,7 @@ function formatSessionDate(timestamp: number): string {
 export default function PastSessionView({
   messages,
   onBack,
+  onDelete,
   session,
 }: PastSessionViewProps) {
   const sessionName = session.sourceLabel ?? 'Untitled Session'
@@ -45,14 +47,24 @@ export default function PastSessionView({
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
       <header className="border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-5">
         <div className="relative flex items-center justify-center">
-          <button
-            className="absolute left-0 inline-flex cursor-pointer items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-            onClick={onBack}
-            type="button"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
+          <div className="absolute left-0 flex items-center gap-3">
+            <button
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              onClick={onBack}
+              type="button"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
+            <button
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-red-200 bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-red-600 transition hover:border-red-300 hover:bg-red-50"
+              onClick={onDelete}
+              type="button"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          </div>
 
           <div className="flex items-center justify-center gap-3">
             <img

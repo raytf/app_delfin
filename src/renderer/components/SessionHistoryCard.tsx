@@ -1,8 +1,9 @@
-import { Clock3, MessageSquare } from 'lucide-react'
+import { Clock3, MessageSquare, Trash2 } from 'lucide-react'
 import type { SessionListItem } from '../../shared/types'
 
 interface SessionHistoryCardProps {
   onClick?: () => void
+  onDelete?: () => void
   session: SessionListItem
   variant?: 'compact' | 'detailed'
 }
@@ -57,6 +58,7 @@ function formatStatus(status: SessionListItem['status']): string {
 
 export default function SessionHistoryCard({
   onClick,
+  onDelete,
   session,
   variant = 'compact',
 }: SessionHistoryCardProps) {
@@ -81,11 +83,26 @@ export default function SessionHistoryCard({
           ) : null}
         </div>
 
-        {isDetailed ? (
-          <div className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-xs font-medium text-[var(--primary)]">
-            {formatRelativeTime(session.lastUpdatedAt)}
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {isDetailed ? (
+            <div className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-xs font-medium text-[var(--primary)]">
+              {formatRelativeTime(session.lastUpdatedAt)}
+            </div>
+          ) : null}
+          {onDelete !== undefined ? (
+            <button
+              aria-label={`Delete ${session.sourceLabel ?? 'session'}`}
+              className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] p-2 text-[var(--text-muted)] transition hover:border-red-300 hover:text-red-600"
+              onClick={(event) => {
+                event.stopPropagation()
+                onDelete()
+              }}
+              type="button"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {isDetailed ? (

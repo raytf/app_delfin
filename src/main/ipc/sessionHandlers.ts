@@ -5,6 +5,7 @@ import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
   type SessionDetailRequest,
+  type SessionDeleteRequest,
   type SessionMessageImageRequest,
   type SessionPromptRequest,
   type SessionPromptResponse,
@@ -73,6 +74,10 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_DETAIL, async (_event, request: SessionDetailRequest) =>
     options.sessionPersistence.getSessionDetail(request.sessionId),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_DELETE, async (_event, request: SessionDeleteRequest) =>
+    options.sessionPersistence.deleteSession(request.sessionId),
   )
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>

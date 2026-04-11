@@ -1,4 +1,26 @@
-// TODO (Phase 3): Zustand store for user settings.
-// Holds: activePreset (PresetId), ttsEnabled, sidecarStatus (SidecarStatus).
+import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
-export const useSettingsStore = (): Record<string, never> => ({})
+interface SettingsState {
+  userName: string | null
+  setUserName: (name: string) => void
+}
+
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set) => ({
+      userName: null,
+      setUserName: (name: string) =>
+        set({
+          userName: name.trim(),
+        }),
+    }),
+    {
+      name: 'screen-copilot-settings',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        userName: state.userName,
+      }),
+    },
+  ),
+)

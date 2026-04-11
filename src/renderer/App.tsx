@@ -4,7 +4,9 @@ import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import PastSessionView from './components/PastSessionView'
+import UserNameModal from './components/UserNameModal'
 import { useSessionStore } from './stores/sessionStore'
+import { useSettingsStore } from './stores/settingsStore'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
@@ -31,6 +33,7 @@ export default function App() {
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
   const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
+  const removeSessionHistoryItem = useSessionStore((state) => state.removeSessionHistoryItem)
   const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
   const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
@@ -38,6 +41,8 @@ export default function App() {
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
   const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
+  const userName = useSettingsStore((state) => state.userName)
+  const setUserName = useSettingsStore((state) => state.setUserName)
   const latestResponseText =
     minimizedResponseMessageId === null
       ? null
@@ -210,6 +215,16 @@ export default function App() {
     setSelectedPastSession(detail)
   }
 
+  async function handleDeleteSession(sessionId: string): Promise<void> {
+    await window.api.deleteSession({ sessionId })
+    removeSessionHistoryItem(sessionId)
+
+    if (selectedPastSession?.session.id === sessionId) {
+      setSelectedPastSession(null)
+      setHomeView('landing')
+    }
+  }
+
   if (sessionMode === 'active' && overlayMode === 'minimized') {
     return (
       <MinimizedSessionBar
@@ -263,6 +278,9 @@ export default function App() {
         onBack={() => {
           setSelectedPastSession(null)
         }}
+        onDelete={() => {
+          void handleDeleteSession(selectedPastSession.session.id)
+        }}
         session={selectedPastSession.session}
       />
     )
@@ -274,6 +292,9 @@ export default function App() {
         onBack={() => {
           setHomeView('landing')
         }}
+        onDeleteSession={(sessionId) => {
+          void handleDeleteSession(sessionId)
+        }}
         onSelectSession={(sessionId) => {
           void handleOpenPastSession(sessionId)
         }}
@@ -283,17 +304,29 @@ export default function App() {
   }
 
   return (
-    <HomeScreen
-      onSelectSession={(sessionId) => {
-        void handleOpenPastSession(sessionId)
-      }}
-      onViewAllSessions={() => {
-        setHomeView('all-sessions')
-      }}
-      sessions={sessionHistory}
-      onStartSession={(sessionName) => {
-        void handleStartSession(sessionName)
-      }}
-    />
+    <>
+      <HomeScreen
+        onDeleteSession={(sessionId) => {
+          void handleDeleteSession(sessionId)
+        }}
+        onSelectSession={(sessionId) => {
+          void handleOpenPastSession(sessionId)
+        }}
+        onViewAllSessions={() => {
+          setHomeView('all-sessions')
+        }}
+        sessions={sessionHistory}
+        onStartSession={(sessionName) => {
+          void handleStartSession(sessionName)
+        }}
+        userName={userName}
+      />
+      <UserNameModal
+        isOpen={userName === null}
+        onSave={(name) => {
+          setUserName(name)
+        }}
+      />
+    </>
   )
 }

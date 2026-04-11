@@ -17,6 +17,7 @@ interface SessionStoreState {
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
+  removeSessionHistoryItem: (sessionId: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
   setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
 }
@@ -127,6 +128,11 @@ export const useSessionStore = create<SessionStoreState>()(
             minimizedResponseMessageId: state.activeAssistantMessageId,
           }
         }),
+
+      removeSessionHistoryItem: (sessionId: string) =>
+        set((state) => ({
+          sessionHistory: state.sessionHistory.filter((session) => session.id !== sessionId),
+        })),
 
       setSessionHistory: (sessions: SessionListItem[]) =>
         set({
