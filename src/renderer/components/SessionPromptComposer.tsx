@@ -4,6 +4,7 @@ import { Send } from 'lucide-react'
 interface SessionPromptComposerProps {
   autoFocus?: boolean
   className?: string
+  disabled?: boolean
   isSubmitting: boolean
   onSubmitPrompt: (text: string) => void
   placeholder: string
@@ -13,6 +14,7 @@ interface SessionPromptComposerProps {
 export default function SessionPromptComposer({
   autoFocus = false,
   className,
+  disabled = false,
   isSubmitting,
   onSubmitPrompt,
   placeholder,
@@ -38,7 +40,8 @@ export default function SessionPromptComposer({
       <form className={className} onSubmit={handleSubmit}>
         <input
           autoFocus={autoFocus}
-          className="h-11 flex-1 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+          className="h-11 flex-1 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={disabled || isSubmitting}
           onChange={(event) => {
             setPromptValue(event.target.value)
           }}
@@ -49,7 +52,7 @@ export default function SessionPromptComposer({
 
         <button
           className="no-drag flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[var(--primary)] text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isSubmitting}
+          disabled={disabled || isSubmitting}
           type="submit"
           aria-label={submitLabel}
         >

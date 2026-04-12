@@ -4,12 +4,12 @@ import type { MinimizedOverlayVariant, OverlayMode } from "../../shared/types";
 
 const EXPANDED_WINDOW_WIDTH = 1100;
 const EXPANDED_WINDOW_HEIGHT = 760;
-const MINIMIZED_WINDOW_WIDTH = 360;
-const MINIMIZED_WINDOW_HEIGHT = 166;
+const MINIMIZED_WINDOW_WIDTH = 380;
+const MINIMIZED_WINDOW_HEIGHT = 64;
 const MINIMIZED_PROMPT_INPUT_WINDOW_WIDTH = 460;
-const MINIMIZED_PROMPT_INPUT_WINDOW_HEIGHT = 232;
+const MINIMIZED_PROMPT_INPUT_WINDOW_HEIGHT = 115;
 const MINIMIZED_PROMPT_RESPONSE_WINDOW_WIDTH = 460;
-const MINIMIZED_PROMPT_RESPONSE_WINDOW_HEIGHT = 484;
+const MINIMIZED_PROMPT_RESPONSE_WINDOW_HEIGHT = 360;
 const WINDOW_MARGIN = 16;
 
 function getExpandedBounds(): Electron.Rectangle {
@@ -97,15 +97,15 @@ export function createOverlayWindow(
 
   const window = new BrowserWindow({
     ...initialBounds,
-    frame: mode === "expanded",
+    frame: false,
     alwaysOnTop: isMinimizedMode,
     resizable: mode === "expanded",
     maximizable: false,
-    minimizable: mode === "expanded",
+    minimizable: false,
     fullscreenable: mode === "expanded",
     skipTaskbar: isMinimizedMode,
     show: false,
-    transparent: isMinimizedMode,
+    transparent: true,
     hasShadow: !isMinimizedMode,
     backgroundColor: isMinimizedMode ? "#00000000" : "#f8fcfd",
     title: "Delfin",
@@ -134,4 +134,12 @@ export function setOverlayMode(
   window.setBounds(getWindowBounds(mode, minimizedVariant), true);
   window.setAlwaysOnTop(mode === "minimized");
   window.setSkipTaskbar(mode === "minimized");
+  window.setResizable(mode === "expanded");
+  window.setMinimizable(false);
+  window.setFullScreenable(mode === "expanded");
+  window.setHasShadow(mode === "expanded");
+  window.setBackgroundColor(mode === "minimized" ? "#00000000" : "#f8fcfd");
+  if (!window.isVisible()) {
+    window.show();
+  }
 }

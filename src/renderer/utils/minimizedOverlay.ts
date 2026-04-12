@@ -28,7 +28,7 @@ export function getVoiceTurnRevealVariant({
     return null
   }
 
-  return 'prompt-response'
+  return 'prompt-input'
 }
 
 export function getAutoAdvanceMinimizedVariant({
@@ -39,12 +39,20 @@ export function getAutoAdvanceMinimizedVariant({
   overlayMode,
   sessionMode,
 }: AutoAdvanceMinimizedVariantContext): MinimizedOverlayVariant | null {
-  if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant === 'compact') {
+  if (sessionMode !== 'active' || overlayMode !== 'minimized') {
     return null
   }
 
   const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
-  const shouldShowResponse = !isMinimizedPromptComposing && (errorMessage !== null || hasResponseText)
+  const shouldShowResponse = errorMessage !== null || hasResponseText
+  if (minimizedVariant === 'compact' && shouldShowResponse) {
+    return 'prompt-response'
+  }
+
+  if (minimizedVariant === 'compact') {
+    return null
+  }
+
   const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
 
   return nextVariant === minimizedVariant ? null : nextVariant

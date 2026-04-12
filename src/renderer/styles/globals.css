@@ -145,6 +145,18 @@ body {
   box-shadow: 0 12px 40px var(--shadow-medium);
 }
 
+/* Thinking dots shimmer */
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
 /* Status badge styles */
 .status-completed {
   background: var(--success-soft);

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import SessionPromptComposer from './SessionPromptComposer'
+import ThinkingDots from './ThinkingDots'
 
 interface MinimizedPromptPanelProps {
   errorMessage: string | null
+  isAudioPlaying: boolean
   isSubmitting: boolean
   isShowingResponse: boolean
   latestResponseText: string | null
@@ -11,24 +13,20 @@ interface MinimizedPromptPanelProps {
 
 export default function MinimizedPromptPanel({
   errorMessage,
+  isAudioPlaying,
   isSubmitting,
   isShowingResponse,
   latestResponseText,
   onSubmitPrompt,
 }: MinimizedPromptPanelProps) {
-  const [isComposing, setIsComposing] = useState(!isShowingResponse)
   const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
-  const isLoadingOnly = isSubmitting && !hasResponseText && errorMessage === null
+  const shouldShowResponse =
+    isShowingResponse || isAudioPlaying || isSubmitting || hasResponseText || errorMessage !== null
+  const [isComposing, setIsComposing] = useState(!shouldShowResponse)
 
   useEffect(() => {
-    if (isSubmitting) {
-      setIsComposing(false)
-    }
-  }, [isSubmitting])
-
-  useEffect(() => {
-    setIsComposing(!isShowingResponse)
-  }, [isShowingResponse])
+    setIsComposing(!shouldShowResponse)
+  }, [shouldShowResponse])
 
   if (isComposing) {
     return (
@@ -36,86 +34,60 @@ export default function MinimizedPromptPanel({
         autoFocus
         className="flex items-center gap-2"
         isSubmitting={isSubmitting}
-        onSubmitPrompt={(text) => {
-          onSubmitPrompt(text)
-        }}
+        onSubmitPrompt={onSubmitPrompt}
         placeholder="Ask Delfin"
         submitLabel="Send"
       />
     )
   }
 
-  if (isLoadingOnly) {
-    return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)] [animation-delay:150ms]" />
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:300ms]" />
-          </div>
-          <p className="text-sm font-medium text-[var(--text-secondary)]">Thinking about what you asked…</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <StreamingResponseBody
-        errorMessage={errorMessage}
-        hasResponseText={hasResponseText}
-        isSubmitting={isSubmitting}
-        latestResponseText={latestResponseText}
-      />
-    </div>
+    <StreamingResponseBody
+      errorMessage={errorMessage}
+      isSubmitting={isSubmitting}
+      latestResponseText={latestResponseText}
+    />
   )
 }
 
 interface StreamingResponseBodyProps {
   errorMessage: string | null
-  hasResponseText: boolean
   isSubmitting: boolean
   latestResponseText: string | null
 }
 
 function StreamingResponseBody({
   errorMessage,
-  hasResponseText,
   isSubmitting,
   latestResponseText,
 }: StreamingResponseBodyProps) {
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null)
+  const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
+  const isThinking = isSubmitting && !hasResponseText && errorMessage === null
 
-  useEffect(() => {
-    if (scrollContainer === null) {
+  useLayoutEffect(() => {
+    if (scrollContainer === null || !hasResponseText) {
       return
     }
 
-    scrollContainer.scrollTo({
-      top: scrollContainer.scrollHeight,
-      behavior: 'smooth',
-    })
-  }, [latestResponseText, scrollContainer])
+    scrollContainer.scrollTop = scrollContainer.scrollHeight
+  }, [latestResponseText, scrollContainer, hasResponseText])
 
   return (
-    <div className="min-h-[10rem] flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
-      {errorMessage !== null ? (
-        <p className="text-sm leading-6 text-[var(--danger)]">{errorMessage}</p>
-      ) : latestResponseText !== null && latestResponseText.length > 0 ? (
-        <div className="no-drag flex h-full min-h-0 flex-col">
-          <div
-            className="min-h-0 flex-1 overflow-y-auto text-sm leading-6 text-[var(--text-primary)]"
-            ref={setScrollContainer}
-          >
-            <p className="whitespace-pre-wrap">{latestResponseText}</p>
+    <div className="h-full rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+      <div className="no-drag h-full overflow-y-auto text-sm leading-6 text-[var(--text-primary)]" ref={setScrollContainer}>
+        {errorMessage !== null ? (
+          <p className="text-[var(--danger)]">{errorMessage}</p>
+        ) : isThinking ? (
+          <div className="flex h-full items-center justify-center">
+            <ThinkingDots label="Thinking" />
           </div>
-        </div>
-      ) : (
-        <p className="text-sm leading-6 text-[var(--text-muted)]">
-          Ask about what's on screen to get a response here.
-        </p>
-      )}
+        ) : hasResponseText ? (
+          <p className="whitespace-pre-wrap">{latestResponseText}</p>
+        ) : (
+          <p className="text-[var(--text-muted)]">Ask about what's on screen to get a response here.</p>
+        )}
+      </div>
     </div>
   )
 }

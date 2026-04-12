@@ -25,7 +25,6 @@ import { decodeAudioChunk } from './utils/audioUtils'
 import {
   getAutoAdvanceMinimizedVariant,
   getVoiceTurnCompleteVariant,
-  getVoiceTurnRevealVariant,
 } from './utils/minimizedOverlay'
 import {
   createWaveformBars,
@@ -82,6 +81,7 @@ export default function App() {
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
+  const activeAssistantMessageId = useSessionStore((state) => state.activeAssistantMessageId)
   const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
   const toggleVadListening = useSessionStore((state) => state.toggleVadListening)
@@ -90,10 +90,22 @@ export default function App() {
   const userName = useSettingsStore((state) => state.userName)
   const setUserName = useSettingsStore((state) => state.setUserName)
 
-  const latestResponseText =
+  const minimizedResponseMessage =
     minimizedResponseMessageId === null
       ? null
-      : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
+      : messages.find((message) => message.id === minimizedResponseMessageId) ?? null
+  const activeAssistantMessage =
+    activeAssistantMessageId === null
+      ? null
+      : messages.find((message) => message.id === activeAssistantMessageId) ?? null
+  const latestAssistantMessage = getLatestAssistantMessage(messages)
+  const liveAssistantResponseText =
+    activeAssistantMessage?.content ??
+    (isSubmitting ? latestAssistantMessage?.content ?? null : null)
+  const latestResponseText =
+    sessionMode === 'active'
+      ? liveAssistantResponseText ?? minimizedResponseMessage?.content ?? null
+      : minimizedResponseMessage?.content ?? null
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const assistantGainNodeRef = useRef<GainNode | null>(null)
@@ -111,7 +123,6 @@ export default function App() {
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minimizedVoiceCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingVoiceWavRef = useRef<string | null>(null)
   const lowerThresholdRef = useRef<(() => void) | null>(null)
 
   const voiceEnabled = window.api.voiceEnabled
@@ -270,22 +281,6 @@ export default function App() {
     }
   }, [clearMinimizedVoiceCollapseTimer])
 
-  const revealMinimizedVoiceResponse = useCallback(() => {
-    const nextVariant = getVoiceTurnRevealVariant({
-      minimizedVariant,
-      overlayMode,
-      sessionMode,
-    })
-
-    if (nextVariant === null) {
-      return
-    }
-
-    setIsMinimizedPromptComposing(false)
-    setMinimizedVariant(nextVariant)
-    void window.api.setMinimizedOverlayVariant(nextVariant)
-  }, [minimizedVariant, overlayMode, sessionMode])
-
   const submitVoiceTurn = useCallback(
     (wavBase64: string) => {
       if (sessionMode !== 'active') {
@@ -298,7 +293,6 @@ export default function App() {
       audioStartedForTurnRef.current = false
       clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
-      revealMinimizedVoiceResponse()
       beginVoiceTurn({ messageId })
 
       void window.api
@@ -323,26 +317,10 @@ export default function App() {
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      revealMinimizedVoiceResponse,
       sessionMode,
       setUserMessageImagePath,
     ],
   )
-
-  const submitPendingVoiceTurn = useCallback(() => {
-    if (sessionMode !== 'active') {
-      pendingVoiceWavRef.current = null
-      return
-    }
-
-    const pendingWav = pendingVoiceWavRef.current
-    if (pendingWav === null) {
-      return
-    }
-
-    pendingVoiceWavRef.current = null
-    submitVoiceTurn(pendingWav)
-  }, [sessionMode, submitVoiceTurn])
 
   const {
     raiseThreshold,
@@ -360,8 +338,15 @@ export default function App() {
         return
       }
 
-      if (useSessionStore.getState().isSubmitting) {
-        pendingVoiceWavRef.current = wavBase64
+      const submitting = useSessionStore.getState().isSubmitting
+      const isAssistantResponding =
+        submitting ||
+        aiStreamingStartedRef.current ||
+        isAudioPlayingRef.current ||
+        audioStreamActiveRef.current ||
+        fallbackSpeechTimerRef.current !== null
+
+      if (isAssistantResponding) {
         return
       }
 
@@ -369,41 +354,28 @@ export default function App() {
     },
     onSpeechStart: () => {
       const submitting = useSessionStore.getState().isSubmitting
-      const isAssistantThinking = submitting && !aiStreamingStartedRef.current
-      if (isAssistantThinking) {
-        return
-      }
-
       const isAssistantSpeaking =
         isAudioPlayingRef.current ||
         audioStreamActiveRef.current ||
         fallbackSpeechTimerRef.current !== null
       const isAssistantStreaming = aiStreamingStartedRef.current && submitting
 
-      if (!isAssistantSpeaking && !isAssistantStreaming) {
+      if (submitting || isAssistantSpeaking || isAssistantStreaming) {
         return
-      }
-
-      clearFallbackSpeechTimer()
-      cancelSpeechSynthesis()
-      stopScheduledAudioSources()
-      ignoreIncomingSidecarAudioRef.current = true
-      aiStreamingStartedRef.current = false
-      audioStreamActiveRef.current = false
-      setAudioPlayingState(false)
-      lowerThreshold()
-
-      try {
-        window.api.sidecarInterrupt()
-      } catch (error) {
-        console.error('[App] Failed to send sidecar interrupt:', error)
       }
     },
   })
 
   lowerThresholdRef.current = lowerThreshold
 
-  const showVoiceWaveform = voiceEnabled && vadListeningEnabled
+  const isAssistantResponding =
+    isSubmitting ||
+    aiStreamingStartedRef.current ||
+    isAudioPlaying ||
+    audioStreamActiveRef.current ||
+    fallbackSpeechTimerRef.current !== null
+  const shouldShowVoiceWaveform =
+    voiceEnabled && vadListeningEnabled && (isUserSpeaking || isAudioPlaying)
   const waveformPresentation = resolveWaveformPresentation({
     assistantAudioLevel,
     assistantWaveformBars,
@@ -419,13 +391,21 @@ export default function App() {
       return
     }
 
-    const shouldBeMuted = !vadListeningEnabled
+    const shouldBeMuted = !vadListeningEnabled || isAssistantResponding
     if (isMuted === shouldBeMuted) {
       return
     }
 
     toggleMute()
-  }, [isListening, isMuted, sessionMode, toggleMute, vadListeningEnabled, voiceEnabled])
+  }, [
+    isAssistantResponding,
+    isListening,
+    isMuted,
+    sessionMode,
+    toggleMute,
+    vadListeningEnabled,
+    voiceEnabled,
+  ])
 
   const speakWithWebSpeech = useCallback(
     (text: string) => {
@@ -674,11 +654,6 @@ export default function App() {
       aiStreamingStartedRef.current = false
       finishAssistantResponse()
 
-      if (pendingVoiceWavRef.current !== null) {
-        submitPendingVoiceTurn()
-        return
-      }
-
       const latestAssistantText =
         getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
       speakWithWebSpeech(latestAssistantText)
@@ -691,7 +666,6 @@ export default function App() {
       cancelSpeechSynthesis()
       clearFallbackSpeechTimer()
       finishAudioPlayback()
-      pendingVoiceWavRef.current = null
       failAssistantResponse(data.message)
     })
 
@@ -724,7 +698,6 @@ export default function App() {
     speakWithWebSpeech,
     startAssistantWaveformLoop,
     stopScheduledAudioSources,
-    submitPendingVoiceTurn,
     syncOverlayStateFromMain,
   ])
 
@@ -758,7 +731,6 @@ export default function App() {
     await window.api.startSession({ sessionName })
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
-    pendingVoiceWavRef.current = null
     clearMinimizedVoiceCollapseTimer()
     clearFallbackSpeechTimer()
     cancelSpeechSynthesis()
@@ -784,16 +756,25 @@ export default function App() {
   async function handleRestoreOverlay(): Promise<void> {
     clearMinimizedVoiceCollapseTimer()
     setOverlayMode('expanded')
-    clearLatestResponse()
     await window.api.restoreOverlay()
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
-    clearLatestResponse()
     clearMinimizedVoiceCollapseTimer()
-    await window.api.minimizeOverlay()
+    const hasActiveResponse =
+      errorMessage !== null ||
+      (latestResponseText !== null && latestResponseText.trim().length > 0)
+    const nextVariant: MinimizedOverlayVariant = hasActiveResponse ? 'prompt-response' : 'compact'
+    setIsMinimizedPromptComposing(false)
     setOverlayMode('minimized')
-    setMinimizedVariant('compact')
+    setMinimizedVariant(nextVariant)
+
+    if (nextVariant === 'compact') {
+      await window.api.minimizeOverlay()
+      return
+    }
+
+    await window.api.setMinimizedOverlayVariant(nextVariant)
   }
 
   async function handleStopSession(): Promise<void> {
@@ -806,7 +787,6 @@ export default function App() {
     }
 
     clearMinimizedVoiceCollapseTimer()
-    pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearFallbackSpeechTimer()
@@ -861,7 +841,6 @@ export default function App() {
 
     const messageId = crypto.randomUUID()
 
-    pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearMinimizedVoiceCollapseTimer()
@@ -915,6 +894,20 @@ export default function App() {
     }
   }
 
+  async function handleAskAnother(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
+    aiStreamingStartedRef.current = false
+    audioStartedForTurnRef.current = false
+    clearFallbackSpeechTimer()
+    cancelSpeechSynthesis()
+    stopScheduledAudioSources()
+    stopAssistantWaveformLoop()
+    resetAssistantWaveform()
+    finishAudioPlayback()
+    clearLatestResponse()
+    await handleSetMinimizedVariant('prompt-input')
+  }
+
   if (endedSessionData !== null) {
     return (
       <SessionEndedView
@@ -937,7 +930,7 @@ export default function App() {
         latestResponseText={latestResponseText}
         minimizedVariant={minimizedVariant}
         onAskAnother={() => {
-          void handleSetMinimizedVariant('prompt-input')
+          void handleAskAnother()
         }}
         onOpen={() => {
           void handleRestoreOverlay()
@@ -952,9 +945,7 @@ export default function App() {
           void handleStopSession()
         }}
         onToggleVadListening={toggleVadListening}
-        showVoiceWaveform={showVoiceWaveform}
         vadListeningEnabled={vadListeningEnabled}
-        waveformBars={waveformPresentation.bars}
         waveformState={waveformPresentation.state}
       />
     )
@@ -981,10 +972,9 @@ export default function App() {
           void handleSubmitPrompt(nextText)
         }}
         onToggleVadListening={toggleVadListening}
-        showVoiceWaveform={showVoiceWaveform}
+        showVoiceWaveform={shouldShowVoiceWaveform}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
-        waveformBars={waveformPresentation.bars}
         waveformState={waveformPresentation.state}
       />
     )

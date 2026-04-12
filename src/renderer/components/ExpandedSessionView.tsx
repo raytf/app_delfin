@@ -3,10 +3,9 @@ import { Clock, Minimize2, Square } from 'lucide-react'
 import type { ChatMessage, SidecarStatus } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import { useSessionStore } from '../stores/sessionStore'
-import type { WaveformBars, WaveformVisualState } from '../utils/waveformState'
+import type { WaveformVisualState } from '../utils/waveformState'
 import SessionConversation from './SessionConversation'
 import SessionPromptComposer from './SessionPromptComposer'
-import VoiceWaveform from './VoiceWaveform'
 
 interface ExpandedSessionViewProps {
   captureSourceLabel: string | null
@@ -24,8 +23,22 @@ interface ExpandedSessionViewProps {
   showVoiceWaveform: boolean
   sidecarStatus: SidecarStatus
   vadListeningEnabled: boolean
-  waveformBars: WaveformBars
   waveformState: WaveformVisualState
+}
+
+type VoiceMode = 'idle' | 'user' | 'thinking' | 'assistant' | 'paused'
+
+function resolveVoiceMode(input: {
+  isSubmitting: boolean
+  isAudioPlaying: boolean
+  vadListeningEnabled: boolean
+  waveformState: WaveformVisualState
+}): VoiceMode {
+  if (input.isAudioPlaying || input.waveformState === 'assistant') return 'assistant'
+  if (input.isSubmitting) return 'thinking'
+  if (input.waveformState === 'user') return 'user'
+  if (!input.vadListeningEnabled) return 'paused'
+  return 'idle'
 }
 
 function formatElapsedTime(startTime: number | null): string {
@@ -67,41 +80,34 @@ function SessionTimer({ startTime }: { startTime: number | null }) {
 }
 
 export default function ExpandedSessionView({
-  captureSourceLabel,
   errorMessage,
   isAudioPlaying,
   isSubmitting,
-  isMicListening,
-  isMicMuted,
   messages,
   sessionName,
   onMinimize,
   onStop,
   onSubmitPrompt,
   onToggleVadListening,
-  showVoiceWaveform,
-  sidecarStatus,
   vadListeningEnabled,
-  waveformBars,
   waveformState,
 }: ExpandedSessionViewProps) {
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
+  const voiceMode = resolveVoiceMode({
+    isSubmitting,
+    isAudioPlaying,
+    vadListeningEnabled,
+    waveformState,
+  })
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
-      <header className="border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img alt="Delfin logo" className="h-14 w-14 object-contain" src={delfinLogo} />
-            <div>
-              <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--primary)]">Delfin</h1>
-              <p className="text-sm text-[var(--text-secondary)]">Your intelligent study companion.</p>
-            </div>
-          </div>
-
-          <div className="rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface-2)] px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            {sidecarStatus.connected ? 'Sidecar Connected' : 'Sidecar Disconnected'}
-          </div>
+      <header className="relative border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-4">
+        <div className="flex items-center justify-center gap-3">
+          <img alt="Delfin logo" className="h-10 w-10 object-contain" src={delfinLogo} />
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--primary)]">
+            Delfin
+          </h1>
         </div>
       </header>
 
@@ -119,73 +125,45 @@ export default function ExpandedSessionView({
 
           <div className="border-t border-[var(--border-soft)] bg-[var(--bg-surface)] p-4">
             <SessionPromptComposer
-              className="flex items-center gap-3"
+              className="flex items-center gap-2"
+              disabled={isAudioPlaying}
               isSubmitting={isSubmitting}
               onSubmitPrompt={onSubmitPrompt}
-              placeholder="Ask about what's on screen"
-              submitLabel="Ask"
+              placeholder={isAudioPlaying ? 'Delfin is speaking…' : 'Ask Delfin'}
+              submitLabel="Send"
             />
           </div>
         </main>
 
-        <aside className="flex w-[22rem] shrink-0 flex-col gap-4 bg-[var(--bg-app-soft)] p-6">
+        <aside className="flex w-[20rem] shrink-0 flex-col gap-5 bg-[var(--bg-app-soft)] p-6">
           <div>
-            <h2 className="font-display text-2xl font-semibold leading-tight text-[var(--text-primary)]">{sessionName}</h2>
-            <div className="mt-4 inline-flex rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+              Session
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-semibold leading-tight text-[var(--text-primary)]">
+              {sessionName}
+            </h2>
+            <div className="mt-3 inline-flex items-center rounded-full bg-[var(--bg-surface)] px-3 py-1.5 shadow-sm">
               <SessionTimer startTime={sessionStartTime} />
             </div>
           </div>
 
-          <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[var(--text-muted)]">Speech</p>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {isMicListening
-                ? isMicMuted
-                  ? 'Microphone is ready, but listening is currently paused.'
-                  : 'Microphone is active and listening for your voice.'
-                : 'Microphone is initialising.'}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-[var(--bg-surface-2)] px-3 py-1 text-[var(--text-secondary)]">
-                {vadListeningEnabled ? 'Speech On' : 'Speech Off'}
-              </span>
-              {isAudioPlaying ? (
-                <span className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-[var(--primary)]">Speaking</span>
-              ) : null}
-            </div>
-            {showVoiceWaveform ? (
-              <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)] px-3 py-2">
-                <VoiceWaveform
-                  bars={waveformBars}
-                  label={`Speech waveform in ${waveformState} mode`}
-                  state={waveformState}
-                />
-              </div>
-            ) : null}
-          </section>
-
-          <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[var(--text-muted)]">Current Capture</p>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {captureSourceLabel ?? 'No frame captured yet. Your next prompt will capture the foreground window.'}
-            </p>
-          </section>
+          <VoiceCard
+            onToggleVadListening={onToggleVadListening}
+            vadListeningEnabled={vadListeningEnabled}
+            voiceMode={voiceMode}
+          />
 
           {errorMessage !== null ? (
-            <section className="rounded-[1.75rem] border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-[var(--danger)]">Latest Error</p>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--danger)]">{errorMessage}</p>
+            <section className="rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--danger)]">
+                Error
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--danger)]">{errorMessage}</p>
             </section>
           ) : null}
 
-          <div className="mt-auto flex flex-col gap-3">
-            <button
-              className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-              onClick={onToggleVadListening}
-              type="button"
-            >
-              {vadListeningEnabled ? 'Toggle Speech Off' : 'Toggle Speech On'}
-            </button>
+          <div className="mt-auto flex flex-col gap-2.5">
             <button
               aria-label="Minimize to overlay"
               className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
@@ -207,6 +185,113 @@ export default function ExpandedSessionView({
           </div>
         </aside>
       </div>
+    </div>
+  )
+}
+
+interface VoiceCardProps {
+  onToggleVadListening: () => void
+  vadListeningEnabled: boolean
+  voiceMode: VoiceMode
+}
+
+function VoiceCard({ onToggleVadListening, vadListeningEnabled, voiceMode }: VoiceCardProps) {
+  const statusLabel = (() => {
+    switch (voiceMode) {
+      case 'assistant':
+        return 'Delfin is speaking'
+      case 'thinking':
+        return 'Delfin is thinking'
+      case 'user':
+        return 'Listening to you'
+      case 'paused':
+        return 'Speech is paused'
+      case 'idle':
+      default:
+        return 'Ready to listen'
+    }
+  })()
+
+  return (
+    <section className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <VoiceOrb mode={voiceMode} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+            Voice
+          </p>
+          <p className="truncate text-sm font-medium text-[var(--text-primary)]">{statusLabel}</p>
+        </div>
+      </div>
+
+      <button
+        aria-label={vadListeningEnabled ? 'Mute microphone' : 'Unmute microphone'}
+        aria-pressed={vadListeningEnabled}
+        className={`mt-4 flex w-full cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+          vadListeningEnabled
+            ? 'border-[var(--primary)]/30 bg-[var(--primary-soft)] text-[var(--primary)] hover:bg-[var(--primary-soft)]/70'
+            : 'border-[var(--border-soft)] bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+        }`}
+        onClick={onToggleVadListening}
+        type="button"
+      >
+        <span>{vadListeningEnabled ? 'Microphone on' : 'Microphone off'}</span>
+        <ToggleSwitch on={vadListeningEnabled} />
+      </button>
+    </section>
+  )
+}
+
+function ToggleSwitch({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
+        on ? 'bg-[var(--primary)]' : 'bg-[var(--border-strong)]'
+      }`}
+      aria-hidden="true"
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+          on ? 'translate-x-4' : 'translate-x-0.5'
+        }`}
+      />
+    </span>
+  )
+}
+
+function VoiceOrb({ mode, size = 'md' }: { mode: VoiceMode; size?: 'md' | 'lg' }) {
+  const dim = size === 'lg' ? 'h-10 w-10' : 'h-6 w-6'
+  const dotDim = size === 'lg' ? 'h-3 w-3' : 'h-2 w-2'
+
+  const palette = (() => {
+    switch (mode) {
+      case 'user':
+        return { core: 'bg-[var(--success)]', halo: 'bg-[var(--success)]/35', ring: 'bg-[var(--success)]' }
+      case 'assistant':
+        return { core: 'bg-[var(--accent)]', halo: 'bg-[var(--accent)]/35', ring: 'bg-[var(--accent)]' }
+      case 'paused':
+        return { core: 'bg-[var(--text-muted)]', halo: 'bg-transparent', ring: 'bg-[var(--text-muted)]' }
+      case 'thinking':
+      case 'idle':
+      default:
+        return { core: 'bg-[var(--primary)]', halo: 'bg-[var(--primary)]/20', ring: 'bg-[var(--primary)]' }
+    }
+  })()
+
+  const isActive = mode === 'user' || mode === 'assistant'
+  const isPulsing = mode === 'idle' || mode === 'thinking'
+
+  return (
+    <div className={`relative flex ${dim} shrink-0 items-center justify-center`} aria-label={`Voice ${mode}`}>
+      {isActive ? (
+        <>
+          <span className={`absolute inset-0 animate-ping rounded-full ${palette.halo}`} />
+          <span className={`absolute inset-[20%] rounded-full ${palette.ring} opacity-50`} />
+        </>
+      ) : null}
+      <span
+        className={`relative ${dotDim} rounded-full ${palette.core} ${isPulsing ? 'animate-pulse' : ''}`}
+      />
     </div>
   )
 }

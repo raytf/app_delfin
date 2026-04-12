@@ -1,8 +1,8 @@
-import { ChevronDown, Loader2, Maximize2, MessageCircle, Mic, MicOff, Square, Volume2 } from 'lucide-react'
+import { ChevronDown, Maximize2, MessageCircle, Mic, MicOff, Square } from 'lucide-react'
 import type { MinimizedOverlayVariant } from '../../shared/types'
-import type { WaveformBars, WaveformVisualState } from '../utils/waveformState'
+import type { WaveformVisualState } from '../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
-import VoiceWaveform from './VoiceWaveform'
+import ThinkingDots from './ThinkingDots'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null
@@ -18,10 +18,23 @@ interface MinimizedSessionBarProps {
   onSubmitPrompt: (text: string) => void
   onStop: () => void
   onToggleVadListening: () => void
-  showVoiceWaveform: boolean
   vadListeningEnabled: boolean
-  waveformBars: WaveformBars
   waveformState: WaveformVisualState
+}
+
+type VoiceMode = 'idle' | 'user' | 'thinking' | 'assistant' | 'paused'
+
+function resolveVoiceMode(input: {
+  isSubmitting: boolean
+  isAudioPlaying: boolean
+  vadListeningEnabled: boolean
+  waveformState: WaveformVisualState
+}): VoiceMode {
+  if (input.isAudioPlaying || input.waveformState === 'assistant') return 'assistant'
+  if (input.isSubmitting) return 'thinking'
+  if (input.waveformState === 'user') return 'user'
+  if (!input.vadListeningEnabled) return 'paused'
+  return 'idle'
 }
 
 export default function MinimizedSessionBar({
@@ -38,158 +51,118 @@ export default function MinimizedSessionBar({
   onSubmitPrompt,
   onStop,
   onToggleVadListening,
-  showVoiceWaveform,
   vadListeningEnabled,
-  waveformBars,
   waveformState,
 }: MinimizedSessionBarProps) {
   const isPromptOpen = minimizedVariant !== 'compact'
   const isResponseMode = minimizedVariant === 'prompt-response'
-  const statusLabel = getMinimizedStatusLabel({
+  const voiceMode = resolveVoiceMode({
+    isSubmitting,
     isAudioPlaying,
+    vadListeningEnabled,
+    waveformState,
+  })
+  const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
+  const isThinkingOnly = isSubmitting && !hasResponseText && errorMessage === null
+
+  if (isThinkingOnly) {
+    return (
+      <div className="drag-region flex h-screen items-center justify-center overflow-hidden">
+        <div className="flex h-full w-full items-center justify-center rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-surface)]/95 shadow-xl backdrop-blur">
+          <ThinkingDots />
+        </div>
+      </div>
+    )
+  }
+
+  const statusLabel = getStatusLabel({
     isMicListening,
     isMicMuted,
-    isPromptOpen,
-    isResponseMode,
-    isSubmitting,
+    voiceMode,
   })
 
   return (
-    <div className="drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
-      <div
-        className={`flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)]/95 shadow-xl ${isPromptOpen ? 'p-3' : 'px-3 py-3'}`}
-      >
+    <div className="drag-region flex h-screen items-center justify-center overflow-hidden text-[var(--text-primary)]">
+      <div className={`flex h-full w-full flex-col overflow-hidden rounded-3xl backdrop-blur ${!isPromptOpen ? 'justify-center mt-2' : ''}`}>
         {isPromptOpen ? (
-          <>
-            <VoiceStatusHeader
-              compact={false}
-              showVoiceWaveform={showVoiceWaveform}
-              statusLabel={statusLabel}
-              vadListeningEnabled={vadListeningEnabled}
-              waveformBars={waveformBars}
-              waveformState={waveformState}
-              onToggleVadListening={onToggleVadListening}
+          <div className="no-drag flex min-h-0 flex-1 flex-col px-2.5 pb-4 pt-2.5">
+            <MinimizedPromptPanel
+              errorMessage={errorMessage}
+              isAudioPlaying={isAudioPlaying}
+              isSubmitting={isSubmitting}
+              isShowingResponse={isResponseMode}
+              latestResponseText={latestResponseText}
+              onSubmitPrompt={onSubmitPrompt}
             />
+          </div>
+        ) : null}
 
-            <div className="mt-3 min-h-0 flex-1">
-              <MinimizedPromptPanel
-                errorMessage={errorMessage}
-                isSubmitting={isSubmitting}
-                isShowingResponse={isResponseMode}
-                latestResponseText={latestResponseText}
-                onSubmitPrompt={onSubmitPrompt}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <VoiceStatusHeader
-              compact
-              showVoiceWaveform={showVoiceWaveform}
-              statusLabel={statusLabel}
-              vadListeningEnabled={vadListeningEnabled}
-              waveformBars={waveformBars}
-              waveformState={waveformState}
-              onToggleVadListening={onToggleVadListening}
-            />
-          </>
-        )}
-
-        <ActionRow
+        <CommandRow
           isPromptOpen={isPromptOpen}
           isResponseMode={isResponseMode}
-          minimizedVariant={minimizedVariant}
           onAskAnother={onAskAnother}
           onOpen={onOpen}
           onSetPromptOpen={onSetPromptOpen}
           onStop={onStop}
+          onToggleVadListening={onToggleVadListening}
+          statusLabel={statusLabel}
+          vadListeningEnabled={vadListeningEnabled}
+          voiceMode={voiceMode}
         />
       </div>
     </div>
   )
 }
 
-interface VoiceStatusHeaderProps {
-  compact?: boolean
-  onToggleVadListening: () => void
-  showVoiceWaveform: boolean
-  statusLabel: string
-  vadListeningEnabled: boolean
-  waveformBars: WaveformBars
-  waveformState: WaveformVisualState
-}
-
-function VoiceStatusHeader({
-  compact = false,
-  onToggleVadListening,
-  showVoiceWaveform,
-  statusLabel,
-  vadListeningEnabled,
-  waveformBars,
-  waveformState,
-}: VoiceStatusHeaderProps) {
-  return (
-    <div className={`no-drag rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)]/80 shadow-sm ${compact ? 'px-3 py-2' : 'px-3 py-2.5'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-[10px] text-[var(--text-muted)]">
-          <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${getCompactStatusClasses(waveformState)}`}>
-            {waveformState === 'processing' ? <Loader2 className="animate-spin" size={12} /> : waveformState === 'assistant' ? <Volume2 size={12} /> : vadListeningEnabled ? <Mic size={12} /> : <MicOff size={12} />}
-            <span className="truncate">{statusLabel}</span>
-          </span>
-          <span className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            {compact ? 'voice' : 'live voice'}
-          </span>
-        </div>
-
-        <button
-          aria-label={vadListeningEnabled ? 'Pause speech listening' : 'Resume speech listening'}
-          className="no-drag flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-          onClick={onToggleVadListening}
-          type="button"
-        >
-          {vadListeningEnabled ? <Mic size={16} /> : <MicOff size={16} />}
-        </button>
-      </div>
-
-      {showVoiceWaveform ? (
-        <div className={compact ? 'mt-2' : 'mt-2.5'}>
-          <VoiceWaveform
-            bars={waveformBars}
-            compact={compact}
-            label={`${compact ? 'Compact' : 'Expanded'} speech waveform in ${waveformState} mode`}
-            state={waveformState}
-          />
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-interface ActionRowProps {
+interface CommandRowProps {
   isPromptOpen: boolean
   isResponseMode: boolean
-  minimizedVariant: MinimizedOverlayVariant
   onAskAnother: () => void
   onOpen: () => void
   onSetPromptOpen: (isOpen: boolean) => void
   onStop: () => void
+  onToggleVadListening: () => void
+  statusLabel: string
+  vadListeningEnabled: boolean
+  voiceMode: VoiceMode
 }
 
-function ActionRow({
+function CommandRow({
   isPromptOpen,
   isResponseMode,
-  minimizedVariant,
   onAskAnother,
   onOpen,
   onSetPromptOpen,
   onStop,
-}: ActionRowProps) {
+  onToggleVadListening,
+  statusLabel,
+  vadListeningEnabled,
+  voiceMode,
+}: CommandRowProps) {
   return (
-    <div className="mt-3 flex w-full items-center gap-2">
+    <div className="flex w-full shrink-0 items-center justify-center gap-1.5 px-2.5 pb-2.5">
+      <div className="flex h-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface-2)]/70 px-3">
+        <VoiceOrb mode={voiceMode} />
+      </div>
+
+      <button
+        aria-label={vadListeningEnabled ? 'Pause speech listening' : 'Resume speech listening'}
+        aria-pressed={vadListeningEnabled}
+        className={`no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border transition ${
+          vadListeningEnabled
+            ? 'border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+            : 'border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+        }`}
+        onClick={onToggleVadListening}
+        type="button"
+      >
+        {vadListeningEnabled ? <Mic size={14} /> : <MicOff size={14} />}
+      </button>
+
       {isResponseMode ? (
         <button
           aria-label="Ask another question"
-          className="no-drag min-w-0 flex-1 cursor-pointer rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          className="no-drag flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
           onClick={onAskAnother}
           type="button"
         >
@@ -198,89 +171,92 @@ function ActionRow({
       ) : !isPromptOpen ? (
         <button
           aria-label="Ask Delfin"
-          className="no-drag flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--primary-hover)]"
+          className="no-drag flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--primary)] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[var(--primary-hover)]"
           onClick={() => onSetPromptOpen(true)}
           type="button"
         >
-          <MessageCircle size={16} />
+          <MessageCircle size={13} />
           <span>Ask</span>
         </button>
       ) : null}
 
-      {isPromptOpen ? (
+      {isPromptOpen && !isResponseMode ? (
         <button
           aria-label="Collapse"
-          className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          className="no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
           onClick={() => onSetPromptOpen(false)}
           type="button"
         >
-          <ChevronDown size={18} />
-        </button>
-      ) : null}
-
-      {minimizedVariant !== 'prompt-response' || isPromptOpen ? (
-        <button
-          aria-label="Expand session"
-          className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-          onClick={onOpen}
-          type="button"
-        >
-          <Maximize2 size={18} />
+          <ChevronDown size={14} />
         </button>
       ) : null}
 
       <button
+        aria-label="Expand session"
+        className="no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+        onClick={onOpen}
+        type="button"
+      >
+        <Maximize2 size={14} />
+      </button>
+
+      <button
         aria-label="End session"
-        className="no-drag flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[var(--danger)] text-white transition hover:bg-[var(--danger)]/80"
+        className="no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--danger)] text-white transition hover:bg-[var(--danger)]/85"
         onClick={onStop}
         type="button"
       >
-        <Square size={14} fill="currentColor" />
+        <Square size={11} fill="currentColor" />
       </button>
     </div>
   )
 }
 
-function getMinimizedStatusLabel(input: {
-  isAudioPlaying: boolean
-  isMicListening: boolean
-  isMicMuted: boolean
-  isPromptOpen: boolean
-  isResponseMode: boolean
-  isSubmitting: boolean
-}): string {
-  if (!input.isMicListening) {
-    return 'Starting'
-  }
+function VoiceOrb({ mode }: { mode: VoiceMode }) {
+  const palette = (() => {
+    switch (mode) {
+      case 'user':
+        return { core: 'bg-[var(--success)]', halo: 'bg-[var(--success)]/35' }
+      case 'assistant':
+        return { core: 'bg-[var(--accent)]', halo: 'bg-[var(--accent)]/35' }
+      case 'paused':
+        return { core: 'bg-[var(--text-muted)]', halo: 'bg-transparent' }
+      case 'thinking':
+      case 'idle':
+      default:
+        return { core: 'bg-[var(--primary)]', halo: 'bg-[var(--primary)]/20' }
+    }
+  })()
 
-  if (input.isMicMuted) {
-    return 'Speech paused'
-  }
+  const isActive = mode === 'user' || mode === 'assistant'
+  const isPulsing = mode === 'idle' || mode === 'thinking'
 
-  if (input.isSubmitting) {
-    return 'Thinking'
-  }
-
-  if (input.isAudioPlaying) {
-    return 'AI speaking'
-  }
-
-  if (input.isPromptOpen && input.isResponseMode) {
-    return 'Ready'
-  }
-
-  return 'Listening'
+  return (
+    <span className="relative flex h-3 w-3 shrink-0 items-center justify-center" aria-hidden="true">
+      {isActive ? <span className={`absolute inset-0 animate-ping rounded-full ${palette.halo}`} /> : null}
+      <span className={`relative h-2 w-2 rounded-full ${palette.core} ${isPulsing ? 'animate-pulse' : ''}`} />
+    </span>
+  )
 }
 
-function getCompactStatusClasses(state: WaveformVisualState): string {
-  switch (state) {
-    case 'user':
-      return 'bg-[var(--success-soft)] text-[var(--success)]'
+function getStatusLabel(input: {
+  isMicListening: boolean
+  isMicMuted: boolean
+  voiceMode: VoiceMode
+}): string {
+  if (!input.isMicListening) return 'Starting'
+
+  switch (input.voiceMode) {
     case 'assistant':
-      return 'bg-[var(--primary-soft)] text-[var(--primary)]'
-    case 'processing':
-      return 'bg-[var(--warning-soft)] text-[var(--warning)]'
+      return 'Speaking'
+    case 'thinking':
+      return 'Thinking'
+    case 'user':
+      return 'Listening'
+    case 'paused':
+      return 'Paused'
     case 'idle':
-      return 'bg-[var(--bg-surface-2)] text-[var(--text-secondary)]'
+    default:
+      return input.isMicMuted ? 'Standby' : 'Ready'
   }
 }
