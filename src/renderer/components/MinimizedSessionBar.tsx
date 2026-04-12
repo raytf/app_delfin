@@ -57,7 +57,7 @@ export default function MinimizedSessionBar({
   return (
     <div className="drag-region flex h-screen overflow-hidden items-center justify-center text-[var(--text-primary)]">
       <div
-        className={`flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)]/95 shadow-xl ${isPromptOpen ? 'p-3' : 'px-3 py-3'}`}
+        className={`flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)]/95 shadow-xl ${isPromptOpen ? 'p-3' : 'px-3 py-3'}`}
       >
         {isPromptOpen ? (
           <>
@@ -71,7 +71,7 @@ export default function MinimizedSessionBar({
               onToggleVadListening={onToggleVadListening}
             />
 
-            <div className="mt-3 min-h-0 flex-1">
+            <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden">
               <MinimizedPromptPanel
                 errorMessage={errorMessage}
                 isSubmitting={isSubmitting}
@@ -129,7 +129,7 @@ function VoiceStatusHeader({
   waveformState,
 }: VoiceStatusHeaderProps) {
   return (
-    <div className={`no-drag rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)]/80 shadow-sm ${compact ? 'px-3 py-2' : 'px-3 py-2.5'}`}>
+    <div className={`no-drag shrink-0 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface-2)]/80 shadow-sm ${compact ? 'px-3 py-2' : 'px-3 py-2.5'}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-[10px] text-[var(--text-muted)]">
           <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${getCompactStatusClasses(waveformState)}`}>
@@ -185,7 +185,7 @@ function ActionRow({
   onStop,
 }: ActionRowProps) {
   return (
-    <div className="mt-3 flex w-full items-center gap-2">
+    <div className="mt-3 flex w-full shrink-0 items-center gap-2">
       {isResponseMode ? (
         <button
           aria-label="Ask another question"

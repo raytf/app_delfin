@@ -47,7 +47,7 @@ export default function MinimizedPromptPanel({
 
   if (isLoadingOnly) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)] [animation-delay:0ms]" />
@@ -61,7 +61,7 @@ export default function MinimizedPromptPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <StreamingResponseBody
         errorMessage={errorMessage}
         hasResponseText={hasResponseText}
@@ -92,24 +92,25 @@ function StreamingResponseBody({
       return
     }
 
-    scrollContainer.scrollTo({
-      top: scrollContainer.scrollHeight,
-      behavior: 'smooth',
+    const animationFrameId = window.requestAnimationFrame(() => {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight
     })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId)
+    }
   }, [latestResponseText, scrollContainer])
 
   return (
-    <div className="min-h-[10rem] flex-1 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-sm">
       {errorMessage !== null ? (
         <p className="text-sm leading-6 text-[var(--danger)]">{errorMessage}</p>
       ) : latestResponseText !== null && latestResponseText.length > 0 ? (
-        <div className="no-drag flex h-full min-h-0 flex-col">
-          <div
-            className="min-h-0 flex-1 overflow-y-auto text-sm leading-6 text-[var(--text-primary)]"
-            ref={setScrollContainer}
-          >
-            <p className="whitespace-pre-wrap">{latestResponseText}</p>
-          </div>
+        <div
+          className="no-drag min-h-0 flex-1 overflow-y-auto text-sm leading-6 text-[var(--text-primary)]"
+          ref={setScrollContainer}
+        >
+          <p className="whitespace-pre-wrap break-words">{latestResponseText}</p>
         </div>
       ) : (
         <p className="text-sm leading-6 text-[var(--text-muted)]">

@@ -60,7 +60,7 @@ export default function SessionConversation({
 
     container.scrollTo({
       top: container.scrollHeight,
-      behavior: 'smooth',
+      behavior: 'instant',
     })
   }, [messages, isSubmitting])
 
@@ -111,8 +111,8 @@ export default function SessionConversation({
                 </span>
                 <div
                   className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${isUser
-                      ? 'bg-[var(--primary)] text-white'
-                      : 'border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
+                    ? 'bg-[var(--primary)] text-white'
+                    : 'border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
                     }`}
                 >
                   {showSpeakingBadge ? (

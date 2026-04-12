@@ -59,11 +59,14 @@
 html,
 body,
 #root {
+  height: 100%;
   min-height: 100%;
   font-family: var(--font-body);
 }
 
 body {
+  margin: 0;
+  overflow: hidden;
   background: var(--bg-app);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;

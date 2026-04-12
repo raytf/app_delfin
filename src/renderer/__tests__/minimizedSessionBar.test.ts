@@ -58,5 +58,7 @@ describe('MinimizedSessionBar', () => {
 
     expect(markup).toContain('Expanded speech waveform in idle mode')
     expect(markup).toContain('Ask another')
+    expect(markup).toContain('overflow-y-auto')
+    expect(markup).toContain('shrink-0')
   })
 })
