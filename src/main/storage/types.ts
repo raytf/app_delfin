@@ -8,6 +8,7 @@ export interface SessionRecord {
   endedAt: number | null
   status: PersistedSessionStatus
   presetId: PresetId | null
+  sessionName: string
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number
@@ -32,6 +33,7 @@ export interface PersistCaptureImageInput {
 export interface SessionStorage {
   createSession(record: SessionRecord): Promise<void>
   updateSession(sessionId: string, updates: Partial<SessionRecord>): Promise<void>
+  deleteSession(sessionId: string): Promise<void>
   appendConversationMessage(message: ConversationMessageRecord): Promise<void>
   replaceConversationMessage(messageId: string, message: ConversationMessageRecord): Promise<void>
   getSession(sessionId: string): Promise<SessionRecord | null>

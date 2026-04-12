@@ -1,7 +1,9 @@
-import { Clock3, MessageSquare } from 'lucide-react'
+import { Clock3, MessageSquare, Trash2 } from 'lucide-react'
 import type { SessionListItem } from '../../shared/types'
 
 interface SessionHistoryCardProps {
+  onClick?: () => void
+  onDelete?: () => void
   session: SessionListItem
   variant?: 'compact' | 'detailed'
 }
@@ -55,6 +57,8 @@ function formatStatus(status: SessionListItem['status']): string {
 }
 
 export default function SessionHistoryCard({
+  onClick,
+  onDelete,
   session,
   variant = 'compact',
 }: SessionHistoryCardProps) {
@@ -62,69 +66,88 @@ export default function SessionHistoryCard({
 
   return (
     <article
-      className={`rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-[0_18px_40px_rgba(20,129,186,0.08)] ${
+      className={`group relative rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-[0_18px_40px_rgba(20,129,186,0.08)] ${
         isDetailed ? 'p-6' : 'p-5'
-      }`}
+      } ${onClick !== undefined ? 'cursor-pointer hover:border-[var(--primary)]' : ''}`}
+      onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-display text-base font-semibold text-[var(--text-primary)]">
-            {session.sourceLabel ?? 'Untitled Session'}
-          </h3>
-          {isDetailed ? (
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              {formatStatus(session.status)}
-            </p>
-          ) : null}
-        </div>
+      {/* Delete button - appears on hover in top right */}
+      {onDelete !== undefined ? (
+        <button
+          aria-label={`Delete ${session.sessionName || session.sourceLabel || 'session'}`}
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-[var(--bg-surface)] text-[var(--text-muted)] opacity-0 shadow-sm transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+          type="button"
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
 
+      <div>
+        <h3
+          className={`font-display text-base font-semibold text-[var(--text-primary)] ${
+            isDetailed ? '' : 'line-clamp-2'
+          }`}
+        >
+          {session.sessionName || session.sourceLabel || 'Untitled Session'}
+        </h3>
         {isDetailed ? (
-          <div className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-xs font-medium text-[var(--primary)]">
-            {formatRelativeTime(session.lastUpdatedAt)}
-          </div>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            {formatStatus(session.status)}
+          </p>
         ) : null}
       </div>
 
       {isDetailed ? (
-        <div className="mt-5 grid gap-3 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
-          <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
-            <div className="flex items-center gap-2 text-[var(--text-muted)]">
-              <MessageSquare size={14} />
-              <span>Messages</span>
+        <>
+          <div className="mt-1">
+            <div className="inline-block rounded-full bg-[var(--primary-soft)] px-3 py-1 text-xs font-medium text-[var(--primary)]">
+              {formatRelativeTime(session.lastUpdatedAt)}
             </div>
-            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
-              {session.messageCount}
-            </p>
           </div>
-          <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
-            <div className="flex items-center gap-2 text-[var(--text-muted)]">
-              <Clock3 size={14} />
-              <span>Duration</span>
+          <div className="mt-5 grid gap-3 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
+            <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
+              <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                <MessageSquare size={14} />
+                <span>Messages</span>
+              </div>
+              <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+                {session.messageCount}
+              </p>
             </div>
-            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
-              {formatDuration(session.startedAt, session.endedAt)}
-            </p>
+            <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
+              <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                <Clock3 size={14} />
+                <span>Duration</span>
+              </div>
+              <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+                {formatDuration(session.startedAt, session.endedAt)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
+              <p className="text-[var(--text-muted)]">Started</p>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {formatDate(session.startedAt)}
+              </p>
+            </div>
           </div>
-          <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
-            <p className="text-[var(--text-muted)]">Started</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-              {formatDate(session.startedAt)}
-            </p>
-          </div>
-        </div>
+        </>
       ) : (
         <>
-          <div className="mt-4 flex items-center gap-4 text-sm text-[var(--text-muted)]">
-            <div className="flex items-center gap-1.5">
-              <MessageSquare size={14} />
-              <span>{session.messageCount}</span>
+          <div className="mt-4 flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+              <MessageSquare size={14} className="text-[var(--primary)]" />
+              <span className="font-medium">{session.messageCount}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock3 size={14} />
-              <span>{formatDuration(session.startedAt, session.endedAt)}</span>
+            <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+              <Clock3 size={14} className="text-[var(--primary)]" />
+              <span className="font-medium">{formatDuration(session.startedAt, session.endedAt)}</span>
             </div>
           </div>
-          <p className="mt-3 text-xs text-[var(--text-muted)]">
+          <p className="mt-3 text-xs text-[var(--text-secondary)]">
             {formatRelativeTime(session.lastUpdatedAt)}
           </p>
         </>

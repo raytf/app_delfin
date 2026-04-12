@@ -1,11 +1,64 @@
+import { useEffect, useState } from 'react'
 import type { SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionHistoryCard from './SessionHistoryCard'
 
 interface HomeScreenProps {
-  onStartSession: () => void
+  onDeleteSession: (sessionId: string) => void
+  onStartSession: (sessionName: string) => void
+  onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
   sessions: SessionListItem[]
+  userName: string | null
+}
+
+// Typing effect component
+function TypewriterText({
+  text,
+  className,
+  delay = 0,
+  onComplete,
+}: {
+  text: string
+  className?: string
+  delay?: number
+  onComplete?: () => void
+}) {
+  const [displayedText, setDisplayedText] = useState('')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [started, setStarted] = useState(delay === 0)
+
+  useEffect(() => {
+    if (delay > 0) {
+      const timeout = setTimeout(() => setStarted(true), delay)
+      return () => clearTimeout(timeout)
+    }
+  }, [delay])
+
+  useEffect(() => {
+    if (!started) return
+
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText((prev) => prev + text[currentIndex])
+        setCurrentIndex((prev) => prev + 1)
+      }, 40)
+      return () => clearTimeout(timeout)
+    } else if (currentIndex === text.length && onComplete) {
+      onComplete()
+    }
+  }, [currentIndex, text, started, onComplete])
+
+  if (!started) return null
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {currentIndex < text.length && (
+        <span className="animate-pulse text-[var(--primary)]">|</span>
+      )}
+    </span>
+  )
 }
 
 // Dolphin wave SVG for decorative element
@@ -34,8 +87,97 @@ function WaveDecoration() {
   )
 }
 
-export default function HomeScreen({ onStartSession, onViewAllSessions, sessions }: HomeScreenProps) {
+interface StartSessionModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onStart: (sessionName: string) => void
+}
+
+function StartSessionModal({ isOpen, onClose, onStart }: StartSessionModalProps) {
+  const [sessionName, setSessionName] = useState('')
+
+  if (!isOpen) return null
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    onStart(sessionName.trim() || 'Study Session')
+    setSessionName('')
+  }
+
+  function handleClose() {
+    setSessionName('')
+    onClose()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      handleClose()
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6 backdrop-blur-sm"
+      onClick={handleClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-[var(--bg-surface)] p-8 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-center font-display text-xl font-semibold text-[var(--text-primary)]">
+          Name your session
+        </h2>
+        <p className="mt-2 text-center text-sm text-[var(--text-muted)]">
+          Give it a name so you can find it later
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-5">
+          <input
+            autoFocus
+            className="h-11 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+            onChange={(e) => setSessionName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What are you studying today?"
+            type="text"
+            value={sessionName}
+          />
+
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <button
+              className="cursor-pointer rounded-xl px-4 py-2.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-secondary)]"
+              onClick={handleClose}
+              type="button"
+            >
+              Maybe later
+            </button>
+            <button
+              className="cursor-pointer rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+              type="submit"
+            >
+              Lock In
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default function HomeScreen({
+  onDeleteSession,
+  onStartSession,
+  onSelectSession,
+  onViewAllSessions,
+  sessions,
+  userName,
+}: HomeScreenProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const recentSessions = sessions.slice(0, 6)
+
+  function handleStartSession(sessionName: string) {
+    setIsModalOpen(false)
+    onStartSession(sessionName)
+  }
 
   return (
     <div className="ocean-gradient relative min-h-screen text-[var(--text-primary)]">
@@ -44,30 +186,41 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-8 py-12">
         {/* Hero Section - Centered */}
         <main className="flex flex-1 flex-col items-center justify-center pb-8 pt-4 text-center">
-          <div className="flex items-center gap-2 sm:gap-2">
+          <div className="flex items-center gap-2">
             <img
               alt="Delfin logo"
-              className="h-28 w-28 object-contain sm:h-32 sm:w-32 mb-1"
+              className="h-16 w-16 object-contain sm:h-20 sm:w-20"
               src={delfinLogo}
             />
-            <h1 className="font-display text-8xl font-bold tracking-tight text-[var(--primary)]">
+            <h1 className="font-display text-5xl font-bold tracking-tight text-[var(--primary)] sm:text-6xl">
               Delfin
             </h1>
           </div>
 
-          {/* Tagline */}
-          <p className="mt-5 max-w-xl text-xl leading-relaxed text-[var(--text-secondary)]">
-            Your intelligent study companion that sees what you see.
-            <br />
-            <span className="text-[var(--text-muted)]">
-              Ask questions, get explanations, and learn faster together.
-            </span>
-          </p>
+          {/* Tagline with typing effect */}
+          <div className="mt-3 max-w-xl text-xl leading-relaxed">
+            <p className="text-[var(--text-secondary)]">
+              <TypewriterText text="Your intelligent study companion that sees what you see." />
+            </p>
+            <p className="mt-0 text-[var(--text-muted)]">
+              <TypewriterText
+                text="Ask questions, get explanations, and learn faster together."
+                delay={2400}
+              />
+            </p>
+          </div>
+
+          {/* Welcome message */}
+          {userName !== null && (
+            <p className="mt-6 text-2xl text-[var(--text-secondary)]">
+              Welcome back, <span className="font-semibold text-[var(--primary)]">{userName}</span>
+            </p>
+          )}
 
           {/* Start Session Button */}
           <button
             className="btn-ocean mt-8 cursor-pointer rounded-2xl px-8 py-4 text-base font-semibold text-white shadow-lg"
-            onClick={onStartSession}
+            onClick={() => setIsModalOpen(true)}
             type="button"
           >
             Start Studying
@@ -94,7 +247,16 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           {recentSessions.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {recentSessions.map((session) => (
-                <SessionHistoryCard key={session.id} session={session} />
+                <SessionHistoryCard
+                  key={session.id}
+                  onDelete={() => {
+                    onDeleteSession(session.id)
+                  }}
+                  onClick={() => {
+                    onSelectSession(session.id)
+                  }}
+                  session={session}
+                />
               ))}
             </div>
           ) : (
@@ -124,6 +286,12 @@ export default function HomeScreen({ onStartSession, onViewAllSessions, sessions
           )}
         </section>
       </div>
+
+      <StartSessionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onStart={handleStartSession}
+      />
     </div>
   )
 }

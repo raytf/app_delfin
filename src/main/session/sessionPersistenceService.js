@@ -1,0 +1,176 @@
+export class SessionPersistenceService {
+    storage;
+    activeSessionId = null;
+    activeAssistantDraft = null;
+    messageCount = 0;
+    pendingFinalStatus = 'completed';
+    constructor(storage) {
+        this.storage = storage;
+    }
+    async startSession(sessionName) {
+        const now = Date.now();
+        const sessionId = crypto.randomUUID();
+        const sessionRecord = {
+            id: sessionId,
+            startedAt: now,
+            endedAt: null,
+            status: 'active',
+            presetId: null,
+            sessionName,
+            sourceLabel: null,
+            messageCount: 0,
+            lastUpdatedAt: now,
+        };
+        await this.storage.createSession(sessionRecord);
+        this.activeSessionId = sessionId;
+        this.activeAssistantDraft = null;
+        this.messageCount = 0;
+        this.pendingFinalStatus = 'completed';
+        return sessionId;
+    }
+    async recordUserPrompt(input) {
+        const sessionId = this.requireActiveSessionId();
+        const timestamp = Date.now();
+        const imagePath = await this.storage.persistCaptureImage({
+            imageBase64: input.imageBase64,
+            messageId: input.messageId,
+            sessionId,
+        });
+        const userMessage = {
+            id: input.messageId,
+            sessionId,
+            role: 'user',
+            content: input.text,
+            timestamp,
+            imagePath,
+        };
+        await this.storage.appendConversationMessage(userMessage);
+        this.messageCount += 1;
+        const assistantDraft = {
+            id: crypto.randomUUID(),
+            sessionId,
+            content: '',
+            timestamp,
+        };
+        await this.storage.appendConversationMessage({
+            id: assistantDraft.id,
+            sessionId,
+            role: 'assistant',
+            content: '',
+            timestamp,
+        });
+        this.messageCount += 1;
+        this.activeAssistantDraft = assistantDraft;
+        this.pendingFinalStatus = 'completed';
+        await this.storage.updateSession(sessionId, {
+            presetId: input.presetId,
+            sourceLabel: input.sourceLabel,
+            messageCount: this.messageCount,
+            lastUpdatedAt: timestamp,
+        });
+        return imagePath;
+    }
+    async appendAssistantToken(text) {
+        if (text.length === 0 || this.activeAssistantDraft === null) {
+            return;
+        }
+        this.activeAssistantDraft = {
+            ...this.activeAssistantDraft,
+            content: this.activeAssistantDraft.content + text,
+        };
+        await this.persistAssistantDraft(Date.now());
+    }
+    async failAssistantResponse(message) {
+        if (this.activeAssistantDraft === null) {
+            return;
+        }
+        const timestamp = Date.now();
+        this.pendingFinalStatus = 'failed';
+        this.activeAssistantDraft = {
+            ...this.activeAssistantDraft,
+            content: message,
+            errorMessage: message,
+        };
+        await this.persistAssistantDraft(timestamp);
+    }
+    async finishAssistantResponse() {
+        if (this.activeAssistantDraft === null || this.activeSessionId === null) {
+            return;
+        }
+        await this.storage.updateSession(this.activeSessionId, {
+            messageCount: this.messageCount,
+            lastUpdatedAt: Date.now(),
+        });
+        this.activeAssistantDraft = null;
+    }
+    async stopSession(status = 'completed') {
+        if (this.activeSessionId === null) {
+            return;
+        }
+        const now = Date.now();
+        const finalStatus = this.pendingFinalStatus === 'failed' ? 'failed' : status;
+        await this.storage.updateSession(this.activeSessionId, {
+            endedAt: now,
+            status: finalStatus,
+            messageCount: this.messageCount,
+            lastUpdatedAt: now,
+        });
+        this.activeSessionId = null;
+        this.activeAssistantDraft = null;
+        this.messageCount = 0;
+        this.pendingFinalStatus = 'completed';
+    }
+    async listSessions() {
+        return this.storage.listSessions();
+    }
+    async getSessionDetail(sessionId) {
+        const session = await this.storage.getSession(sessionId);
+        if (session === null) {
+            throw new Error(`Session not found: ${sessionId}`);
+        }
+        const conversation = await this.storage.getConversation(sessionId);
+        return {
+            session,
+            messages: conversation.map((message) => ({
+                id: message.id,
+                role: message.role,
+                content: message.content,
+                timestamp: message.timestamp,
+                imagePath: message.imagePath,
+            })),
+        };
+    }
+    async getCaptureImageDataUrl(relativePath) {
+        return this.storage.getCaptureImageDataUrl(relativePath);
+    }
+    async deleteSession(sessionId) {
+        if (sessionId === this.activeSessionId) {
+            throw new Error('Cannot delete the active session.');
+        }
+        await this.storage.deleteSession(sessionId);
+    }
+    async persistAssistantDraft(timestamp) {
+        const draft = this.activeAssistantDraft;
+        if (draft === null) {
+            return;
+        }
+        await this.storage.replaceConversationMessage(draft.id, {
+            id: draft.id,
+            sessionId: draft.sessionId,
+            role: 'assistant',
+            content: draft.content,
+            timestamp: draft.timestamp,
+            errorMessage: draft.errorMessage,
+        });
+        await this.storage.updateSession(draft.sessionId, {
+            messageCount: this.messageCount,
+            lastUpdatedAt: timestamp,
+        });
+    }
+    requireActiveSessionId() {
+        if (this.activeSessionId === null) {
+            throw new Error('Cannot persist prompt without an active session.');
+        }
+        return this.activeSessionId;
+    }
+}

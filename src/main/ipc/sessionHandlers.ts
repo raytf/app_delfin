@@ -5,20 +5,31 @@ import { sessionPromptRequestSchema } from '../../shared/schemas'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
+  type SessionDetailRequest,
+  type SessionDeleteRequest,
   type SessionMessageImageRequest,
   type SessionPromptResponse,
+  type SessionStartRequest,
+  type SessionStopRequest,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async () => {
-    await options.sessionPersistence.startSession()
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async (_event, request: SessionStartRequest) => {
+    const sessionName = request.sessionName.trim()
+
+    if (sessionName.length === 0) {
+      throw new Error('Session name cannot be empty.')
+    }
+
+    await options.sessionPersistence.startSession(sessionName)
     options.setSessionMode('active')
     options.setMinimizedVariant('compact')
     await options.switchOverlayMode('minimized')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async (_event, request: SessionStopRequest) => {
+    options.setEndedSessionData(request.endedSessionData)
     await options.sessionPersistence.stopSession('completed')
     options.setSessionMode('home')
     options.setMinimizedVariant('compact')
@@ -74,6 +85,14 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
   })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST, async () => options.sessionPersistence.listSessions())
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_DETAIL, async (_event, request: SessionDetailRequest) =>
+    options.sessionPersistence.getSessionDetail(request.sessionId),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_DELETE, async (_event, request: SessionDeleteRequest) =>
+    options.sessionPersistence.deleteSession(request.sessionId),
+  )
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>
     options.sessionPersistence.getCaptureImageDataUrl(request.imagePath),
