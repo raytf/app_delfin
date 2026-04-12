@@ -1,4 +1,15 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
+
+// ---------------------------------------------------------------------------
+// SharedArrayBuffer — must be re-enabled before app.whenReady().
+// Chromium disabled SAB by default (Spectre mitigation) and requires
+// cross-origin isolation (COOP + COEP headers) to re-enable it.
+// In Electron the header-based approach is unreliable across versions, so we
+// also force-enable it via the Chromium feature flag as a belt-and-suspenders
+// approach. The Vite dev server + webRequest handler still set the headers so
+// window.crossOriginIsolated is true (required by some browser APIs).
+// ---------------------------------------------------------------------------
+app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer");
 import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
@@ -88,7 +99,53 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 }
 
 app.whenReady().then(() => {
-  console.log("Screen Copilot started");
+  console.log("Delfin started");
+
+  // ------------------------------------------------------------------
+  // COOP/COEP headers — required for SharedArrayBuffer used by
+  // @ricky0123/vad-web (Silero VAD runs in a SharedArrayBuffer-backed
+  // AudioWorklet).
+  //
+  // Dev mode: the Vite server sets these headers itself (renderer.server.headers
+  // in electron.vite.config.ts) because webRequest fires after the initial
+  // document is already parsed.
+  //
+  // Production: file:// loads have no server, so we inject via webRequest here.
+  // We scrub any pre-existing COOP/COEP keys (case-insensitive) first to avoid
+  // duplicate conflicting headers from the app:// / file:// protocol handler.
+  // ------------------------------------------------------------------
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers: Record<string, string[]> = {};
+    for (const [key, value] of Object.entries(
+      details.responseHeaders as Record<string, string[]>,
+    )) {
+      const lower = key.toLowerCase();
+      if (
+        lower === "cross-origin-opener-policy" ||
+        lower === "cross-origin-embedder-policy"
+      ) {
+        continue; // drop existing value — we set our own below
+      }
+      headers[key] = value;
+    }
+    headers["Cross-Origin-Opener-Policy"] = ["same-origin"];
+    // credentialless (not require-corp) — see comment in electron.vite.config.ts
+    headers["Cross-Origin-Embedder-Policy"] = ["credentialless"];
+    callback({ responseHeaders: headers });
+  });
+
+  // ------------------------------------------------------------------
+  // Grant microphone (getUserMedia) permission automatically.
+  // The user will still see the OS-level mic permission prompt on first
+  // run — this just prevents Electron from blocking the request itself.
+  // ------------------------------------------------------------------
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      const allowed = ["media", "microphone"];
+      callback(allowed.includes(permission));
+    },
+  );
+
   sessionPersistence = new SessionPersistenceService(
     new FileSessionStorage(join(app.getPath("userData"), "storage")),
   );

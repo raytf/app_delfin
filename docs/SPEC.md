@@ -1,8 +1,8 @@
-# Screen Copilot — Implementation Spec
+# Delfin — Implementation Spec
 
-> **Purpose**: This spec is the single source of truth for an AI coding agent building Screen Copilot from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
+> **Purpose**: This spec is the single source of truth for an AI coding agent building Delfin from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
 
-## What is Screen Copilot?
+## What is Delfin?
 
 A desktop AI sidebar that captures your screen, sends the image to a local LLM (Gemma 4 via LiteRT-LM), and displays a structured explanation — all running on-device with no cloud, no login, and no API costs. The primary demo is a **Lecture Slide Explainer** that summarises slides, explains jargon, and generates quiz questions.
 
@@ -126,6 +126,8 @@ MAX_IMAGE_WIDTH=512
 # === TTS ===
 TTS_ENABLED=false
 TTS_BACKEND=web-speech
+KOKORO_VOICE=af_heart
+KOKORO_SPEED=1.1
 ```
 
 ## WebSocket Message Protocol
@@ -160,9 +162,21 @@ interface WsInboundMessage {
     key_points: string[];
   };
   audio?: string;      // for 'audio_chunk' — base64 int16 PCM
+  sample_rate?: number;    // for 'audio_start' — PCM sample rate
+  sentence_count?: number; // for 'audio_start' — number of sentence chunks
+  index?: number;          // for 'audio_chunk' — sentence index
+  tts_time?: number;       // for 'audio_end' — synthesis time in seconds
   message?: string;    // for 'error'
 }
 ```
+
+For turns with server-side TTS, message ordering is:
+
+```text
+token* → audio_start → audio_chunk* → audio_end → done
+```
+
+This means `done` represents the end of the full turn, not just the end of token streaming.
 
 ### IPC Channels (Electron Main ↔ Renderer)
 
@@ -182,9 +196,10 @@ interface WsInboundMessage {
 | Main → Renderer | `frame:captured` | `CaptureFrame` |
 | Main → Renderer | `sidecar:token` | `{ text: string }` |
 | Main → Renderer | `sidecar:structured` | `{ summary, answer, key_points }` |
-| Main → Renderer | `sidecar:audio_start` | — |
-| Main → Renderer | `sidecar:audio_chunk` | `{ audio: string }` |
-| Main → Renderer | `sidecar:audio_end` | — |
+| Main → Renderer | `sidecar:audio_start` | `{ sampleRate: number, sentenceCount: number }` |
+| Main → Renderer | `sidecar:audio_chunk` | `{ audio: string, index?: number }` |
+| Main → Renderer | `sidecar:audio_end` | `{ ttsTime: number }` |
 | Main → Renderer | `sidecar:done` | — |
+| Main → Renderer | `overlay:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:error` | `{ message: string }` |
 | Main → Renderer | `sidecar:status` | `{ connected: boolean, backend?: string, model?: string }` |

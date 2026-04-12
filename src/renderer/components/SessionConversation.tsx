@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { User, Layers3 } from 'lucide-react'
+import { Layers3, Mic, User } from 'lucide-react'
 import type { ChatMessage } from '../../shared/types'
 import delfinLogo from '../assets/logo-alt.png'
 
 interface SessionConversationProps {
   className?: string
   emptyMessage: string
+  isAudioPlaying: boolean
   isSubmitting: boolean
   messages: ChatMessage[]
 }
@@ -33,11 +34,21 @@ function UserAvatar() {
 export default function SessionConversation({
   className,
   emptyMessage,
+  isAudioPlaying,
   isSubmitting,
   messages,
 }: SessionConversationProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const [selectedImage, setSelectedImage] = useState<{ src: string; text: string } | null>(null)
+  const latestAssistantIndex = (() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === 'assistant') {
+        return index
+      }
+    }
+
+    return -1
+  })()
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [loadingImageMessageId, setLoadingImageMessageId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -81,6 +92,11 @@ export default function SessionConversation({
         {messages.map((message) => {
           const isUser = message.role === 'user'
           const isThinking = message.content.length === 0
+          const showSpeakingBadge =
+            !isUser &&
+            isAudioPlaying &&
+            latestAssistantIndex >= 0 &&
+            messages[latestAssistantIndex]?.id === message.id
 
           return (
             <article
@@ -94,17 +110,24 @@ export default function SessionConversation({
                   {isUser ? 'You' : 'Delfin'}
                 </span>
                 <div
-                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    isUser
+                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${isUser
                       ? 'bg-[var(--primary)] text-white'
                       : 'border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
-                  }`}
+                    }`}
                 >
+                  {showSpeakingBadge ? (
+                    <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--primary)]">Speaking</p>
+                  ) : null}
                   {isThinking ? (
                     <div className="flex items-center gap-1.5">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60" />
                       <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60 [animation-delay:150ms]" />
                       <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60 [animation-delay:300ms]" />
+                    </div>
+                  ) : message.isVoiceTurn ? (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-medium">
+                      <Mic size={14} />
+                      Voice input
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{message.content}</p>
@@ -154,7 +177,7 @@ export default function SessionConversation({
               <img
                 alt="Visual context for the selected question"
                 className="mx-auto h-auto max-w-full rounded-lg"
-                src={selectedImage.src}
+                src={selectedImage}
               />
             </div>
           </div>
@@ -175,10 +198,7 @@ export default function SessionConversation({
         imagePath: message.imagePath,
       })
 
-      setSelectedImage({
-        src: imageSrc,
-        text: message.content,
-      })
+      setSelectedImage(imageSrc)
     } finally {
       setLoadingImageMessageId(null)
     }

@@ -1,10 +1,13 @@
 """FastAPI sidecar — LiteRT-LM inference over WebSocket."""
 
 import asyncio
+import base64
 import json
 import logging
 import os
-from contextlib import asynccontextmanager
+import re
+import time
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 from dotenv import find_dotenv, load_dotenv
@@ -14,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from inference.engine import load_engine, pre_warm
 from inference.preprocess import resize_image_blob
 from prompts.presets import PRESETS
-from tts import TTSPipeline
+from tts import TTSPipeline, split_sentences
 
 load_dotenv(find_dotenv())
 logging.basicConfig(level=logging.INFO)
@@ -54,9 +57,27 @@ async def handle_turn(
         await ws.send_json({"type": "error", "message": "Request must include text, image, or audio."})
         return
 
+    tts_sentence_queue: asyncio.Queue[str | None] | None = None
+    tts_worker: asyncio.Task[None] | None = None
+    turn_t0 = time.monotonic()
+
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         chunk_queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
+        full_text_parts: list[str] = []
+        tts_buffer = ""
+
+        if tts_pipeline is not None and tts_pipeline.is_available():
+            tts_sentence_queue = asyncio.Queue()
+            tts_worker = asyncio.create_task(
+                stream_tts_sentence_queue(
+                    ws=ws,
+                    sentence_queue=tts_sentence_queue,
+                    interrupted=interrupted,
+                    turn_t0=turn_t0,
+                )
+            )
+            logger.info("[handle_turn] +%.3fs TTS worker created", time.monotonic() - turn_t0)
 
         def _run_stream() -> None:
             try:
@@ -76,15 +97,46 @@ async def handle_turn(
 
         while True:
             if interrupted.is_set():
+                logger.info("[handle_turn] +%.3fs interrupted during token loop", time.monotonic() - turn_t0)
                 break
-            item = await chunk_queue.get()
+            try:
+                item = await asyncio.wait_for(chunk_queue.get(), timeout=0.1)
+            except asyncio.TimeoutError:
+                continue
             if item is None:
                 break
             if isinstance(item, Exception):
                 raise item
+            full_text_parts.append(item)
             await ws.send_json({"type": "token", "text": item})
 
+            if tts_sentence_queue is not None:
+                tts_buffer += item
+                ready_sentences, tts_buffer = drain_complete_tts_sentences(tts_buffer)
+                for sentence in ready_sentences:
+                    logger.info("[handle_turn] +%.3fs enqueued sentence for TTS: %s", time.monotonic() - turn_t0, sentence[:60])
+                    await tts_sentence_queue.put(sentence)
+
+        logger.info("[handle_turn] +%.3fs token loop finished", time.monotonic() - turn_t0)
         await executor_fut
+        logger.info("[handle_turn] +%.3fs executor done", time.monotonic() - turn_t0)
+
+        if tts_sentence_queue is not None:
+            try:
+                final_sentence = normalize_tts_text(tts_buffer)
+                if final_sentence and not interrupted.is_set():
+                    logger.info("[handle_turn] +%.3fs enqueued final sentence: %s", time.monotonic() - turn_t0, final_sentence[:60])
+                    await tts_sentence_queue.put(final_sentence)
+                await tts_sentence_queue.put(None)
+                if tts_worker is not None:
+                    await tts_worker
+            except Exception as tts_exc:
+                logger.warning(
+                    "[handle_turn] TTS error (non-fatal, inference already delivered): %s",
+                    tts_exc,
+                )
+
+        logger.info("[handle_turn] +%.3fs sending done", time.monotonic() - turn_t0)
         await ws.send_json({"type": "done"})
         logger.info("[handle_turn] done sent")
 
@@ -94,6 +146,94 @@ async def handle_turn(
             await ws.send_json({"type": "error", "message": str(exc)})
         except Exception:
             logger.exception("[handle_turn] failed to send error message to client")
+    finally:
+        if tts_worker is not None and not tts_worker.done():
+            if tts_sentence_queue is not None:
+                with suppress(Exception):
+                    await tts_sentence_queue.put(None)
+            tts_worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await tts_worker
+
+
+def normalize_tts_text(text: str) -> str:
+    """Collapse whitespace for stable incremental sentence detection."""
+    return " ".join(text.split())
+
+
+def drain_complete_tts_sentences(buffer: str) -> tuple[list[str], str]:
+    """Return completed sentences and the remaining incomplete tail."""
+    collapsed = normalize_tts_text(buffer)
+    if not collapsed:
+        return [], ""
+
+    sentences = split_sentences(collapsed)
+    if not sentences:
+        return [], collapsed
+
+    ends_with_sentence_punctuation = bool(re.search(r"[.!?][\"')\]]*$", collapsed))
+    if ends_with_sentence_punctuation:
+        return sentences, ""
+
+    if len(sentences) == 1:
+        return [], sentences[0]
+
+    return sentences[:-1], sentences[-1]
+
+
+async def stream_tts_sentence_queue(
+    ws: WebSocket,
+    sentence_queue: asyncio.Queue[str | None],
+    interrupted: asyncio.Event,
+    turn_t0: float = 0.0,
+) -> None:
+    """Synthesize and stream sentence-level TTS concurrently with token output."""
+    if interrupted.is_set() or tts_pipeline is None or not tts_pipeline.is_available():
+        return
+
+    loop = asyncio.get_running_loop()
+    audio_started = False
+    chunk_index = 0
+    tts_start = 0.0
+
+    while True:
+        sentence = await sentence_queue.get()
+        if sentence is None:
+            logger.info("[TTS] +%.3fs received sentinel, stopping", time.monotonic() - turn_t0)
+            break
+        if interrupted.is_set():
+            logger.info("[TTS] +%.3fs interrupted, stopping", time.monotonic() - turn_t0)
+            break
+
+        if tts_start == 0.0:
+            tts_start = time.monotonic()
+
+        logger.info("[TTS] +%.3fs synthesizing: %s", time.monotonic() - turn_t0, sentence[:60])
+        pcm = await loop.run_in_executor(None, tts_pipeline.generate, sentence)
+        logger.info("[TTS] +%.3fs synthesis done (%d samples)", time.monotonic() - turn_t0, pcm.size)
+        if interrupted.is_set():
+            logger.info("[TTS] +%.3fs interrupted after synthesis", time.monotonic() - turn_t0)
+            break
+        if pcm.size == 0:
+            continue
+
+        if not audio_started:
+            await ws.send_json({
+                "type": "audio_start",
+                "sample_rate": tts_pipeline.sample_rate,
+            })
+            logger.info("[TTS] +%.3fs audio_start sent", time.monotonic() - turn_t0)
+            audio_started = True
+
+        audio_b64 = base64.b64encode(pcm.tobytes()).decode("ascii")
+        await ws.send_json({"type": "audio_chunk", "audio": audio_b64, "index": chunk_index})
+        logger.info("[TTS] +%.3fs audio_chunk[%d] sent", time.monotonic() - turn_t0, chunk_index)
+        chunk_index += 1
+
+    if audio_started:
+        tts_time = round(time.monotonic() - tts_start, 3)
+        await ws.send_json({"type": "audio_end", "tts_time": tts_time})
+        logger.info("[TTS] streamed %d chunks in %.3fs", chunk_index, tts_time)
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +243,7 @@ async def handle_turn(
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN001
     global engine, active_backend, tts_pipeline
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     engine, active_backend = await loop.run_in_executor(None, load_engine)
     await loop.run_in_executor(None, pre_warm, engine)
     if os.environ.get("TTS_ENABLED", "false").lower() == "true":
@@ -167,6 +307,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 raw = await ws.receive_text()
                 msg = json.loads(raw)
                 if msg.get("type") == "interrupt":
+                    logger.info("[receiver] interrupt received")
                     interrupted.set()
                 else:
                     # Update preset for this connection if supplied

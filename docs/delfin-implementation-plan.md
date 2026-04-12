@@ -1,6 +1,6 @@
-# Screen Copilot — Detailed Implementation Plan
+# Delfin — Detailed Implementation Plan
 
-> **A local, privacy-first screen copilot that helps you understand what's on your screen.**
+> **A local, privacy-first study assistant that helps you understand what's on your screen.**
 > 1.5-day hackathon · 5 people · 3 streams · Phase-gated milestones
 
 > ⚠️ **This plan reflects the team/parallel-stream view of the work. The authoritative API contract, file structure, and pseudocode live in [`docs/SPEC.md`](docs/SPEC.md) and the phase docs (`docs/phases/phase-*.md`). Where this document conflicts with those, the SPEC wins.**
@@ -112,7 +112,7 @@ Before anyone goes to sleep Friday night, confirm in the team chat:
 | # | Task | Owner | Time | Depends On | Deliverable |
 |---|------|-------|------|------------|-------------|
 | A1.1 | Create overlay window config: frameless, always-on-top, right-edge, 420px wide, `skipTaskbar: true` | A1 | 30 min | Phase 0 scaffold | `overlayWindow.ts` — Electron window positioned correctly |
-| A1.2 | Implement `captureForegroundWindow()` — get all window sources, filter out "Screen Copilot", take JPEG thumbnail of the top candidate | A1 | 30 min | A1.1 | `captureService.ts` — returns `CapturedFrame` object |
+| A1.2 | Implement `captureForegroundWindow()` — get all window sources, filter out "Delfin", take JPEG thumbnail of the top candidate | A1 | 30 min | A1.1 | `captureService.ts` — returns `CapturedFrame` object |
 | A1.3 | Set up preload bridge: expose `window.electronAPI.captureNow()` to renderer | A2 | 30 min | A1.1 | `preload/index.ts` — secure contextBridge setup |
 | A1.4 | Wire IPC handler: renderer sends `capture:now` → main calls `captureForegroundWindow()` → main sends `frame:captured` back to renderer | A2 | 30 min | A1.2, A1.3 | Round-trip works: button click → screenshot appears |
 | A1.5 | Set up shared types: `CaptureFrame`, `ChatMessage`, `Session`, `AnalyzeRequest` in `src/shared/types.ts` | A2 | 20 min | — | Types importable by both main and renderer |
@@ -120,7 +120,7 @@ Before anyone goes to sleep Friday night, confirm in the team chat:
 
 **Stream A notes:**
 - The overlay window must use `setAlwaysOnTop(true, 'screen-saver')` to stay above other apps without stealing focus.
-- Filter captures by window title: exclude anything containing "Screen Copilot".
+- Filter captures by window title: exclude anything containing "Delfin".
 - A1 and A2 can split however they prefer — the suggested split has A1 on OS-level capture logic and A2 on IPC/types plumbing, but swap if your pair has different strengths.
 
 ---
@@ -414,7 +414,7 @@ These are ordered by impact-to-effort ratio:
 | # | Risk | Probability | Impact | Mitigation | Owner |
 |---|------|-------------|--------|------------|-------|
 | R1 | LiteRT-LM vision doesn't work on WSL2/x86 Linux | Medium | **Critical** | Test in Phase 0. Fallback: Ollama with `gemma3:4b` vision. Sidecar API stays the same. | C1 |
-| R2 | `desktopCapturer` captures the overlay window | Medium | Medium | Filter by window title (exclude "Screen Copilot"). Fallback: full-display capture + crop. | A1 |
+| R2 | `desktopCapturer` captures the overlay window | Medium | Medium | Filter by window title (exclude "Delfin"). Fallback: full-display capture + crop. | A1 |
 | R3 | Foreground window detection picks wrong window | Medium | Medium | `getSources()` returns z-ordered list — first non-overlay candidate is usually correct. Fallback: full-display capture. | A1 |
 | R4 | CPU inference too slow for live demo (>15s per response) | Medium | High | Streaming masks latency. Keep max_tokens low (512). Pre-warm model. Use low temperature. | C1 |
 | R5 | WSL2 port forwarding breaks | Low | High | Test in Phase 0. Fallback: use WSL2's internal IP via `hostname -I`. | A1 |

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { VOICE_TURN_TEXT } from '../../shared/constants'
 import type { ChatMessage, SessionListItem } from '../../shared/types'
 
 interface SessionStoreState {
@@ -8,17 +9,20 @@ interface SessionStoreState {
   messages: ChatMessage[]
   sessionHistory: SessionListItem[]
   activeAssistantMessageId: string | null
+  vadListeningEnabled: boolean
   minimizedResponseMessageId: string | null
   sessionStartTime: number | null
   clearConversation: () => void
   clearLatestResponse: () => void
   startSession: () => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
+  beginVoiceTurn: (input: { messageId: string }) => void
   appendAssistantText: (text: string) => void
   finishAssistantResponse: () => void
   failAssistantResponse: (message: string) => void
   removeSessionHistoryItem: (sessionId: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
+  toggleVadListening: () => void
   setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
 }
 
@@ -34,6 +38,7 @@ export const useSessionStore = create<SessionStoreState>()(
       messages: [],
       sessionHistory: [],
       activeAssistantMessageId: null,
+      vadListeningEnabled: true,
       minimizedResponseMessageId: null,
       sessionStartTime: null,
 
@@ -44,6 +49,7 @@ export const useSessionStore = create<SessionStoreState>()(
           messages: [],
           sessionHistory: state.sessionHistory,
           activeAssistantMessageId: null,
+          vadListeningEnabled: state.vadListeningEnabled,
           minimizedResponseMessageId: null,
           sessionStartTime: null,
         })),
@@ -66,6 +72,33 @@ export const useSessionStore = create<SessionStoreState>()(
             role: 'user',
             content: input.prompt,
             timestamp: Date.now(),
+          }
+
+          const assistantMessageId = createMessageId()
+          const assistantMessage: ChatMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+          }
+
+          return {
+            errorMessage: null,
+            isSubmitting: true,
+            messages: [...state.messages, userMessage, assistantMessage],
+            activeAssistantMessageId: assistantMessageId,
+            minimizedResponseMessageId: assistantMessageId,
+          }
+        }),
+
+      beginVoiceTurn: (input: { messageId: string }) =>
+        set((state) => {
+          const userMessage: ChatMessage = {
+            id: input.messageId,
+            role: 'user',
+            content: VOICE_TURN_TEXT,
+            timestamp: Date.now(),
+            isVoiceTurn: true,
           }
 
           const assistantMessageId = createMessageId()
@@ -112,13 +145,13 @@ export const useSessionStore = create<SessionStoreState>()(
             state.activeAssistantMessageId === null
               ? state.messages
               : state.messages.map((entry) =>
-                  entry.id === state.activeAssistantMessageId
-                    ? {
-                        ...entry,
-                        content: message,
-                      }
-                    : entry,
-                )
+                entry.id === state.activeAssistantMessageId
+                  ? {
+                    ...entry,
+                    content: message,
+                  }
+                  : entry,
+              )
 
           return {
             errorMessage: message,
@@ -139,20 +172,25 @@ export const useSessionStore = create<SessionStoreState>()(
           sessionHistory: sessions,
         }),
 
+      toggleVadListening: () =>
+        set((state) => ({
+          vadListeningEnabled: !state.vadListeningEnabled,
+        })),
+
       setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
         set((state) => ({
           messages: state.messages.map((message) =>
             message.id === input.messageId
               ? {
-                  ...message,
-                  imagePath: input.imagePath,
-                }
+                ...message,
+                imagePath: input.imagePath,
+              }
               : message,
           ),
         })),
     }),
     {
-      name: 'screen-copilot-active-session',
+      name: 'delfin-active-session',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         errorMessage: state.errorMessage,
@@ -160,6 +198,7 @@ export const useSessionStore = create<SessionStoreState>()(
         messages: state.messages,
         sessionHistory: state.sessionHistory,
         activeAssistantMessageId: state.activeAssistantMessageId,
+        vadListeningEnabled: state.vadListeningEnabled,
         minimizedResponseMessageId: state.minimizedResponseMessageId,
         sessionStartTime: state.sessionStartTime,
       }),

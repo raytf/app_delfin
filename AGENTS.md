@@ -1,10 +1,10 @@
-# AGENTS.md — Screen Copilot
+# AGENTS.md — Delfin
 
 > **For AI coding agents.** Read this file first. It tells you what to build, where the specs live, and what rules to follow.
 
 ---
 
-## What Is Screen Copilot?
+## What Is Delfin?
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
@@ -16,7 +16,7 @@ A local, privacy-first AI desktop sidebar (Electron + React) that captures the f
 STATUS.md                            ← Live feature status tracker. Update after every implementation change.
 docs/
 ├── SPEC.md                          ← Single source of truth. Read this first.
-├── screen-copilot-implementation-plan.md  ← Team/parallel-stream view (secondary)
+├── delfin-implementation-plan.md           ← Team/parallel-stream view (secondary)
 └── phases/
     ├── phase-0-scaffold.md          ← Repo structure, deps, .env, setup scripts
     ├── phase-1-sidecar.md           ← FastAPI sidecar, LiteRT-LM, tool calling
@@ -171,10 +171,11 @@ These are confirmed facts — do not revisit without good reason:
 | **Per-connection closure** | Define `respond_to_user` and `tool_result` inside `ws_endpoint()` as a closure, not as module-level globals. This prevents data races between concurrent connections. |
 | **JSON extraction fallback** | When the model does not call the `respond_to_user` tool, `_extract_structured_from_text()` tries to parse `Summary:` / `Answer:` / `Key points:` from the raw output before falling back to raw token streaming. |
 | **Rolling hash for auto-refresh** | Sample base64 at 0%, 25%, 50%, 75% (2 KB each) before hashing — not just the head. Avoids false negatives on slides with shared background templates. |
-| **VAD library** | `@ricky0123/vad-web` (Silero ONNX in browser). Requires `SharedArrayBuffer` → set COOP/COEP headers via `session.defaultSession.webRequest.onHeadersReceived` in `src/main/index.ts`. WASM/worker files must be copied to renderer build output via `vite-plugin-static-copy`. |
+| **VAD library** | `@ricky0123/vad-web` (Silero ONNX in browser). Use the browser-runtime pattern: self-host `bundle.min.js` plus `onnxruntime-web`'s `ort.wasm.min.js` and `ort-wasm*` files under `vad-runtime/`, load them via script tags, and pass absolute `baseAssetPath` / `onnxWASMBasePath` URLs from `document.baseURI`. Requires `SharedArrayBuffer` → set COOP/COEP headers via `session.defaultSession.webRequest.onHeadersReceived` in `src/main/index.ts`. |
 | **Voice turn text field** | For pure voice turns, `text` is set to the constant `VOICE_TURN_TEXT = "Please respond to what the user just asked."`. Empty string is not used because `sessionHandlers.ts` has an empty-text guard; the fixed instruction also gives the model explicit context about its role. |
 | **Audio backend** | `audio_backend` in `litert_lm.Engine` is always CPU (GPU audio not supported). Exposed as `LITERT_AUDIO_BACKEND` env var but defaults to `CPU`. The engine already has `audio_backend=litert_lm.Backend.CPU` in both GPU-attempt and CPU-fallback paths. |
 | **Barge-in protection** | Two-layer: (1) raise Silero `positiveSpeechThreshold` from 0.50 → 0.92 while AI is speaking; (2) 800 ms grace period after `audio_start` during which `onSpeechStart` is silently ignored, preventing the mic from picking up the AI's own voice. |
+| **WSL2 espeak-ng fix** | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`. |
 
 ---
 
@@ -196,5 +197,4 @@ Full rules are in `docs/SPEC.md` §Cross-Cutting Rules. Key points:
 ## Nice-to-Haves (implement only if time allows)
 
 - Conversation history trimming (see `docs/phases/phase-1-sidecar.md` §1.5)
-- mlx-audio TTS backend for macOS (stub currently raises `NotImplementedError`)
 - Wayland support on Linux native (desktopCapturer may require additional Electron flags)

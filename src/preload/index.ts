@@ -19,6 +19,13 @@ import type {
 } from '../shared/types'
 
 const api: ElectronAPI = {
+  // Evaluated once at preload time (Node.js context has access to process.env).
+  // Defaults to true so voice is on when the env var is absent.
+  voiceEnabled: process.env.VOICE_ENABLED !== 'false',
+
+  // Evaluated once at preload time. Defaults to false so speech output is opt-in.
+  ttsEnabled: process.env.TTS_ENABLED === 'true',
+
   captureNow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.CAPTURE_NOW),
 
   captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) =>
@@ -65,19 +72,22 @@ const api: ElectronAPI = {
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
 
+  onOverlayError: (cb: (data: { message: string }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR, (_event, data) => cb(data)),
+
   onSidecarToken: (cb: (data: { text: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, (_event, data) => cb(data)),
 
-  onSidecarAudioStart: (cb: () => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START, () => cb()),
+  onSidecarAudioStart: (cb: (data: { sampleRate: number; sentenceCount: number }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START, (_event, data) => cb(data)),
 
-  onSidecarAudioChunk: (cb: (data: { audio: string }) => void) =>
+  onSidecarAudioChunk: (cb: (data: { audio: string; index?: number }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK, (_event, data) =>
       cb(data),
     ),
 
-  onSidecarAudioEnd: (cb: () => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END, () => cb()),
+  onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END, (_event, data) => cb(data)),
 
   onSidecarDone: (cb: () => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE, () => cb()),

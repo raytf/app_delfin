@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== Screen Copilot Setup Check ==="
+echo "=== Delfin Setup Check ==="
 echo ""
 
 # Node.js
@@ -46,6 +46,48 @@ if [ -f ".env" ]; then
   echo "✅ .env: present"
 else
   echo "⚠️  .env: missing (copy from .env.example)"
+fi
+
+# .env key diff vs .env.example
+if [ -f ".env" ] && [ -f ".env.example" ]; then
+  missing=()
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    key="${line%%=*}"
+    [[ -z "$key" ]] && continue
+    if ! grep -qE "^${key}=" .env 2>/dev/null; then
+      missing+=("$key")
+    fi
+  done < .env.example
+
+  if [ ${#missing[@]} -eq 0 ]; then
+    echo "✅ .env: all keys from .env.example are present"
+  else
+    echo "⚠️  .env is missing keys from .env.example:"
+    for key in "${missing[@]}"; do
+      echo "    - $key"
+    done
+    echo "   (copy missing values from .env.example and adjust for your machine)"
+  fi
+fi
+
+# Kokoro TTS model files
+KOKORO_MODEL=$(grep -E '^KOKORO_MODEL_PATH=' .env 2>/dev/null | cut -d= -f2)
+KOKORO_MODEL=${KOKORO_MODEL:-kokoro-v1.0.onnx}
+KOKORO_VOICES=$(grep -E '^KOKORO_VOICES_PATH=' .env 2>/dev/null | cut -d= -f2)
+KOKORO_VOICES=${KOKORO_VOICES:-voices-v1.0.bin}
+
+if [ -f "sidecar/$KOKORO_MODEL" ]; then
+  echo "✅ Kokoro model ($KOKORO_MODEL): present"
+else
+  echo "⚠️  Kokoro model ($KOKORO_MODEL): missing (run: npm run download:models)"
+fi
+
+if [ -f "sidecar/$KOKORO_VOICES" ]; then
+  echo "✅ Kokoro voices ($KOKORO_VOICES): present"
+else
+  echo "⚠️  Kokoro voices ($KOKORO_VOICES): missing (run: npm run download:models)"
 fi
 
 # Sidecar health check

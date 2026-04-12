@@ -1,5 +1,5 @@
-# Screen Copilot Setup Check (PowerShell)
-Write-Host "=== Screen Copilot Setup Check ===" -ForegroundColor Cyan
+# Delfin Setup Check (PowerShell)
+Write-Host "=== Delfin Setup Check ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Node.js
@@ -45,6 +45,51 @@ if (Test-Path ".env") {
   Write-Host "✅ .env: present" -ForegroundColor Green
 } else {
   Write-Host "⚠️  .env: missing (copy from .env.example)" -ForegroundColor Yellow
+}
+
+# .env key diff vs .env.example
+if ((Test-Path ".env") -and (Test-Path ".env.example")) {
+  $exampleKeys = Get-Content ".env.example" |
+    Where-Object { $_ -notmatch '^\s*#' -and $_ -match '=' } |
+    ForEach-Object { ($_ -split '=', 2)[0].Trim() } |
+    Where-Object { $_ -ne '' }
+  $envContent = Get-Content ".env"
+  $missingKeys = $exampleKeys | Where-Object {
+    $key = $_
+    -not ($envContent | Where-Object { $_ -match "^${key}=" })
+  }
+  if ($missingKeys.Count -eq 0) {
+    Write-Host "✅ .env: all keys from .env.example are present" -ForegroundColor Green
+  } else {
+    Write-Host "⚠️  .env is missing keys from .env.example:" -ForegroundColor Yellow
+    foreach ($key in $missingKeys) {
+      Write-Host "    - $key" -ForegroundColor Yellow
+    }
+    Write-Host "   (copy missing values from .env.example and adjust for your machine)" -ForegroundColor Yellow
+  }
+}
+
+# Kokoro TTS model files
+$kokoroModel = "kokoro-v1.0.onnx"
+$kokoroVoices = "voices-v1.0.bin"
+if (Test-Path ".env") {
+  $envLines = Get-Content ".env"
+  foreach ($line in $envLines) {
+    if ($line -match '^KOKORO_MODEL_PATH=(.+)') { $kokoroModel = $Matches[1] }
+    if ($line -match '^KOKORO_VOICES_PATH=(.+)') { $kokoroVoices = $Matches[1] }
+  }
+}
+
+if (Test-Path "sidecar\$kokoroModel") {
+  Write-Host "✅ Kokoro model ($kokoroModel): present" -ForegroundColor Green
+} else {
+  Write-Host "⚠️  Kokoro model ($kokoroModel): missing (run: npm run download:models)" -ForegroundColor Yellow
+}
+
+if (Test-Path "sidecar\$kokoroVoices") {
+  Write-Host "✅ Kokoro voices ($kokoroVoices): present" -ForegroundColor Green
+} else {
+  Write-Host "⚠️  Kokoro voices ($kokoroVoices): missing (run: npm run download:models)" -ForegroundColor Yellow
 }
 
 # Sidecar health check
