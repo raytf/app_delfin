@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Layers3, Mic, User } from 'lucide-react'
 import type { ChatMessage } from '../../shared/types'
 import delfinLogo from '../assets/logo-alt.png'
+import ThinkingDots from './ThinkingDots'
 
 interface SessionConversationProps {
   className?: string
@@ -119,11 +120,7 @@ export default function SessionConversation({
                     <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--primary)]">Speaking</p>
                   ) : null}
                   {isThinking ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60" />
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60 [animation-delay:150ms]" />
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-60 [animation-delay:300ms]" />
-                    </div>
+                    <ThinkingDots size="sm" />
                   ) : message.isVoiceTurn ? (
                     <div className="inline-flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-medium">
                       <Mic size={14} />
