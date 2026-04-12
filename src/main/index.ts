@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from "electron";
+import { app, BrowserWindow, nativeImage, session } from "electron";
 
 // ---------------------------------------------------------------------------
 // SharedArrayBuffer — must be re-enabled before app.whenReady().
@@ -29,6 +29,8 @@ import {
 
 config(); // load .env from repo root
 validateEnv(); // warn on missing / invalid env vars — never throws
+
+app.setName("Delfin");
 
 let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
@@ -100,6 +102,18 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Delfin started");
+
+  // Set app icon for the macOS dock (and window title bar on other platforms)
+  const isDev = !!process.env["ELECTRON_RENDERER_URL"];
+  const iconPath = isDev
+    ? join(app.getAppPath(), "src/renderer/assets/logo.png")
+    : join(__dirname, "../renderer/assets/logo.png");
+  const appIcon = nativeImage.createFromPath(iconPath);
+  if (!appIcon.isEmpty()) {
+    if (process.platform === "darwin") {
+      app.dock?.setIcon(appIcon);
+    }
+  }
 
   // ------------------------------------------------------------------
   // COOP/COEP headers — required for SharedArrayBuffer used by

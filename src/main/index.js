@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from "electron";
+import { app, BrowserWindow, nativeImage, session } from "electron";
 // ---------------------------------------------------------------------------
 // SharedArrayBuffer — must be re-enabled before app.whenReady().
 // Chromium disabled SAB by default (Spectre mitigation) and requires
@@ -20,6 +20,8 @@ import { FileSessionStorage } from "./storage/fileSessionStorage";
 import { MAIN_TO_RENDERER_CHANNELS, } from "../shared/types";
 config(); // load .env from repo root
 validateEnv(); // warn on missing / invalid env vars — never throws
+
+app.setName("Delfin");
 let mainWindow = null;
 let overlayMode = "expanded";
 let minimizedVariant = "compact";
@@ -77,6 +79,18 @@ async function switchOverlayMode(mode) {
 }
 app.whenReady().then(() => {
     console.log("Delfin started");
+
+    // Set app icon for the macOS dock and app switcher
+    const isDev = !!process.env["ELECTRON_RENDERER_URL"];
+    const iconPath = isDev
+        ? join(app.getAppPath(), "src/renderer/assets/logo.png")
+        : join(__dirname, "../renderer/assets/logo.png");
+    const appIcon = nativeImage.createFromPath(iconPath);
+    if (!appIcon.isEmpty()) {
+        if (process.platform === "darwin") {
+            app.dock?.setIcon(appIcon);
+        }
+    }
     // ------------------------------------------------------------------
     // COOP/COEP headers — required for SharedArrayBuffer used by
     // @ricky0123/vad-web (Silero VAD runs in a SharedArrayBuffer-backed
