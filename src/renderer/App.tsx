@@ -111,7 +111,6 @@ export default function App() {
   const isAudioPlayingRef = useRef(false)
   const fallbackSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minimizedVoiceCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingVoiceWavRef = useRef<string | null>(null)
   const lowerThresholdRef = useRef<(() => void) | null>(null)
 
   const voiceEnabled = window.api.voiceEnabled
@@ -329,21 +328,6 @@ export default function App() {
     ],
   )
 
-  const submitPendingVoiceTurn = useCallback(() => {
-    if (sessionMode !== 'active') {
-      pendingVoiceWavRef.current = null
-      return
-    }
-
-    const pendingWav = pendingVoiceWavRef.current
-    if (pendingWav === null) {
-      return
-    }
-
-    pendingVoiceWavRef.current = null
-    submitVoiceTurn(pendingWav)
-  }, [sessionMode, submitVoiceTurn])
-
   const {
     raiseThreshold,
     lowerThreshold,
@@ -360,8 +344,15 @@ export default function App() {
         return
       }
 
-      if (useSessionStore.getState().isSubmitting) {
-        pendingVoiceWavRef.current = wavBase64
+      const submitting = useSessionStore.getState().isSubmitting
+      const isAssistantResponding =
+        submitting ||
+        aiStreamingStartedRef.current ||
+        isAudioPlayingRef.current ||
+        audioStreamActiveRef.current ||
+        fallbackSpeechTimerRef.current !== null
+
+      if (isAssistantResponding) {
         return
       }
 
@@ -369,41 +360,28 @@ export default function App() {
     },
     onSpeechStart: () => {
       const submitting = useSessionStore.getState().isSubmitting
-      const isAssistantThinking = submitting && !aiStreamingStartedRef.current
-      if (isAssistantThinking) {
-        return
-      }
-
       const isAssistantSpeaking =
         isAudioPlayingRef.current ||
         audioStreamActiveRef.current ||
         fallbackSpeechTimerRef.current !== null
       const isAssistantStreaming = aiStreamingStartedRef.current && submitting
 
-      if (!isAssistantSpeaking && !isAssistantStreaming) {
+      if (submitting || isAssistantSpeaking || isAssistantStreaming) {
         return
-      }
-
-      clearFallbackSpeechTimer()
-      cancelSpeechSynthesis()
-      stopScheduledAudioSources()
-      ignoreIncomingSidecarAudioRef.current = true
-      aiStreamingStartedRef.current = false
-      audioStreamActiveRef.current = false
-      setAudioPlayingState(false)
-      lowerThreshold()
-
-      try {
-        window.api.sidecarInterrupt()
-      } catch (error) {
-        console.error('[App] Failed to send sidecar interrupt:', error)
       }
     },
   })
 
   lowerThresholdRef.current = lowerThreshold
 
-  const showVoiceWaveform = voiceEnabled && vadListeningEnabled
+  const isAssistantResponding =
+    isSubmitting ||
+    aiStreamingStartedRef.current ||
+    isAudioPlaying ||
+    audioStreamActiveRef.current ||
+    fallbackSpeechTimerRef.current !== null
+  const shouldShowVoiceWaveform =
+    voiceEnabled && vadListeningEnabled && (isUserSpeaking || isAudioPlaying)
   const waveformPresentation = resolveWaveformPresentation({
     assistantAudioLevel,
     assistantWaveformBars,
@@ -419,13 +397,21 @@ export default function App() {
       return
     }
 
-    const shouldBeMuted = !vadListeningEnabled
+    const shouldBeMuted = !vadListeningEnabled || isAssistantResponding
     if (isMuted === shouldBeMuted) {
       return
     }
 
     toggleMute()
-  }, [isListening, isMuted, sessionMode, toggleMute, vadListeningEnabled, voiceEnabled])
+  }, [
+    isAssistantResponding,
+    isListening,
+    isMuted,
+    sessionMode,
+    toggleMute,
+    vadListeningEnabled,
+    voiceEnabled,
+  ])
 
   const speakWithWebSpeech = useCallback(
     (text: string) => {
@@ -674,11 +660,6 @@ export default function App() {
       aiStreamingStartedRef.current = false
       finishAssistantResponse()
 
-      if (pendingVoiceWavRef.current !== null) {
-        submitPendingVoiceTurn()
-        return
-      }
-
       const latestAssistantText =
         getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
       speakWithWebSpeech(latestAssistantText)
@@ -691,7 +672,6 @@ export default function App() {
       cancelSpeechSynthesis()
       clearFallbackSpeechTimer()
       finishAudioPlayback()
-      pendingVoiceWavRef.current = null
       failAssistantResponse(data.message)
     })
 
@@ -724,7 +704,6 @@ export default function App() {
     speakWithWebSpeech,
     startAssistantWaveformLoop,
     stopScheduledAudioSources,
-    submitPendingVoiceTurn,
     syncOverlayStateFromMain,
   ])
 
@@ -758,7 +737,6 @@ export default function App() {
     await window.api.startSession({ sessionName })
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
-    pendingVoiceWavRef.current = null
     clearMinimizedVoiceCollapseTimer()
     clearFallbackSpeechTimer()
     cancelSpeechSynthesis()
@@ -806,7 +784,6 @@ export default function App() {
     }
 
     clearMinimizedVoiceCollapseTimer()
-    pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearFallbackSpeechTimer()
@@ -861,7 +838,6 @@ export default function App() {
 
     const messageId = crypto.randomUUID()
 
-    pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearMinimizedVoiceCollapseTimer()
@@ -952,7 +928,7 @@ export default function App() {
           void handleStopSession()
         }}
         onToggleVadListening={toggleVadListening}
-        showVoiceWaveform={showVoiceWaveform}
+        showVoiceWaveform={shouldShowVoiceWaveform}
         vadListeningEnabled={vadListeningEnabled}
         waveformBars={waveformPresentation.bars}
         waveformState={waveformPresentation.state}
@@ -981,7 +957,7 @@ export default function App() {
           void handleSubmitPrompt(nextText)
         }}
         onToggleVadListening={toggleVadListening}
-        showVoiceWaveform={showVoiceWaveform}
+        showVoiceWaveform={shouldShowVoiceWaveform}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
         waveformBars={waveformPresentation.bars}

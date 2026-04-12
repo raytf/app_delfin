@@ -28,13 +28,6 @@ export interface WaveformPresentation {
 }
 
 export function resolveWaveformPresentation(input: WaveformPresentationInput): WaveformPresentation {
-  if (input.isUserSpeaking) {
-    return {
-      bars: input.userWaveformBars,
-      state: 'user',
-    }
-  }
-
   if (input.isAssistantSpeaking) {
     return {
       bars: input.assistantWaveformBars,
@@ -42,22 +35,22 @@ export function resolveWaveformPresentation(input: WaveformPresentationInput): W
     }
   }
 
-  const fallbackBars = selectLeadingWaveformBars({
-    assistantAudioLevel: input.assistantAudioLevel,
-    assistantWaveformBars: input.assistantWaveformBars,
-    userAudioLevel: input.userAudioLevel,
-    userWaveformBars: input.userWaveformBars,
-  })
+  if (input.isUserSpeaking) {
+    return {
+      bars: input.userWaveformBars,
+      state: 'user',
+    }
+  }
 
   if (input.isProcessing) {
     return {
-      bars: fallbackBars,
+      bars: createWaveformBars(),
       state: 'processing',
     }
   }
 
   return {
-    bars: fallbackBars,
+    bars: createWaveformBars(),
     state: 'idle',
   }
 }
@@ -158,19 +151,6 @@ export function resampleWaveformBars(bars: WaveformBars, targetCount: number): n
   }
 
   return resampledBars
-}
-
-function selectLeadingWaveformBars(input: {
-  assistantAudioLevel: number
-  assistantWaveformBars: WaveformBars
-  userAudioLevel: number
-  userWaveformBars: WaveformBars
-}): WaveformBars {
-  if (input.userAudioLevel >= input.assistantAudioLevel) {
-    return input.userWaveformBars
-  }
-
-  return input.assistantWaveformBars
 }
 
 function clampLevel(level: number): number {
