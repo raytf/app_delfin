@@ -54,7 +54,7 @@ export default function AllSessionsPage({
                 No sessions yet
               </h2>
               <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-                Start a Delfin session from the home screen and your study history will appear here.
+                Start a session with Delfin and your study history will appear here.
               </p>
             </div>
           ) : (
