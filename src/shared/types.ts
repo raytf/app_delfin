@@ -33,6 +33,10 @@ export interface SessionPromptRequest {
   audio?: string // base64 WAV — present on voice turns; text will be VOICE_TURN_TEXT
 }
 
+export interface SessionStartRequest {
+  sessionName: string
+}
+
 export interface SessionPromptResponse {
   imagePath: string
   messageId: string
@@ -40,6 +44,24 @@ export interface SessionPromptResponse {
 
 export interface SessionMessageImageRequest {
   imagePath: string
+}
+
+export interface SessionDetailRequest {
+  sessionId: string
+}
+
+export interface SessionDeleteRequest {
+  sessionId: string
+}
+
+export interface EndedSessionSnapshot {
+  sessionName: string
+  duration: number
+  messageCount: number
+}
+
+export interface SessionStopRequest {
+  endedSessionData: EndedSessionSnapshot | null
 }
 
 export interface WsInterruptMessage {
@@ -80,10 +102,13 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   OVERLAY_MINIMIZE: 'overlay:minimize',
   OVERLAY_RESTORE: 'overlay:restore',
   OVERLAY_SET_MINIMIZED_VARIANT: 'overlay:set-minimized-variant',
+  OVERLAY_CLEAR_ENDED_SESSION: 'overlay:clear-ended-session',
   SESSION_START: 'session:start',
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
   SESSION_LIST: 'session:list',
+  SESSION_GET_DETAIL: 'session:get-detail',
+  SESSION_DELETE: 'session:delete',
   SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
 } as const
 
@@ -124,9 +149,15 @@ export interface SessionListItem {
   endedAt: number | null
   status: PersistedSessionStatus
   presetId: PresetId | null
+  sessionName: string
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number
+}
+
+export interface SessionDetail {
+  session: SessionListItem
+  messages: ChatMessage[]
 }
 
 export type OverlayMode = 'expanded' | 'minimized'
@@ -137,6 +168,7 @@ export interface OverlayState {
   overlayMode: OverlayMode
   minimizedVariant: MinimizedOverlayVariant
   sessionMode: SessionMode
+  endedSessionData: EndedSessionSnapshot | null
 }
 
 // Electron API exposed via contextBridge (window.api)
@@ -150,14 +182,17 @@ export interface ElectronAPI {
   sidecarSend: (msg: WsOutboundMessage) => void
   sidecarInterrupt: () => void
   getOverlayState: () => Promise<OverlayState>
-  startSession: () => Promise<void>
-  stopSession: () => Promise<void>
+  startSession: (request: SessionStartRequest) => Promise<void>
+  stopSession: (request: SessionStopRequest) => Promise<void>
   submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>
+  getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>
+  deleteSession: (request: SessionDeleteRequest) => Promise<void>
   getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
   minimizeOverlay: () => Promise<void>
   restoreOverlay: () => Promise<void>
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
+  clearEndedSession: () => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void

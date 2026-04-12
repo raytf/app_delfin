@@ -1,4 +1,4 @@
-import type { PresetId } from '../../shared/types'
+import type { ChatMessage, PresetId, SessionDetail } from '../../shared/types'
 import type {
   ConversationMessageRecord,
   PersistedSessionStatus,
@@ -24,7 +24,7 @@ export class SessionPersistenceService {
 
   constructor(private readonly storage: SessionStorage) {}
 
-  async startSession(): Promise<string> {
+  async startSession(sessionName: string): Promise<string> {
     const now = Date.now()
     const sessionId = crypto.randomUUID()
     const sessionRecord: SessionRecord = {
@@ -33,6 +33,7 @@ export class SessionPersistenceService {
       endedAt: null,
       status: 'active',
       presetId: null,
+      sessionName,
       sourceLabel: null,
       messageCount: 0,
       lastUpdatedAt: now,
@@ -167,8 +168,37 @@ export class SessionPersistenceService {
     return this.storage.listSessions()
   }
 
+  async getSessionDetail(sessionId: string): Promise<SessionDetail> {
+    const session = await this.storage.getSession(sessionId)
+
+    if (session === null) {
+      throw new Error(`Session not found: ${sessionId}`)
+    }
+
+    const conversation = await this.storage.getConversation(sessionId)
+
+    return {
+      session,
+      messages: conversation.map<ChatMessage>((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp,
+        imagePath: message.imagePath,
+      })),
+    }
+  }
+
   async getCaptureImageDataUrl(relativePath: string): Promise<string> {
     return this.storage.getCaptureImageDataUrl(relativePath)
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    if (sessionId === this.activeSessionId) {
+      throw new Error('Cannot delete the active session.')
+    }
+
+    await this.storage.deleteSession(sessionId)
   }
 
   private async persistAssistantDraft(timestamp: number): Promise<void> {

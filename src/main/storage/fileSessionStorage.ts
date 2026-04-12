@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type {
   ConversationMessageRecord,
@@ -47,6 +47,24 @@ export class FileSessionStorage implements SessionStorage {
         ...updates,
       };
       await this.writeSessionIndex(sessions);
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.enqueueWrite(async () => {
+      const sessions = await this.readSessionIndex();
+      const nextSessions = sessions.filter((session) => session.id !== sessionId);
+
+      if (nextSessions.length === sessions.length) {
+        throw new Error(`Cannot delete missing session: ${sessionId}`);
+      }
+
+      await this.writeSessionIndex(nextSessions);
+      await rm(this.getConversationPath(sessionId), { force: true });
+      await rm(this.getCaptureDirectoryPath(sessionId), {
+        force: true,
+        recursive: true,
+      });
     });
   }
 
@@ -151,6 +169,10 @@ export class FileSessionStorage implements SessionStorage {
 
   private getConversationPath(sessionId: string): string {
     return join(this.sessionsDir, `${sessionId}.json`);
+  }
+
+  private getCaptureDirectoryPath(sessionId: string): string {
+    return join(this.capturesDir, sessionId);
   }
 
   private resolveStoragePath(relativePath: string): string {

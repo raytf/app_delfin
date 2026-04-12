@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  type ChatMessage,
-  MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
+  type ChatMessage,
+  type EndedSessionSnapshot,
+  MAIN_TO_RENDERER_CHANNELS,
   type MinimizedOverlayVariant,
   type OverlayMode,
+  type SessionDetail,
   type SessionMode,
   type SidecarStatus,
 } from '../shared/types'
@@ -13,8 +15,12 @@ import AllSessionsPage from './components/AllSessionsPage'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
+import PastSessionView from './components/PastSessionView'
+import SessionEndedView from './components/SessionEndedView'
+import UserNameModal from './components/UserNameModal'
 import { useVAD } from './hooks/useVAD'
 import { useSessionStore } from './stores/sessionStore'
+import { useSettingsStore } from './stores/settingsStore'
 import { decodeAudioChunk } from './utils/audioUtils'
 import {
   getAutoAdvanceMinimizedVariant,
@@ -30,8 +36,6 @@ import {
   WAVEFORM_BAR_COUNT,
 } from './utils/waveformState'
 
-// Serialises audio-chunk processing so concurrent IPC callbacks cannot race on
-// ensureAudioContext(), audioNextStartTimeRef, or audioSourceNodesRef.
 let lastAudioChunkPromise: Promise<void> = Promise.resolve()
 
 const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
@@ -48,15 +52,20 @@ function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null 
 
 export default function App() {
   const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
+  const [selectedPastSession, setSelectedPastSession] = useState<SessionDetail | null>(null)
+  const [activeSessionName, setActiveSessionName] = useState('Study Session')
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
   const [isMinimizedPromptComposing, setIsMinimizedPromptComposing] = useState(false)
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
+  const [endedSessionData, setEndedSessionData] = useState<EndedSessionSnapshot | null>(null)
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [assistantAudioLevel, setAssistantAudioLevel] = useState(0)
-  const [assistantWaveformBars, setAssistantWaveformBars] = useState(() => createWaveformBars())
+  const [assistantWaveformBars, setAssistantWaveformBars] = useState(() =>
+    createWaveformBars(),
+  )
 
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
@@ -66,6 +75,7 @@ export default function App() {
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
+  const removeSessionHistoryItem = useSessionStore((state) => state.removeSessionHistoryItem)
   const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
   const sessionHistory = useSessionStore((state) => state.sessionHistory)
   const setSessionHistory = useSessionStore((state) => state.setSessionHistory)
@@ -73,8 +83,12 @@ export default function App() {
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
   const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
+  const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
   const toggleVadListening = useSessionStore((state) => state.toggleVadListening)
   const vadListeningEnabled = useSessionStore((state) => state.vadListeningEnabled)
+
+  const userName = useSettingsStore((state) => state.userName)
+  const setUserName = useSettingsStore((state) => state.setUserName)
 
   const latestResponseText =
     minimizedResponseMessageId === null
@@ -157,7 +171,8 @@ export default function App() {
       setAssistantWaveformBars(nextBars)
       setAssistantAudioLevel(nextLevel)
 
-      const shouldContinue = isAudioPlayingRef.current || audioStreamActiveRef.current || nextLevel > 0.014
+      const shouldContinue =
+        isAudioPlayingRef.current || audioStreamActiveRef.current || nextLevel > 0.014
       if (!shouldContinue) {
         stopAssistantWaveformLoop()
         return
@@ -194,7 +209,7 @@ export default function App() {
       try {
         sourceNode.stop()
       } catch {
-        // already stopped
+        // Source might have already finished.
       }
       sourceNode.disconnect()
     }
@@ -246,6 +261,7 @@ export default function App() {
       setSessionMode(state.sessionMode)
       setOverlayMode(state.overlayMode)
       setMinimizedVariant(state.minimizedVariant)
+      setEndedSessionData(state.endedSessionData)
       setIsMinimizedPromptComposing(
         state.overlayMode === 'minimized' && state.minimizedVariant === 'prompt-input',
       )
@@ -298,11 +314,19 @@ export default function App() {
             messageId: response.messageId,
           })
         })
-        .catch((err: unknown) => {
-          failAssistantResponse(err instanceof Error ? err.message : 'Voice turn failed.')
+        .catch((error: unknown) => {
+          failAssistantResponse(error instanceof Error ? error.message : 'Voice turn failed.')
         })
     },
-    [beginVoiceTurn, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, failAssistantResponse, revealMinimizedVoiceResponse, sessionMode, setUserMessageImagePath],
+    [
+      beginVoiceTurn,
+      clearFallbackSpeechTimer,
+      clearMinimizedVoiceCollapseTimer,
+      failAssistantResponse,
+      revealMinimizedVoiceResponse,
+      sessionMode,
+      setUserMessageImagePath,
+    ],
   )
 
   const submitPendingVoiceTurn = useCallback(() => {
@@ -344,10 +368,9 @@ export default function App() {
       submitVoiceTurn(wavBase64)
     },
     onSpeechStart: () => {
-      const isSubmitting = useSessionStore.getState().isSubmitting
-      const isAssistantThinking = isSubmitting && !aiStreamingStartedRef.current
+      const submitting = useSessionStore.getState().isSubmitting
+      const isAssistantThinking = submitting && !aiStreamingStartedRef.current
       if (isAssistantThinking) {
-        console.debug('[barge-in] blocked: assistant is thinking (isSubmitting=%s, aiStreamingStarted=%s)', isSubmitting, aiStreamingStartedRef.current)
         return
       }
 
@@ -355,20 +378,11 @@ export default function App() {
         isAudioPlayingRef.current ||
         audioStreamActiveRef.current ||
         fallbackSpeechTimerRef.current !== null
-
-      // Also allow barge-in while the assistant is streaming text (before audio starts).
-      // Without this, the user can't interrupt during the window between first token
-      // and first audio chunk.
-      const isAssistantStreaming = aiStreamingStartedRef.current && isSubmitting
+      const isAssistantStreaming = aiStreamingStartedRef.current && submitting
 
       if (!isAssistantSpeaking && !isAssistantStreaming) {
-        console.debug('[barge-in] blocked: assistant not active (isAudioPlaying=%s, audioStreamActive=%s, fallbackTimer=%s, aiStreaming=%s, isSubmitting=%s)',
-          isAudioPlayingRef.current, audioStreamActiveRef.current, fallbackSpeechTimerRef.current !== null, aiStreamingStartedRef.current, isSubmitting)
         return
       }
-
-      console.info('[barge-in] INTERRUPTING assistant (isAudioPlaying=%s, audioStreamActive=%s, aiStreaming=%s)',
-        isAudioPlayingRef.current, audioStreamActiveRef.current, aiStreamingStartedRef.current)
 
       clearFallbackSpeechTimer()
       cancelSpeechSynthesis()
@@ -431,8 +445,8 @@ export default function App() {
         cancelSpeechSynthesis()
 
         const utterance = new SpeechSynthesisUtterance(trimmedText)
-        utterance.rate = 1.0
-        utterance.pitch = 1.0
+        utterance.rate = 1
+        utterance.pitch = 1
         utterance.onstart = () => {
           aiStreamingStartedRef.current = true
           setAudioPlayingState(true)
@@ -448,7 +462,14 @@ export default function App() {
         window.speechSynthesis.speak(utterance)
       }, 500)
     },
-    [cancelSpeechSynthesis, clearFallbackSpeechTimer, finishAudioPlayback, raiseThreshold, setAudioPlayingState, ttsEnabled],
+    [
+      cancelSpeechSynthesis,
+      clearFallbackSpeechTimer,
+      finishAudioPlayback,
+      raiseThreshold,
+      setAudioPlayingState,
+      ttsEnabled,
+    ],
   )
 
   useEffect(() => {
@@ -467,26 +488,36 @@ export default function App() {
 
     void window.api.setMinimizedOverlayVariant(nextVariant)
     setMinimizedVariant(nextVariant)
-  }, [errorMessage, isMinimizedPromptComposing, latestResponseText, minimizedVariant, overlayMode, sessionMode])
+  }, [
+    errorMessage,
+    isMinimizedPromptComposing,
+    latestResponseText,
+    minimizedVariant,
+    overlayMode,
+    sessionMode,
+  ])
 
-  const handleSetMinimizedVariant = useCallback(async (variant: MinimizedOverlayVariant): Promise<void> => {
-    clearMinimizedVoiceCollapseTimer()
+  const handleSetMinimizedVariant = useCallback(
+    async (variant: MinimizedOverlayVariant): Promise<void> => {
+      clearMinimizedVoiceCollapseTimer()
 
-    try {
-      await window.api.setMinimizedOverlayVariant(variant)
+      try {
+        await window.api.setMinimizedOverlayVariant(variant)
 
-      if (variant !== 'prompt-response') {
-        clearLatestResponse()
+        if (variant !== 'prompt-response') {
+          clearLatestResponse()
+        }
+
+        setOverlayMode('minimized')
+        setMinimizedVariant(variant)
+        setIsMinimizedPromptComposing(variant === 'prompt-input')
+      } catch (error) {
+        console.error('[App] Failed to set minimized overlay variant:', error)
+        void syncOverlayStateFromMain()
       }
-
-      setOverlayMode('minimized')
-      setMinimizedVariant(variant)
-      setIsMinimizedPromptComposing(variant === 'prompt-input')
-    } catch (error) {
-      console.error('[App] Failed to set minimized overlay variant:', error)
-      void syncOverlayStateFromMain()
-    }
-  }, [clearLatestResponse, clearMinimizedVoiceCollapseTimer, syncOverlayStateFromMain])
+    },
+    [clearLatestResponse, clearMinimizedVoiceCollapseTimer, syncOverlayStateFromMain],
+  )
 
   useEffect(() => {
     const nextVariant = getVoiceTurnCompleteVariant({
@@ -536,14 +567,16 @@ export default function App() {
       setSessionMode(state.sessionMode)
       setOverlayMode(state.overlayMode)
       setMinimizedVariant(state.minimizedVariant)
+      setEndedSessionData(state.endedSessionData)
+      setIsMinimizedPromptComposing(
+        state.overlayMode === 'minimized' && state.minimizedVariant === 'prompt-input',
+      )
     })
 
     void window.api.listSessions().then((sessions) => {
-      if (cancelled) {
-        return
+      if (!cancelled) {
+        setSessionHistory(sessions)
       }
-
-      setSessionHistory(sessions)
     })
 
     return () => {
@@ -595,7 +628,11 @@ export default function App() {
             return
           }
 
-          const audioBuffer = decodeAudioChunk(data.audio, audioContext, audioSampleRateRef.current)
+          const audioBuffer = decodeAudioChunk(
+            data.audio,
+            audioContext,
+            audioSampleRateRef.current,
+          )
           const startAt = Math.max(audioNextStartTimeRef.current, audioContext.currentTime)
           const sourceNode = audioContext.createBufferSource()
           sourceNode.buffer = audioBuffer
@@ -615,7 +652,7 @@ export default function App() {
           sourceNode.start(startAt)
           audioNextStartTimeRef.current = startAt + audioBuffer.duration
         })
-        .catch(() => { })
+        .catch(() => {})
     })
 
     window.api.onSidecarAudioEnd((data) => {
@@ -642,7 +679,8 @@ export default function App() {
         return
       }
 
-      const latestAssistantText = getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
+      const latestAssistantText =
+        getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
       speakWithWebSpeech(latestAssistantText)
     })
 
@@ -672,7 +710,23 @@ export default function App() {
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
       window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
     }
-  }, [appendAssistantText, cancelSpeechSynthesis, clearFallbackSpeechTimer, ensureAudioContext, failAssistantResponse, finishAudioPlayback, finishAssistantResponse, raiseThreshold, setAudioPlayingState, speakWithWebSpeech, stopScheduledAudioSources, submitPendingVoiceTurn, syncOverlayStateFromMain])
+  }, [
+    appendAssistantText,
+    cancelSpeechSynthesis,
+    clearFallbackSpeechTimer,
+    ensureAudioContext,
+    failAssistantResponse,
+    finishAudioPlayback,
+    finishAssistantResponse,
+    raiseThreshold,
+    resetAssistantWaveform,
+    setAudioPlayingState,
+    speakWithWebSpeech,
+    startAssistantWaveformLoop,
+    stopScheduledAudioSources,
+    submitPendingVoiceTurn,
+    syncOverlayStateFromMain,
+  ])
 
   useEffect(() => {
     return () => {
@@ -691,18 +745,36 @@ export default function App() {
       assistantGainNodeRef.current = null
       assistantAnalyserRef.current = null
     }
-  }, [cancelSpeechSynthesis, clearFallbackSpeechTimer, clearMinimizedVoiceCollapseTimer, resetAssistantWaveform, stopAssistantWaveformLoop, stopScheduledAudioSources])
+  }, [
+    cancelSpeechSynthesis,
+    clearFallbackSpeechTimer,
+    clearMinimizedVoiceCollapseTimer,
+    resetAssistantWaveform,
+    stopAssistantWaveformLoop,
+    stopScheduledAudioSources,
+  ])
 
-  async function handleStartSession(): Promise<void> {
-    await window.api.startSession()
+  async function handleStartSession(sessionName: string): Promise<void> {
+    await window.api.startSession({ sessionName })
     aiStreamingStartedRef.current = false
+    audioStartedForTurnRef.current = false
+    pendingVoiceWavRef.current = null
     clearMinimizedVoiceCollapseTimer()
+    clearFallbackSpeechTimer()
+    cancelSpeechSynthesis()
+    stopScheduledAudioSources()
     stopAssistantWaveformLoop()
     resetAssistantWaveform()
+    finishAudioPlayback()
+    ignoreIncomingSidecarAudioRef.current = false
+    setCaptureSourceLabel(null)
     setSessionHistory([])
     clearConversation()
     startSession()
+    setActiveSessionName(sessionName)
     setHomeView('landing')
+    setSelectedPastSession(null)
+    setEndedSessionData(null)
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
@@ -717,6 +789,7 @@ export default function App() {
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
+    clearLatestResponse()
     clearMinimizedVoiceCollapseTimer()
     await window.api.minimizeOverlay()
     setOverlayMode('minimized')
@@ -724,15 +797,25 @@ export default function App() {
   }
 
   async function handleStopSession(): Promise<void> {
+    const userMessageCount = messages.filter((message) => message.role === 'user').length
+    const duration = sessionStartTime === null ? 0 : Date.now() - sessionStartTime
+    const nextEndedSessionData: EndedSessionSnapshot = {
+      sessionName: activeSessionName,
+      duration,
+      messageCount: userMessageCount,
+    }
+
     clearMinimizedVoiceCollapseTimer()
     pendingVoiceWavRef.current = null
     aiStreamingStartedRef.current = false
+    audioStartedForTurnRef.current = false
     clearFallbackSpeechTimer()
     cancelSpeechSynthesis()
     stopScheduledAudioSources()
     stopAssistantWaveformLoop()
     resetAssistantWaveform()
     finishAudioPlayback()
+    setEndedSessionData(nextEndedSessionData)
 
     if (audioContextRef.current !== null) {
       void audioContextRef.current.close()
@@ -747,20 +830,31 @@ export default function App() {
       console.error('[App] Failed to send sidecar interrupt while stopping session:', error)
     }
 
-    await window.api.stopSession()
+    await window.api.stopSession({
+      endedSessionData: nextEndedSessionData,
+    })
+
     const sessions = await window.api.listSessions()
     setSessionHistory(sessions)
     clearConversation()
+    setActiveSessionName('Study Session')
     setHomeView('landing')
+    setSelectedPastSession(null)
     setIsMinimizedPromptComposing(false)
     setSessionMode('home')
     setOverlayMode('expanded')
     setMinimizedVariant('compact')
   }
 
+  function handleGoHomeFromEnded(): void {
+    setEndedSessionData(null)
+    setHomeView('landing')
+    setSelectedPastSession(null)
+    void window.api.clearEndedSession()
+  }
+
   async function handleSubmitPrompt(text: string): Promise<void> {
     const trimmedText = text.trim()
-
     if (trimmedText.length === 0) {
       return
     }
@@ -806,6 +900,32 @@ export default function App() {
     }
   }
 
+  async function handleOpenPastSession(sessionId: string): Promise<void> {
+    const detail = await window.api.getSessionDetail({ sessionId })
+    setSelectedPastSession(detail)
+  }
+
+  async function handleDeleteSession(sessionId: string): Promise<void> {
+    await window.api.deleteSession({ sessionId })
+    removeSessionHistoryItem(sessionId)
+
+    if (selectedPastSession?.session.id === sessionId) {
+      setSelectedPastSession(null)
+      setHomeView('landing')
+    }
+  }
+
+  if (endedSessionData !== null) {
+    return (
+      <SessionEndedView
+        duration={endedSessionData.duration}
+        messageCount={endedSessionData.messageCount}
+        onGoHome={handleGoHomeFromEnded}
+        sessionName={endedSessionData.sessionName}
+      />
+    )
+  }
+
   if (sessionMode === 'active' && overlayMode === 'minimized') {
     return (
       <MinimizedSessionBar
@@ -832,9 +952,9 @@ export default function App() {
           void handleStopSession()
         }}
         onToggleVadListening={toggleVadListening}
+        showVoiceWaveform={showVoiceWaveform}
         vadListeningEnabled={vadListeningEnabled}
         waveformBars={waveformPresentation.bars}
-        showVoiceWaveform={showVoiceWaveform}
         waveformState={waveformPresentation.state}
       />
     )
@@ -850,6 +970,7 @@ export default function App() {
         isMicListening={isListening}
         isMicMuted={isMuted}
         messages={messages}
+        sessionName={activeSessionName}
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}
@@ -860,11 +981,26 @@ export default function App() {
           void handleSubmitPrompt(nextText)
         }}
         onToggleVadListening={toggleVadListening}
+        showVoiceWaveform={showVoiceWaveform}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
         waveformBars={waveformPresentation.bars}
-        showVoiceWaveform={showVoiceWaveform}
         waveformState={waveformPresentation.state}
+      />
+    )
+  }
+
+  if (sessionMode === 'home' && selectedPastSession !== null) {
+    return (
+      <PastSessionView
+        messages={selectedPastSession.messages}
+        onBack={() => {
+          setSelectedPastSession(null)
+        }}
+        onDelete={() => {
+          void handleDeleteSession(selectedPastSession.session.id)
+        }}
+        session={selectedPastSession.session}
       />
     )
   }
@@ -875,20 +1011,41 @@ export default function App() {
         onBack={() => {
           setHomeView('landing')
         }}
+        onDeleteSession={(sessionId) => {
+          void handleDeleteSession(sessionId)
+        }}
+        onSelectSession={(sessionId) => {
+          void handleOpenPastSession(sessionId)
+        }}
         sessions={sessionHistory}
       />
     )
   }
 
   return (
-    <HomeScreen
-      onViewAllSessions={() => {
-        setHomeView('all-sessions')
-      }}
-      onStartSession={() => {
-        void handleStartSession()
-      }}
-      sessions={sessionHistory}
-    />
+    <>
+      <HomeScreen
+        onDeleteSession={(sessionId) => {
+          void handleDeleteSession(sessionId)
+        }}
+        onSelectSession={(sessionId) => {
+          void handleOpenPastSession(sessionId)
+        }}
+        onStartSession={(sessionName) => {
+          void handleStartSession(sessionName)
+        }}
+        onViewAllSessions={() => {
+          setHomeView('all-sessions')
+        }}
+        sessions={sessionHistory}
+        userName={userName}
+      />
+      <UserNameModal
+        isOpen={userName === null}
+        onSave={(name) => {
+          setUserName(name)
+        }}
+      />
+    </>
   )
 }

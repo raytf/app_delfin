@@ -16,6 +16,7 @@ interface ExpandedSessionViewProps {
   isMicListening: boolean
   isMicMuted: boolean
   messages: ChatMessage[]
+  sessionName: string
   onMinimize: () => void
   onStop: () => void
   onSubmitPrompt: (text: string) => void
@@ -73,6 +74,7 @@ export default function ExpandedSessionView({
   isMicListening,
   isMicMuted,
   messages,
+  sessionName,
   onMinimize,
   onStop,
   onSubmitPrompt,
@@ -84,7 +86,6 @@ export default function ExpandedSessionView({
   waveformState,
 }: ExpandedSessionViewProps) {
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
-  const sessionName = captureSourceLabel ?? 'Study Session'
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
