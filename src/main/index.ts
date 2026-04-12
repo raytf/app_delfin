@@ -80,24 +80,15 @@ function clearEndedSessionData(): void {
 }
 
 async function switchOverlayMode(mode: OverlayMode): Promise<void> {
-  if (
-    overlayMode === mode &&
-    mainWindow !== null &&
-    !mainWindow.isDestroyed()
-  ) {
-    setOverlayMode(mainWindow, mode, minimizedVariant);
-    mainWindow.focus();
+  if (mainWindow === null || mainWindow.isDestroyed()) {
+    const nextWindow = createWindow(mode);
+    nextWindow.focus();
     return;
   }
 
-  const previousWindow = mainWindow;
-  const nextWindow = createWindow(mode);
-
-  if (previousWindow !== null && !previousWindow.isDestroyed()) {
-    previousWindow.destroy();
-  }
-
-  nextWindow.focus();
+  overlayMode = mode;
+  setOverlayMode(mainWindow, mode, minimizedVariant);
+  mainWindow.focus();
 }
 
 app.whenReady().then(() => {

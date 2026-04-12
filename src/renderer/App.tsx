@@ -82,6 +82,7 @@ export default function App() {
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
+  const activeAssistantMessageId = useSessionStore((state) => state.activeAssistantMessageId)
   const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
   const toggleVadListening = useSessionStore((state) => state.toggleVadListening)
@@ -90,10 +91,22 @@ export default function App() {
   const userName = useSettingsStore((state) => state.userName)
   const setUserName = useSettingsStore((state) => state.setUserName)
 
-  const latestResponseText =
+  const minimizedResponseMessage =
     minimizedResponseMessageId === null
       ? null
-      : messages.find((message) => message.id === minimizedResponseMessageId)?.content ?? null
+      : messages.find((message) => message.id === minimizedResponseMessageId) ?? null
+  const activeAssistantMessage =
+    activeAssistantMessageId === null
+      ? null
+      : messages.find((message) => message.id === activeAssistantMessageId) ?? null
+  const latestAssistantMessage = getLatestAssistantMessage(messages)
+  const liveAssistantResponseText =
+    activeAssistantMessage?.content ??
+    (isSubmitting ? latestAssistantMessage?.content ?? null : null)
+  const latestResponseText =
+    sessionMode === 'active'
+      ? liveAssistantResponseText ?? minimizedResponseMessage?.content ?? null
+      : minimizedResponseMessage?.content ?? null
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const assistantGainNodeRef = useRef<GainNode | null>(null)
@@ -461,6 +474,7 @@ export default function App() {
   useEffect(() => {
     const nextVariant = getAutoAdvanceMinimizedVariant({
       errorMessage,
+      isAssistantResponding,
       isMinimizedPromptComposing,
       latestResponseText,
       minimizedVariant,
@@ -476,6 +490,7 @@ export default function App() {
     setMinimizedVariant(nextVariant)
   }, [
     errorMessage,
+    isAssistantResponding,
     isMinimizedPromptComposing,
     latestResponseText,
     minimizedVariant,
@@ -767,11 +782,22 @@ export default function App() {
   }
 
   async function handleMinimizeOverlay(): Promise<void> {
-    clearLatestResponse()
     clearMinimizedVoiceCollapseTimer()
-    await window.api.minimizeOverlay()
+    const hasActiveResponse =
+      errorMessage !== null ||
+      (latestResponseText !== null && latestResponseText.trim().length > 0) ||
+      isAssistantResponding
+    const nextVariant: MinimizedOverlayVariant = hasActiveResponse ? 'prompt-response' : 'compact'
+    setIsMinimizedPromptComposing(false)
     setOverlayMode('minimized')
-    setMinimizedVariant('compact')
+    setMinimizedVariant(nextVariant)
+
+    if (nextVariant === 'compact') {
+      await window.api.minimizeOverlay()
+      return
+    }
+
+    await window.api.setMinimizedOverlayVariant(nextVariant)
   }
 
   async function handleStopSession(): Promise<void> {
@@ -958,7 +984,6 @@ export default function App() {
         showVoiceWaveform={shouldShowVoiceWaveform}
         sidecarStatus={sidecarStatus}
         vadListeningEnabled={vadListeningEnabled}
-        waveformBars={waveformPresentation.bars}
         waveformState={waveformPresentation.state}
       />
     )

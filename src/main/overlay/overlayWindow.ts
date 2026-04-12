@@ -97,15 +97,15 @@ export function createOverlayWindow(
 
   const window = new BrowserWindow({
     ...initialBounds,
-    frame: mode === "expanded",
+    frame: false,
     alwaysOnTop: isMinimizedMode,
     resizable: mode === "expanded",
     maximizable: false,
-    minimizable: mode === "expanded",
+    minimizable: false,
     fullscreenable: mode === "expanded",
     skipTaskbar: isMinimizedMode,
     show: false,
-    transparent: isMinimizedMode,
+    transparent: true,
     hasShadow: !isMinimizedMode,
     backgroundColor: isMinimizedMode ? "#00000000" : "#f8fcfd",
     title: "Delfin",
@@ -134,4 +134,12 @@ export function setOverlayMode(
   window.setBounds(getWindowBounds(mode, minimizedVariant), true);
   window.setAlwaysOnTop(mode === "minimized");
   window.setSkipTaskbar(mode === "minimized");
+  window.setResizable(mode === "expanded");
+  window.setMinimizable(false);
+  window.setFullScreenable(mode === "expanded");
+  window.setHasShadow(mode === "expanded");
+  window.setBackgroundColor(mode === "minimized" ? "#00000000" : "#f8fcfd");
+  if (!window.isVisible()) {
+    window.show();
+  }
 }

@@ -19,27 +19,23 @@ export default function MinimizedPromptPanel({
   latestResponseText,
   onSubmitPrompt,
 }: MinimizedPromptPanelProps) {
-  const [isComposing, setIsComposing] = useState(!isShowingResponse)
+  const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
+  const shouldShowResponse =
+    isShowingResponse || isAudioPlaying || isSubmitting || hasResponseText || errorMessage !== null
+  const [isComposing, setIsComposing] = useState(!shouldShowResponse)
 
   useEffect(() => {
-    if (isSubmitting) {
-      setIsComposing(false)
-    }
-  }, [isSubmitting])
-
-  useEffect(() => {
-    setIsComposing(!isShowingResponse)
-  }, [isShowingResponse])
+    setIsComposing(!shouldShowResponse)
+  }, [shouldShowResponse])
 
   if (isComposing) {
     return (
       <SessionPromptComposer
         autoFocus
         className="flex items-center gap-2"
-        disabled={isAudioPlaying}
         isSubmitting={isSubmitting}
         onSubmitPrompt={onSubmitPrompt}
-        placeholder={isAudioPlaying ? 'Delfin is speaking…' : 'Ask Delfin'}
+        placeholder="Ask Delfin"
         submitLabel="Send"
       />
     )
@@ -87,7 +83,7 @@ function StreamingResponseBody({
             <ThinkingDots label="Thinking" />
           </div>
         ) : hasResponseText ? (
-          <p className="whitespace-pre-wrap">{latestResponseText}</p>
+          <p>test</p>
         ) : (
           <p className="text-[var(--text-muted)]">Ask about what's on screen to get a response here.</p>
         )}

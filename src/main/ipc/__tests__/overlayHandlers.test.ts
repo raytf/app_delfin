@@ -41,11 +41,14 @@ describe('registerOverlayIpcHandlers', () => {
         webContents: { send },
       }) as never,
       getOverlayState: () => ({
+        endedSessionData: null,
         minimizedVariant: currentVariant,
         overlayMode: 'expanded',
         sessionMode: 'active',
       }),
+      clearEndedSessionData: () => undefined,
       sessionPersistence: {} as never,
+      setEndedSessionData: () => undefined,
       setMinimizedVariant: (variant) => {
         currentVariant = variant
       },
