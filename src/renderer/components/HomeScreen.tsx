@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionHistoryCard from './SessionHistoryCard'
@@ -10,6 +10,55 @@ interface HomeScreenProps {
   onViewAllSessions: () => void
   sessions: SessionListItem[]
   userName: string | null
+}
+
+// Typing effect component
+function TypewriterText({
+  text,
+  className,
+  delay = 0,
+  onComplete,
+}: {
+  text: string
+  className?: string
+  delay?: number
+  onComplete?: () => void
+}) {
+  const [displayedText, setDisplayedText] = useState('')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [started, setStarted] = useState(delay === 0)
+
+  useEffect(() => {
+    if (delay > 0) {
+      const timeout = setTimeout(() => setStarted(true), delay)
+      return () => clearTimeout(timeout)
+    }
+  }, [delay])
+
+  useEffect(() => {
+    if (!started) return
+
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText((prev) => prev + text[currentIndex])
+        setCurrentIndex((prev) => prev + 1)
+      }, 40)
+      return () => clearTimeout(timeout)
+    } else if (currentIndex === text.length && onComplete) {
+      onComplete()
+    }
+  }, [currentIndex, text, started, onComplete])
+
+  if (!started) return null
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {currentIndex < text.length && (
+        <span className="animate-pulse text-[var(--primary)]">|</span>
+      )}
+    </span>
+  )
 }
 
 // Dolphin wave SVG for decorative element
@@ -137,25 +186,36 @@ export default function HomeScreen({
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-8 py-12">
         {/* Hero Section - Centered */}
         <main className="flex flex-1 flex-col items-center justify-center pb-8 pt-4 text-center">
-          <div className="flex items-center gap-2 sm:gap-2">
+          <div className="flex items-center gap-2">
             <img
               alt="Delfin logo"
-              className="mb-1 h-28 w-28 object-contain sm:h-32 sm:w-32"
+              className="h-16 w-16 object-contain sm:h-20 sm:w-20"
               src={delfinLogo}
             />
-            <h1 className="font-display text-8xl font-bold tracking-tight text-[var(--primary)]">
+            <h1 className="font-display text-5xl font-bold tracking-tight text-[var(--primary)] sm:text-6xl">
               Delfin
             </h1>
           </div>
 
-          {/* Tagline */}
-          <p className="mt-5 max-w-xl text-xl leading-relaxed text-[var(--text-secondary)]">
-            {userName !== null ? `Welcome back, ${userName}.` : 'Your intelligent study companion that sees what you see.'}
-            <br />
-            <span className="text-[var(--text-muted)]">
-              Ask questions, get explanations, and learn faster together.
-            </span>
-          </p>
+          {/* Tagline with typing effect */}
+          <div className="mt-3 max-w-xl text-xl leading-relaxed">
+            <p className="text-[var(--text-secondary)]">
+              <TypewriterText text="Your intelligent study companion that sees what you see." />
+            </p>
+            <p className="mt-0 text-[var(--text-muted)]">
+              <TypewriterText
+                text="Ask questions, get explanations, and learn faster together."
+                delay={2400}
+              />
+            </p>
+          </div>
+
+          {/* Welcome message */}
+          {userName !== null && (
+            <p className="mt-6 text-2xl text-[var(--text-secondary)]">
+              Welcome back, <span className="font-semibold text-[var(--primary)]">{userName}</span>
+            </p>
+          )}
 
           {/* Start Session Button */}
           <button
