@@ -4,12 +4,14 @@ import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import PastSessionView from './components/PastSessionView'
+import SessionEndedView from './components/SessionEndedView'
 import UserNameModal from './components/UserNameModal'
 import { useSessionStore } from './stores/sessionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type CaptureFrame,
+  type EndedSessionSnapshot,
   type MinimizedOverlayVariant,
   type OverlayMode,
   type SessionDetail,
@@ -27,6 +29,7 @@ export default function App() {
   const [isMinimizedPromptComposing, setIsMinimizedPromptComposing] = useState(false)
   const [captureSourceLabel, setCaptureSourceLabel] = useState<string | null>(null)
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>({ connected: false })
+  const [endedSessionData, setEndedSessionData] = useState<EndedSessionSnapshot | null>(null)
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const startSession = useSessionStore((state) => state.startSession)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
@@ -42,6 +45,7 @@ export default function App() {
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
   const minimizedResponseMessageId = useSessionStore((state) => state.minimizedResponseMessageId)
+  const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
   const userName = useSettingsStore((state) => state.userName)
   const setUserName = useSettingsStore((state) => state.setUserName)
   const latestResponseText =
@@ -78,6 +82,7 @@ export default function App() {
       setSessionMode(state.sessionMode)
       setOverlayMode(state.overlayMode)
       setMinimizedVariant(state.minimizedVariant)
+      setEndedSessionData(state.endedSessionData)
     })
 
     void window.api.listSessions().then((sessions) => {
@@ -131,6 +136,7 @@ export default function App() {
     setActiveSessionName(sessionName)
     setHomeView('landing')
     setSelectedPastSession(null)
+    setEndedSessionData(null)
     setIsMinimizedPromptComposing(false)
     setSessionMode('active')
     setOverlayMode('minimized')
@@ -158,7 +164,21 @@ export default function App() {
   }
 
   async function handleStopSession(): Promise<void> {
-    await window.api.stopSession()
+    // Capture session data before clearing
+    const userMessageCount = messages.filter((m) => m.role === 'user').length
+    const duration = sessionStartTime ? Date.now() - sessionStartTime : 0
+
+    const nextEndedSessionData: EndedSessionSnapshot = {
+      sessionName: activeSessionName,
+      duration,
+      messageCount: userMessageCount,
+    }
+
+    setEndedSessionData(nextEndedSessionData)
+
+    await window.api.stopSession({
+      endedSessionData: nextEndedSessionData,
+    })
     const sessions = await window.api.listSessions()
     setSessionHistory(sessions)
     clearConversation()
@@ -169,6 +189,11 @@ export default function App() {
     setSessionMode('home')
     setOverlayMode('expanded')
     setMinimizedVariant('compact')
+  }
+
+  function handleGoHomeFromEnded(): void {
+    setEndedSessionData(null)
+    void window.api.clearEndedSession()
   }
 
   async function handleSetMinimizedVariant(variant: MinimizedOverlayVariant): Promise<void> {
@@ -225,6 +250,17 @@ export default function App() {
       setSelectedPastSession(null)
       setHomeView('landing')
     }
+  }
+
+  if (endedSessionData !== null) {
+    return (
+      <SessionEndedView
+        duration={endedSessionData.duration}
+        messageCount={endedSessionData.messageCount}
+        onGoHome={handleGoHomeFromEnded}
+        sessionName={endedSessionData.sessionName}
+      />
+    )
   }
 
   if (sessionMode === 'active' && overlayMode === 'minimized') {

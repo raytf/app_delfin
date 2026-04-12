@@ -10,6 +10,7 @@ import {
   type SessionPromptRequest,
   type SessionPromptResponse,
   type SessionStartRequest,
+  type SessionStopRequest,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
@@ -27,7 +28,8 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     await options.switchOverlayMode('minimized')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async (_event, request: SessionStopRequest) => {
+    options.setEndedSessionData(request.endedSessionData)
     await options.sessionPersistence.stopSession('completed')
     options.setSessionMode('home')
     options.setMinimizedVariant('compact')

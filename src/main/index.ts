@@ -9,6 +9,7 @@ import { validateEnv } from "./envValidation";
 import { FileSessionStorage } from "./storage/fileSessionStorage";
 import {
   MAIN_TO_RENDERER_CHANNELS,
+  type EndedSessionSnapshot,
   type MinimizedOverlayVariant,
   type OverlayMode,
   type OverlayState,
@@ -23,6 +24,7 @@ let overlayMode: OverlayMode = "expanded";
 let minimizedVariant: MinimizedOverlayVariant = "compact";
 let sessionMode: SessionMode = "home";
 let sessionPersistence: SessionPersistenceService | null = null;
+let endedSessionData: EndedSessionSnapshot | null = null;
 
 function createWindow(mode: OverlayMode): BrowserWindow {
   const window = createOverlayWindow(mode, minimizedVariant);
@@ -44,6 +46,7 @@ function getOverlayState(): OverlayState {
     overlayMode,
     minimizedVariant,
     sessionMode,
+    endedSessionData,
   };
 }
 
@@ -53,6 +56,14 @@ function setSessionMode(mode: SessionMode): void {
 
 function setMinimizedVariant(variant: MinimizedOverlayVariant): void {
   minimizedVariant = variant;
+}
+
+function setEndedSessionData(data: EndedSessionSnapshot | null): void {
+  endedSessionData = data;
+}
+
+function clearEndedSessionData(): void {
+  endedSessionData = null;
 }
 
 async function switchOverlayMode(mode: OverlayMode): Promise<void> {
@@ -86,6 +97,8 @@ app.whenReady().then(() => {
     getMainWindow: () => mainWindow,
     sessionPersistence,
     sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
+    clearEndedSessionData,
+    setEndedSessionData,
     setMinimizedVariant,
     switchOverlayMode,
     setSessionMode,

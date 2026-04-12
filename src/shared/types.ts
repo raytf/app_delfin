@@ -51,6 +51,16 @@ export interface SessionDeleteRequest {
   sessionId: string
 }
 
+export interface EndedSessionSnapshot {
+  sessionName: string
+  duration: number
+  messageCount: number
+}
+
+export interface SessionStopRequest {
+  endedSessionData: EndedSessionSnapshot | null
+}
+
 export interface WsInterruptMessage {
   type: 'interrupt'
 }
@@ -81,6 +91,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   OVERLAY_MINIMIZE: 'overlay:minimize',
   OVERLAY_RESTORE: 'overlay:restore',
   OVERLAY_SET_MINIMIZED_VARIANT: 'overlay:set-minimized-variant',
+  OVERLAY_CLEAR_ENDED_SESSION: 'overlay:clear-ended-session',
   SESSION_START: 'session:start',
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
@@ -145,6 +156,7 @@ export interface OverlayState {
   overlayMode: OverlayMode
   minimizedVariant: MinimizedOverlayVariant
   sessionMode: SessionMode
+  endedSessionData: EndedSessionSnapshot | null
 }
 
 // Electron API exposed via contextBridge (window.api)
@@ -155,7 +167,7 @@ export interface ElectronAPI {
   sidecarInterrupt: () => void
   getOverlayState: () => Promise<OverlayState>
   startSession: (request: SessionStartRequest) => Promise<void>
-  stopSession: () => Promise<void>
+  stopSession: (request: SessionStopRequest) => Promise<void>
   submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>
   getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>
@@ -164,6 +176,7 @@ export interface ElectronAPI {
   minimizeOverlay: () => Promise<void>
   restoreOverlay: () => Promise<void>
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
+  clearEndedSession: () => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
   onSidecarAudioStart: (cb: () => void) => void

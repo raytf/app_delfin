@@ -4,6 +4,9 @@ import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerOverlayIpcHandlers(options: RegisterIpcHandlersOptions): void {
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.OVERLAY_GET_STATE, async () => options.getOverlayState())
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.OVERLAY_CLEAR_ENDED_SESSION, async () => {
+    options.clearEndedSessionData()
+  })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.OVERLAY_MINIMIZE, async () => {
     options.setMinimizedVariant('compact')

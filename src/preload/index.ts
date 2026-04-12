@@ -6,6 +6,7 @@ import type {
   SidecarStatus,
   ElectronAPI,
   OverlayState,
+  SessionStopRequest,
   SessionDetail,
   SessionDetailRequest,
   SessionDeleteRequest,
@@ -34,7 +35,8 @@ const api: ElectronAPI = {
   startSession: (request: SessionStartRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START, request),
 
-  stopSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP),
+  stopSession: (request: SessionStopRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, request),
 
   submitSessionPrompt: (request: SessionPromptRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request) as Promise<SessionPromptResponse>,
@@ -57,6 +59,8 @@ const api: ElectronAPI = {
 
   setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MINIMIZED_VARIANT, variant),
+
+  clearEndedSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_CLEAR_ENDED_SESSION),
 
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
