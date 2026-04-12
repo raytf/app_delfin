@@ -8,6 +8,7 @@ export interface SessionRecord {
   endedAt: number | null
   status: PersistedSessionStatus
   presetId: PresetId | null
+  sessionName: string
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number

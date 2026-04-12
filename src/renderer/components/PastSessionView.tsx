@@ -41,7 +41,7 @@ export default function PastSessionView({
   onDelete,
   session,
 }: PastSessionViewProps) {
-  const sessionName = session.sourceLabel ?? 'Untitled Session'
+  const sessionName = session.sessionName || session.sourceLabel || 'Untitled Session'
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">

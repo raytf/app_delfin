@@ -24,7 +24,7 @@ export class SessionPersistenceService {
 
   constructor(private readonly storage: SessionStorage) {}
 
-  async startSession(): Promise<string> {
+  async startSession(sessionName: string): Promise<string> {
     const now = Date.now()
     const sessionId = crypto.randomUUID()
     const sessionRecord: SessionRecord = {
@@ -33,6 +33,7 @@ export class SessionPersistenceService {
       endedAt: null,
       status: 'active',
       presetId: null,
+      sessionName,
       sourceLabel: null,
       messageCount: 0,
       lastUpdatedAt: now,

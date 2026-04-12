@@ -74,7 +74,7 @@ export default function SessionHistoryCard({
       {/* Delete button - appears on hover in top right */}
       {onDelete !== undefined ? (
         <button
-          aria-label={`Delete ${session.sourceLabel ?? 'session'}`}
+          aria-label={`Delete ${session.sessionName || session.sourceLabel || 'session'}`}
           className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-[var(--bg-surface)] text-[var(--text-muted)] opacity-0 shadow-sm transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
           onClick={(event) => {
             event.stopPropagation()
@@ -92,7 +92,7 @@ export default function SessionHistoryCard({
             isDetailed ? '' : 'line-clamp-2'
           }`}
         >
-          {session.sourceLabel ?? 'Untitled Session'}
+          {session.sessionName || session.sourceLabel || 'Untitled Session'}
         </h3>
         {isDetailed ? (
           <p className="mt-2 text-sm text-[var(--text-secondary)]">

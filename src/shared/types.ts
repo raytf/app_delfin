@@ -30,6 +30,10 @@ export interface SessionPromptRequest {
   presetId: PresetId
 }
 
+export interface SessionStartRequest {
+  sessionName: string
+}
+
 export interface SessionPromptResponse {
   imagePath: string
   messageId: string
@@ -122,6 +126,7 @@ export interface SessionListItem {
   endedAt: number | null
   status: PersistedSessionStatus
   presetId: PresetId | null
+  sessionName: string
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number
@@ -149,7 +154,7 @@ export interface ElectronAPI {
   sidecarSend: (msg: WsOutboundMessage) => void
   sidecarInterrupt: () => void
   getOverlayState: () => Promise<OverlayState>
-  startSession: () => Promise<void>
+  startSession: (request: SessionStartRequest) => Promise<void>
   stopSession: () => Promise<void>
   submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>

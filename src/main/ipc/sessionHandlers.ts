@@ -9,12 +9,19 @@ import {
   type SessionMessageImageRequest,
   type SessionPromptRequest,
   type SessionPromptResponse,
+  type SessionStartRequest,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async () => {
-    await options.sessionPersistence.startSession()
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async (_event, request: SessionStartRequest) => {
+    const sessionName = request.sessionName.trim()
+
+    if (sessionName.length === 0) {
+      throw new Error('Session name cannot be empty.')
+    }
+
+    await options.sessionPersistence.startSession(sessionName)
     options.setSessionMode('active')
     options.setMinimizedVariant('compact')
     await options.switchOverlayMode('minimized')

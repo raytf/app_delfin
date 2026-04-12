@@ -12,6 +12,7 @@ import type {
   SessionMessageImageRequest,
   SessionPromptRequest,
   SessionPromptResponse,
+  SessionStartRequest,
   MinimizedOverlayVariant,
   SessionListItem,
 } from '../shared/types'
@@ -30,7 +31,8 @@ const api: ElectronAPI = {
   getOverlayState: () =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_GET_STATE) as Promise<OverlayState>,
 
-  startSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START),
+  startSession: (request: SessionStartRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START, request),
 
   stopSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP),
 

@@ -20,6 +20,7 @@ import {
 export default function App() {
   const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
   const [selectedPastSession, setSelectedPastSession] = useState<SessionDetail | null>(null)
+  const [activeSessionName, setActiveSessionName] = useState<string>('Study Session')
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('expanded')
   const [minimizedVariant, setMinimizedVariant] = useState<MinimizedOverlayVariant>('compact')
@@ -123,11 +124,11 @@ export default function App() {
   }, [appendAssistantText, failAssistantResponse, finishAssistantResponse])
 
   async function handleStartSession(sessionName: string): Promise<void> {
-    await window.api.startSession()
+    await window.api.startSession({ sessionName })
     setSessionHistory([])
     clearConversation()
     startSession()
-    setCaptureSourceLabel(sessionName)
+    setActiveSessionName(sessionName)
     setHomeView('landing')
     setSelectedPastSession(null)
     setIsMinimizedPromptComposing(false)
@@ -161,6 +162,7 @@ export default function App() {
     const sessions = await window.api.listSessions()
     setSessionHistory(sessions)
     clearConversation()
+    setActiveSessionName('Study Session')
     setHomeView('landing')
     setSelectedPastSession(null)
     setIsMinimizedPromptComposing(false)
@@ -254,10 +256,10 @@ export default function App() {
   if (sessionMode === 'active') {
     return (
       <ExpandedSessionView
-        captureSourceLabel={captureSourceLabel}
         errorMessage={errorMessage}
         isSubmitting={isSubmitting}
         messages={messages}
+        sessionName={activeSessionName}
         onMinimize={() => {
           void handleMinimizeOverlay()
         }}

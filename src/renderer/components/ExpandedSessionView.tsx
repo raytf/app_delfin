@@ -6,10 +6,10 @@ import { useSessionStore } from '../stores/sessionStore'
 import SessionConversation from './SessionConversation'
 
 interface ExpandedSessionViewProps {
-  captureSourceLabel: string | null
   errorMessage: string | null
   isSubmitting: boolean
   messages: ChatMessage[]
+  sessionName: string
   onMinimize: () => void
   onAskDelfin: () => void
   onStop: () => void
@@ -51,16 +51,15 @@ function SessionTimer({ startTime }: { startTime: number | null }) {
 }
 
 export default function ExpandedSessionView({
-  captureSourceLabel,
   errorMessage,
   isSubmitting,
   messages,
+  sessionName,
   onMinimize,
   onAskDelfin,
   onStop,
 }: ExpandedSessionViewProps) {
   const sessionStartTime = useSessionStore((state) => state.sessionStartTime)
-  const sessionName = captureSourceLabel ?? 'Study Session'
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
