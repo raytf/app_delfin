@@ -141,20 +141,22 @@ function CommandRow({
 }: CommandRowProps) {
   return (
     <div className="flex w-full shrink-0 items-center justify-center gap-1.5 px-2.5 pb-2.5">
+      <div className="flex h-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface-2)]/70 px-3">
+        <VoiceOrb mode={voiceMode} />
+      </div>
+
       <button
         aria-label={vadListeningEnabled ? 'Pause speech listening' : 'Resume speech listening'}
         aria-pressed={vadListeningEnabled}
-        className={`no-drag flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[11px] font-semibold uppercase tracking-[0.14em] transition ${
+        className={`no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border transition ${
           vadListeningEnabled
-            ? 'border-[var(--border-soft)] bg-[var(--bg-surface-2)]/70 text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
-            : 'border-[var(--border-soft)] bg-[var(--bg-surface-2)]/70 text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+            ? 'border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+            : 'border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
         }`}
         onClick={onToggleVadListening}
         type="button"
       >
-        <VoiceOrb mode={voiceMode} />
-        <span className="truncate">{statusLabel}</span>
-        {vadListeningEnabled ? <Mic size={13} /> : <MicOff size={13} />}
+        {vadListeningEnabled ? <Mic size={14} /> : <MicOff size={14} />}
       </button>
 
       {isResponseMode ? (
