@@ -83,7 +83,7 @@ export default function MinimizedSessionBar({
 
   return (
     <div className="drag-region flex h-screen items-center justify-center overflow-hidden text-[var(--text-primary)]">
-      <div className="flex h-full w-full flex-col overflow-hidden rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-surface)]/95 shadow-xl backdrop-blur">
+      <div className={`flex h-full w-full flex-col overflow-hidden rounded-3xl backdrop-blur ${!isPromptOpen ? 'justify-center mt-2' : ''}`}>
         {isPromptOpen ? (
           <div className="no-drag flex min-h-0 flex-1 flex-col px-2.5 pb-4 pt-2.5">
             <MinimizedPromptPanel
