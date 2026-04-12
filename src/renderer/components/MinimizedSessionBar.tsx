@@ -1,8 +1,7 @@
-import { ChevronDown, Loader2, Maximize2, MessageCircle, Mic, MicOff, Square, Volume2 } from 'lucide-react'
+import { ChevronDown, Maximize2, MessageCircle, Mic, MicOff, Square, Volume2 } from 'lucide-react'
 import type { MinimizedOverlayVariant } from '../../shared/types'
-import type { WaveformBars, WaveformVisualState } from '../utils/waveformState'
+import type { WaveformVisualState } from '../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
-import VoiceWaveform from './VoiceWaveform'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null
@@ -18,9 +17,7 @@ interface MinimizedSessionBarProps {
   onSubmitPrompt: (text: string) => void
   onStop: () => void
   onToggleVadListening: () => void
-  showVoiceWaveform: boolean
   vadListeningEnabled: boolean
-  waveformBars: WaveformBars
   waveformState: WaveformVisualState
 }
 
@@ -38,9 +35,7 @@ export default function MinimizedSessionBar({
   onSubmitPrompt,
   onStop,
   onToggleVadListening,
-  showVoiceWaveform,
   vadListeningEnabled,
-  waveformBars,
   waveformState,
 }: MinimizedSessionBarProps) {
   const isPromptOpen = minimizedVariant !== 'compact'
@@ -63,10 +58,9 @@ export default function MinimizedSessionBar({
           <>
             <VoiceStatusHeader
               compact={false}
-              showVoiceWaveform={showVoiceWaveform}
+              isSubmitting={isSubmitting}
               statusLabel={statusLabel}
               vadListeningEnabled={vadListeningEnabled}
-              waveformBars={waveformBars}
               waveformState={waveformState}
               onToggleVadListening={onToggleVadListening}
             />
@@ -74,6 +68,7 @@ export default function MinimizedSessionBar({
             <div className="mt-3 min-h-0 flex-1">
               <MinimizedPromptPanel
                 errorMessage={errorMessage}
+                isAudioPlaying={isAudioPlaying}
                 isSubmitting={isSubmitting}
                 isShowingResponse={isResponseMode}
                 latestResponseText={latestResponseText}
@@ -85,10 +80,9 @@ export default function MinimizedSessionBar({
           <>
             <VoiceStatusHeader
               compact
-              showVoiceWaveform={showVoiceWaveform}
+              isSubmitting={isSubmitting}
               statusLabel={statusLabel}
               vadListeningEnabled={vadListeningEnabled}
-              waveformBars={waveformBars}
               waveformState={waveformState}
               onToggleVadListening={onToggleVadListening}
             />
@@ -111,21 +105,19 @@ export default function MinimizedSessionBar({
 
 interface VoiceStatusHeaderProps {
   compact?: boolean
+  isSubmitting: boolean
   onToggleVadListening: () => void
-  showVoiceWaveform: boolean
   statusLabel: string
   vadListeningEnabled: boolean
-  waveformBars: WaveformBars
   waveformState: WaveformVisualState
 }
 
 function VoiceStatusHeader({
   compact = false,
+  isSubmitting,
   onToggleVadListening,
-  showVoiceWaveform,
   statusLabel,
   vadListeningEnabled,
-  waveformBars,
   waveformState,
 }: VoiceStatusHeaderProps) {
   return (
@@ -133,9 +125,12 @@ function VoiceStatusHeader({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-[10px] text-[var(--text-muted)]">
           <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${getCompactStatusClasses(waveformState)}`}>
-            {waveformState === 'processing' ? <Loader2 className="animate-spin" size={12} /> : waveformState === 'assistant' ? <Volume2 size={12} /> : vadListeningEnabled ? <Mic size={12} /> : <MicOff size={12} />}
+            {waveformState === 'assistant' ? <Volume2 size={12} /> : vadListeningEnabled ? <Mic size={12} /> : <MicOff size={12} />}
             <span className="truncate">{statusLabel}</span>
           </span>
+
+          <VoiceBubble state={waveformState} isSubmitting={isSubmitting} />
+
           <span className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             {compact ? 'voice' : 'live voice'}
           </span>
@@ -150,19 +145,49 @@ function VoiceStatusHeader({
           {vadListeningEnabled ? <Mic size={16} /> : <MicOff size={16} />}
         </button>
       </div>
-
-      {showVoiceWaveform ? (
-        <div className={compact ? 'mt-2' : 'mt-2.5'}>
-          <VoiceWaveform
-            bars={waveformBars}
-            compact={compact}
-            label={`${compact ? 'Compact' : 'Expanded'} speech waveform in ${waveformState} mode`}
-            state={waveformState}
-          />
-        </div>
-      ) : null}
     </div>
   )
+}
+
+interface VoiceBubbleProps {
+  isSubmitting: boolean
+  state: WaveformVisualState
+}
+
+function VoiceBubble({ isSubmitting, state }: VoiceBubbleProps) {
+  // Thinking: three bouncing dots, no voice indicator
+  if (isSubmitting && state !== 'user' && state !== 'assistant') {
+    return (
+      <div className="flex items-center gap-[3px]" aria-label="Thinking">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-bounce [animation-delay:0ms]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-bounce [animation-delay:150ms]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)] animate-bounce [animation-delay:300ms]" />
+      </div>
+    )
+  }
+
+  // User speaking: green pulsing bubble
+  if (state === 'user') {
+    return (
+      <div className="relative flex h-4 w-4 shrink-0 items-center justify-center" aria-label="Voice detected">
+        <span className="absolute h-4 w-4 animate-ping rounded-full bg-[var(--success)] opacity-40" />
+        <span className="h-2 w-2 rounded-full bg-[var(--success)]" />
+      </div>
+    )
+  }
+
+  // Delfin speaking: blue pulsing bubble
+  if (state === 'assistant') {
+    return (
+      <div className="relative flex h-4 w-4 shrink-0 items-center justify-center" aria-label="Delfin speaking">
+        <span className="absolute h-4 w-4 animate-ping rounded-full bg-[var(--primary)] opacity-40" />
+        <span className="h-2 w-2 rounded-full bg-[var(--primary)]" />
+      </div>
+    )
+  }
+
+  // Idle: no indicator
+  return null
 }
 
 interface ActionRowProps {
@@ -262,7 +287,7 @@ function getMinimizedStatusLabel(input: {
   }
 
   if (input.isAudioPlaying) {
-    return 'AI speaking'
+    return 'Speaking'
   }
 
   if (input.isPromptOpen && input.isResponseMode) {

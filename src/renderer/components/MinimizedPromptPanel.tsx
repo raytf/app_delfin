@@ -3,6 +3,7 @@ import SessionPromptComposer from './SessionPromptComposer'
 
 interface MinimizedPromptPanelProps {
   errorMessage: string | null
+  isAudioPlaying: boolean
   isSubmitting: boolean
   isShowingResponse: boolean
   latestResponseText: string | null
@@ -11,6 +12,7 @@ interface MinimizedPromptPanelProps {
 
 export default function MinimizedPromptPanel({
   errorMessage,
+  isAudioPlaying,
   isSubmitting,
   isShowingResponse,
   latestResponseText,
@@ -35,11 +37,12 @@ export default function MinimizedPromptPanel({
       <SessionPromptComposer
         autoFocus
         className="flex items-center gap-2"
+        disabled={isAudioPlaying}
         isSubmitting={isSubmitting}
         onSubmitPrompt={(text) => {
           onSubmitPrompt(text)
         }}
-        placeholder="Ask Delfin"
+        placeholder={isAudioPlaying ? 'Delfin is speaking…' : 'Ask Delfin'}
         submitLabel="Send"
       />
     )

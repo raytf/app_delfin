@@ -928,9 +928,7 @@ export default function App() {
           void handleStopSession()
         }}
         onToggleVadListening={toggleVadListening}
-        showVoiceWaveform={shouldShowVoiceWaveform}
         vadListeningEnabled={vadListeningEnabled}
-        waveformBars={waveformPresentation.bars}
         waveformState={waveformPresentation.state}
       />
     )
