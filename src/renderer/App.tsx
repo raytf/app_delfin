@@ -25,7 +25,6 @@ import { decodeAudioChunk } from './utils/audioUtils'
 import {
   getAutoAdvanceMinimizedVariant,
   getVoiceTurnCompleteVariant,
-  getVoiceTurnRevealVariant,
 } from './utils/minimizedOverlay'
 import {
   createWaveformBars,
@@ -282,22 +281,6 @@ export default function App() {
     }
   }, [clearMinimizedVoiceCollapseTimer])
 
-  const revealMinimizedVoiceResponse = useCallback(() => {
-    const nextVariant = getVoiceTurnRevealVariant({
-      minimizedVariant,
-      overlayMode,
-      sessionMode,
-    })
-
-    if (nextVariant === null) {
-      return
-    }
-
-    setIsMinimizedPromptComposing(false)
-    setMinimizedVariant(nextVariant)
-    void window.api.setMinimizedOverlayVariant(nextVariant)
-  }, [minimizedVariant, overlayMode, sessionMode])
-
   const submitVoiceTurn = useCallback(
     (wavBase64: string) => {
       if (sessionMode !== 'active') {
@@ -310,7 +293,6 @@ export default function App() {
       audioStartedForTurnRef.current = false
       clearMinimizedVoiceCollapseTimer()
       clearFallbackSpeechTimer()
-      revealMinimizedVoiceResponse()
       beginVoiceTurn({ messageId })
 
       void window.api
@@ -335,7 +317,6 @@ export default function App() {
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      revealMinimizedVoiceResponse,
       sessionMode,
       setUserMessageImagePath,
     ],
