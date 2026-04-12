@@ -474,7 +474,6 @@ export default function App() {
   useEffect(() => {
     const nextVariant = getAutoAdvanceMinimizedVariant({
       errorMessage,
-      isAssistantResponding,
       isMinimizedPromptComposing,
       latestResponseText,
       minimizedVariant,
@@ -490,7 +489,6 @@ export default function App() {
     setMinimizedVariant(nextVariant)
   }, [
     errorMessage,
-    isAssistantResponding,
     isMinimizedPromptComposing,
     latestResponseText,
     minimizedVariant,
@@ -784,8 +782,7 @@ export default function App() {
     clearMinimizedVoiceCollapseTimer()
     const hasActiveResponse =
       errorMessage !== null ||
-      (latestResponseText !== null && latestResponseText.trim().length > 0) ||
-      isAssistantResponding
+      (latestResponseText !== null && latestResponseText.trim().length > 0)
     const nextVariant: MinimizedOverlayVariant = hasActiveResponse ? 'prompt-response' : 'compact'
     setIsMinimizedPromptComposing(false)
     setOverlayMode('minimized')
