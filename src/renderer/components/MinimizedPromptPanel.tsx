@@ -83,7 +83,7 @@ function StreamingResponseBody({
             <ThinkingDots label="Thinking" />
           </div>
         ) : hasResponseText ? (
-          <p>test</p>
+          <p className="whitespace-pre-wrap">{latestResponseText}</p>
         ) : (
           <p className="text-[var(--text-muted)]">Ask about what's on screen to get a response here.</p>
         )}

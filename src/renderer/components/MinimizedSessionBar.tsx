@@ -140,7 +140,7 @@ function CommandRow({
   voiceMode,
 }: CommandRowProps) {
   return (
-    <div className="flex h-full w-full items-center justify-center gap-1.5 px-2.5">
+    <div className="flex w-full shrink-0 items-center justify-center gap-1.5 px-2.5 pb-2.5">
       <button
         aria-label={vadListeningEnabled ? 'Pause speech listening' : 'Resume speech listening'}
         aria-pressed={vadListeningEnabled}

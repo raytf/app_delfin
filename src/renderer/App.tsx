@@ -777,7 +777,6 @@ export default function App() {
   async function handleRestoreOverlay(): Promise<void> {
     clearMinimizedVoiceCollapseTimer()
     setOverlayMode('expanded')
-    clearLatestResponse()
     await window.api.restoreOverlay()
   }
 
@@ -917,6 +916,20 @@ export default function App() {
     }
   }
 
+  async function handleAskAnother(): Promise<void> {
+    clearMinimizedVoiceCollapseTimer()
+    aiStreamingStartedRef.current = false
+    audioStartedForTurnRef.current = false
+    clearFallbackSpeechTimer()
+    cancelSpeechSynthesis()
+    stopScheduledAudioSources()
+    stopAssistantWaveformLoop()
+    resetAssistantWaveform()
+    finishAudioPlayback()
+    clearLatestResponse()
+    await handleSetMinimizedVariant('prompt-input')
+  }
+
   if (endedSessionData !== null) {
     return (
       <SessionEndedView
@@ -939,7 +952,7 @@ export default function App() {
         latestResponseText={latestResponseText}
         minimizedVariant={minimizedVariant}
         onAskAnother={() => {
-          void handleSetMinimizedVariant('prompt-input')
+          void handleAskAnother()
         }}
         onOpen={() => {
           void handleRestoreOverlay()
