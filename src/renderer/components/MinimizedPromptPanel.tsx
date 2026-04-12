@@ -95,10 +95,16 @@ function StreamingResponseBody({
       return
     }
 
-    scrollContainer.scrollTo({
-      top: scrollContainer.scrollHeight,
-      behavior: 'smooth',
+    const frame = window.requestAnimationFrame(() => {
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior: 'auto',
+      })
     })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+    }
   }, [latestResponseText, scrollContainer])
 
   return (
