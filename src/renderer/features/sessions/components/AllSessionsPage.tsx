@@ -1,6 +1,6 @@
 import { ArrowLeft, Sparkles } from 'lucide-react'
-import type { SessionListItem } from '../../shared/types'
-import SessionHistoryCard from './SessionHistoryCard'
+import type { SessionListItem } from '../../../../shared/types'
+import SessionHistoryCard from '../../../components/SessionHistoryCard'
 
 interface AllSessionsPageProps {
   onBack: () => void

@@ -1,8 +1,8 @@
 import { ChevronDown, Maximize2, MessageCircle, Mic, MicOff, Square } from 'lucide-react'
-import type { MinimizedOverlayVariant } from '../../shared/types'
-import type { WaveformVisualState } from '../utils/waveformState'
+import type { MinimizedOverlayVariant } from '../../../../shared/types'
+import type { WaveformVisualState } from '../../../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
-import ThinkingDots from './ThinkingDots'
+import ThinkingDots from '../../../components/ThinkingDots'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null

@@ -1,12 +1,10 @@
+import { useCallback } from 'react'
 import { ArrowLeft, CheckCircle, Clock3, MessageSquare } from 'lucide-react'
-import delfinLogo from '../assets/logo.png'
-
-interface SessionEndedViewProps {
-  duration: number
-  messageCount: number
-  onGoHome: () => void
-  sessionName: string
-}
+import { useNavigate } from 'react-router-dom'
+import delfinLogo from '../../assets/logo.png'
+import { OverlayLoadScreen, useOverlayRouteSync } from '../shared/hooks/useOverlayRouting'
+import { ROUTES } from '../../navigation/routes'
+import { useOverlayStore } from '../../stores/overlayStore'
 
 function formatDuration(durationMs: number): string {
   const minutes = Math.floor(durationMs / 60000)
@@ -20,15 +18,29 @@ function formatDuration(durationMs: number): string {
   return `${hours}h ${remainingMins}m`
 }
 
-export default function SessionEndedView({
-  duration,
-  messageCount,
-  onGoHome,
-  sessionName,
-}: SessionEndedViewProps) {
+export default function SessionEndedScreen() {
+  const navigate = useNavigate()
+  const { overlayState } = useOverlayRouteSync()
+  const pendingEndedSession = useOverlayStore((state) => state.pendingEndedSession)
+  const resetToHome = useOverlayStore((state) => state.resetToHome)
+
+  const handleGoHomeFromEnded = useCallback(async (): Promise<void> => {
+    resetToHome()
+    navigate(ROUTES.home, { replace: true })
+    await window.api.clearEndedSession()
+  }, [navigate, resetToHome])
+
+  if (overlayState === null) {
+    return <OverlayLoadScreen message="Loading session summary..." />
+  }
+
+  const snapshot = overlayState.endedSessionData ?? pendingEndedSession
+  if (snapshot === null) {
+    return <OverlayLoadScreen message="Loading session summary..." />
+  }
+
   return (
     <div className="ocean-gradient flex min-h-screen flex-col items-center justify-center px-8 py-12 text-center">
-      {/* Success icon */}
       <div className="relative mb-6">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[var(--success-soft)]">
           <CheckCircle size={48} className="text-[var(--success)]" />
@@ -40,22 +52,21 @@ export default function SessionEndedView({
         />
       </div>
 
-      {/* Title */}
       <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">
         Session Complete
       </h1>
 
-      {/* Session name */}
-      <p className="mt-2 text-lg text-[var(--text-secondary)]">{sessionName}</p>
+      <p className="mt-2 text-lg text-[var(--text-secondary)]">{snapshot.sessionName}</p>
 
-      {/* Stats */}
       <div className="mt-8 flex items-center gap-6">
         <div className="flex flex-col items-center rounded-2xl bg-[var(--bg-surface)] px-6 py-4 shadow-sm">
           <div className="flex items-center gap-2 text-[var(--text-muted)]">
             <MessageSquare size={18} className="text-[var(--primary)]" />
             <span className="text-sm">Questions</span>
           </div>
-          <p className="mt-1 text-2xl font-bold text-[var(--text-primary)]">{messageCount}</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--text-primary)]">
+            {snapshot.messageCount}
+          </p>
         </div>
         <div className="flex flex-col items-center rounded-2xl bg-[var(--bg-surface)] px-6 py-4 shadow-sm">
           <div className="flex items-center gap-2 text-[var(--text-muted)]">
@@ -63,20 +74,20 @@ export default function SessionEndedView({
             <span className="text-sm">Duration</span>
           </div>
           <p className="mt-1 text-2xl font-bold text-[var(--text-primary)]">
-            {formatDuration(duration)}
+            {formatDuration(snapshot.duration)}
           </p>
         </div>
       </div>
 
-      {/* Encouragement message */}
       <p className="mt-8 max-w-md text-[var(--text-muted)]">
         Great study session! Your progress has been saved. Keep up the momentum!
       </p>
 
-      {/* Back to home button */}
       <button
         className="btn-ocean mt-8 flex cursor-pointer items-center gap-2 rounded-2xl px-6 py-3 text-base font-semibold text-white shadow-lg"
-        onClick={onGoHome}
+        onClick={() => {
+          void handleGoHomeFromEnded()
+        }}
         type="button"
       >
         <ArrowLeft size={18} />

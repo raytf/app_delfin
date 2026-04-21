@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import SessionPromptComposer from './SessionPromptComposer'
-import ThinkingDots from './ThinkingDots'
+import ThinkingDots from '../../../components/ThinkingDots'
 
 interface MinimizedPromptPanelProps {
   errorMessage: string | null

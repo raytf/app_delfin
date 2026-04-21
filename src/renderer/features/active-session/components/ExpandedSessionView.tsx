@@ -1,27 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Clock, Minimize2, Square } from 'lucide-react'
-import type { ChatMessage, SidecarStatus } from '../../shared/types'
-import delfinLogo from '../assets/logo.png'
-import { useSessionStore } from '../stores/sessionStore'
-import type { WaveformVisualState } from '../utils/waveformState'
-import SessionConversation from './SessionConversation'
+import type { ChatMessage } from '../../../../shared/types'
+import delfinLogo from '../../../assets/logo.png'
+import SessionConversation from '../../../components/SessionConversation'
+import { useSessionStore } from '../../../stores/sessionStore'
+import type { WaveformVisualState } from '../../../utils/waveformState'
 import SessionPromptComposer from './SessionPromptComposer'
 
 interface ExpandedSessionViewProps {
-  captureSourceLabel: string | null
   errorMessage: string | null
   isAudioPlaying: boolean
   isSubmitting: boolean
-  isMicListening: boolean
-  isMicMuted: boolean
   messages: ChatMessage[]
   sessionName: string
   onMinimize: () => void
   onStop: () => void
   onSubmitPrompt: (text: string) => void
   onToggleVadListening: () => void
-  showVoiceWaveform: boolean
-  sidecarStatus: SidecarStatus
   vadListeningEnabled: boolean
   waveformState: WaveformVisualState
 }
