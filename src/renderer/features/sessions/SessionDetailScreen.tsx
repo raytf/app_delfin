@@ -59,7 +59,7 @@ export default function SessionDetailScreen() {
     <PastSessionView
       messages={detail.messages}
       onBack={() => {
-        navigate(ROUTES.sessions)
+        navigate(-1)
       }}
       onDelete={() => {
         void handleDelete()

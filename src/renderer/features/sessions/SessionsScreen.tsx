@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SessionListItem } from '../../../shared/types'
 import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
-import { buildSessionDetailPath, ROUTES } from '../../navigation/routes'
+import { buildSessionDetailPath } from '../../navigation/routes'
 import AllSessionsPage from './components/AllSessionsPage'
 
 export default function SessionsScreen() {
@@ -38,7 +38,7 @@ export default function SessionsScreen() {
   return (
     <AllSessionsPage
       onBack={() => {
-        navigate(ROUTES.home)
+        navigate(-1)
       }}
       onDeleteSession={(sessionId) => {
         void handleDeleteSession(sessionId)
