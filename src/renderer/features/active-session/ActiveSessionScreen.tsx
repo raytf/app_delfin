@@ -1,33 +1,18 @@
-import { useEffect, useReducer } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { EndedSessionSnapshot, OverlayState } from '../../../shared/types'
+import type { EndedSessionSnapshot } from '../../../shared/types'
 import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
-import {
-  activeScreenStateFromOverlayState,
-  activeScreenStateReducer,
-} from '../../navigation/screenState'
 import { useSessionStore } from '../../stores/sessionStore'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
-import { useActiveSessionController } from './hooks/useActiveSessionController'
-
-const FALLBACK_ACTIVE_OVERLAY_STATE: OverlayState = {
-  mode: 'expanded',
-}
+import { useActiveSession } from './hooks/useActiveSession'
 
 export default function ActiveSessionScreen() {
   const navigate = useNavigate()
-  const { overlayState, reconcileOverlayStateFromMain } = useOverlayState()
+  const { overlayState } = useOverlayState()
   const activeSessionName = useSessionStore((state) => state.activeSessionName)
   const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
   const setEndedSessionSnapshot = useSessionStore((state) => state.setEndedSessionSnapshot)
-  const reducerOverlayState = overlayState ?? FALLBACK_ACTIVE_OVERLAY_STATE
-  const [screenState, transitionScreen] = useReducer(
-    activeScreenStateReducer,
-    reducerOverlayState,
-    activeScreenStateFromOverlayState,
-  )
 
   const handleBeginSessionEnd = (snapshot: EndedSessionSnapshot): void => {
     setEndedSessionSnapshot(snapshot)
@@ -40,81 +25,67 @@ export default function ActiveSessionScreen() {
     navigate(ROUTES.sessionEnded, { replace: true })
   }
 
-  const controller = useActiveSessionController({
+  const session = useActiveSession({
     onBeginSessionEnd: handleBeginSessionEnd,
     onSessionEndCommitted: handleSessionEndCommitted,
-    reconcileScreenStateFromMain: reconcileOverlayStateFromMain,
-    screenState,
     sessionName: activeSessionName ?? 'Study Session',
-    transitionScreen,
   })
-
-  useEffect(() => {
-    if (overlayState === null) {
-      return
-    }
-
-    transitionScreen({
-      type: 'SYNC_FROM_MAIN',
-      overlayState,
-    })
-  }, [overlayState, transitionScreen])
 
   if (overlayState === null) {
     return <OverlayLoadScreen message="Loading Delfin..." />
   }
 
-  if (screenState.kind === 'active-minimized') {
+  if (overlayState.mode !== 'expanded') {
     return (
       <MinimizedSessionBar
-        errorMessage={controller.errorMessage}
-        isAudioPlaying={controller.isAudioPlaying}
-        isSubmitting={controller.isSubmitting}
-        isMicListening={controller.isListening}
-        isMicMuted={controller.isMuted}
-        latestResponseText={controller.latestResponseText}
-        mode={screenState.mode}
+        errorMessage={session.errorMessage}
+        isAudioPlaying={session.isAudioPlaying}
+        isSubmitting={session.isSubmitting}
+        isMicListening={session.isListening}
+        isMicMuted={session.isMuted}
+        latestResponseText={session.latestResponseText}
+        mode={overlayState.mode}
         onAskAnother={() => {
-          void controller.handleAskAnother()
+          void session.handleAskAnother()
         }}
         onOpen={() => {
-          void controller.handleRestoreOverlay()
+          void session.handleRestoreOverlay()
         }}
         onSetMode={(mode) => {
-          void controller.handleSetMode(mode)
+          void session.handleSetMode(mode)
         }}
         onSubmitPrompt={(text) => {
-          void controller.handleSubmitPrompt(text)
+          void session.handleSubmitPrompt(text)
         }}
         onStop={() => {
-          void controller.handleStopSession()
+          void session.handleStopSession()
         }}
-        onToggleVadListening={controller.toggleVadListening}
-        vadListeningEnabled={controller.vadListeningEnabled}
-        waveformState={controller.waveformState}
+        onToggleVadListening={session.toggleVadListening}
+        vadListeningEnabled={session.vadListeningEnabled}
+        waveformState={session.waveformState}
       />
     )
   }
 
   return (
     <ExpandedSessionView
-      errorMessage={controller.errorMessage}
-      isAudioPlaying={controller.isAudioPlaying}
-      isSubmitting={controller.isSubmitting}
-      messages={controller.messages}
+      errorMessage={session.errorMessage}
+      isAudioPlaying={session.isAudioPlaying}
+      isSubmitting={session.isSubmitting}
+      messages={session.messages}
       sessionName={activeSessionName ?? 'Study Session'}
       onMinimize={() => {
-        void controller.handleMinimizeOverlay()
+        void session.handleMinimizeOverlay()
       }}
       onStop={() => {
-        void controller.handleStopSession()
+        void session.handleStopSession()
       }}
       onSubmitPrompt={(text) => {
-        void controller.handleSubmitPrompt(text)
+        void session.handleSubmitPrompt(text)
       }}
-      onToggleVadListening={controller.toggleVadListening}
-      vadListeningEnabled={controller.vadListeningEnabled}
-      waveformState={controller.waveformState}
+      onToggleVadListening={session.toggleVadListening}
+      vadListeningEnabled={session.vadListeningEnabled}
+      waveformState={session.waveformState}
     />
   )
 }

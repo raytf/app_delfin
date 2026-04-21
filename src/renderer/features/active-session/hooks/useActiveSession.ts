@@ -1,4 +1,3 @@
-import type { Dispatch } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   type ChatMessage,
@@ -7,10 +6,7 @@ import {
   type OverlayMode,
 } from '../../../../shared/types'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
-import {
-  type ActiveScreenAction,
-  type ActiveScreenState,
-} from '../../../navigation/screenState'
+import { useOverlayState } from '../../../hooks/useOverlayState'
 import { useSessionStore } from '../../../stores/sessionStore'
 import { decodeAudioChunk } from '../../../utils/audioUtils'
 import {
@@ -42,16 +38,13 @@ function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null 
   return null
 }
 
-interface UseActiveSessionControllerArgs {
+interface UseActiveSessionArgs {
   onBeginSessionEnd: (snapshot: EndedSessionSnapshot) => void
   onSessionEndCommitted: (snapshot: EndedSessionSnapshot) => void
-  reconcileScreenStateFromMain: () => Promise<void>
-  screenState: ActiveScreenState
   sessionName: string
-  transitionScreen: Dispatch<ActiveScreenAction>
 }
 
-interface ActiveSessionController {
+interface ActiveSession {
   errorMessage: string | null
   handleAskAnother: () => Promise<void>
   handleMinimizeOverlay: () => Promise<void>
@@ -70,14 +63,12 @@ interface ActiveSessionController {
   waveformState: WaveformVisualState
 }
 
-export function useActiveSessionController({
+export function useActiveSession({
   onBeginSessionEnd,
   onSessionEndCommitted,
-  reconcileScreenStateFromMain,
-  screenState,
   sessionName,
-  transitionScreen,
-}: UseActiveSessionControllerArgs): ActiveSessionController {
+}: UseActiveSessionArgs): ActiveSession {
+  const { overlayState, reconcileOverlayStateFromMain, setOverlayMode } = useOverlayState()
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [assistantAudioLevel, setAssistantAudioLevel] = useState(0)
   const [assistantWaveformBars, setAssistantWaveformBars] = useState(() =>
@@ -262,7 +253,7 @@ export function useActiveSessionController({
 
       return audioContext
     } catch (error) {
-      console.error('[useActiveSessionController] Failed to initialise audio context:', error)
+      console.error('[useActiveSession] Failed to initialise audio context:', error)
       return null
     }
   }, [])
@@ -366,7 +357,7 @@ export function useActiveSessionController({
     userAudioLevel,
     userWaveformBars,
   })
-  const mode = screenState.kind === 'active-minimized' ? screenState.mode : 'expanded'
+  const mode = overlayState?.mode ?? 'expanded'
 
   useEffect(() => {
     if (!voiceEnabled || !isListening) {
@@ -438,26 +429,19 @@ export function useActiveSessionController({
       clearMinimizedVoiceCollapseTimer()
 
       try {
-        await window.api.setOverlayMode(nextMode)
+        await setOverlayMode(nextMode)
 
         if (nextMode !== 'minimized-prompt-response') {
           clearLatestResponse()
         }
-
-        transitionScreen({
-          type: 'SHOW_MODE',
-          mode: nextMode,
-        })
       } catch (error) {
-        console.error('[useActiveSessionController] Failed to set overlay mode:', error)
-        void reconcileScreenStateFromMain()
+        console.error('[useActiveSession] Failed to set overlay mode:', error)
       }
     },
     [
       clearLatestResponse,
       clearMinimizedVoiceCollapseTimer,
-      reconcileScreenStateFromMain,
-      transitionScreen,
+      setOverlayMode,
     ],
   )
 
@@ -473,19 +457,14 @@ export function useActiveSessionController({
       return
     }
 
-    void window.api
-      .setOverlayMode(nextMode)
-      .catch(() => reconcileScreenStateFromMain())
-    transitionScreen({
-      type: 'SHOW_MODE',
-      mode: nextMode,
+    void setOverlayMode(nextMode).catch((error) => {
+      console.error('[useActiveSession] Failed to auto-advance overlay mode:', error)
     })
   }, [
     errorMessage,
     latestResponseText,
     mode,
-    reconcileScreenStateFromMain,
-    transitionScreen,
+    setOverlayMode,
   ])
 
   useEffect(() => {
@@ -523,8 +502,8 @@ export function useActiveSessionController({
 
   useEffect(() => {
     window.api.onOverlayError((data) => {
-      console.error('[useActiveSessionController] Overlay IPC error:', data.message)
-      void reconcileScreenStateFromMain()
+      console.error('[useActiveSession] Overlay IPC error:', data.message)
+      void reconcileOverlayStateFromMain()
     })
 
     window.api.onSidecarToken((data) => {
@@ -596,7 +575,7 @@ export function useActiveSessionController({
 
       audioStreamActiveRef.current = false
       if (data.ttsTime > 0) {
-        console.debug(`[useActiveSessionController] TTS synthesis took ${data.ttsTime}s`)
+        console.debug(`[useActiveSession] TTS synthesis took ${data.ttsTime}s`)
       }
       if (audioSourceNodesRef.current.size === 0) {
         finishAudioPlayback()
@@ -645,7 +624,7 @@ export function useActiveSessionController({
     speakWithWebSpeech,
     startAssistantWaveformLoop,
     stopScheduledAudioSources,
-    reconcileScreenStateFromMain,
+    reconcileOverlayStateFromMain,
   ])
 
   useEffect(() => {
@@ -676,14 +655,12 @@ export function useActiveSessionController({
 
   const handleRestoreOverlay = useCallback(async (): Promise<void> => {
     clearMinimizedVoiceCollapseTimer()
-    transitionScreen({ type: 'RESTORE' })
     try {
-      await window.api.setOverlayMode('expanded')
+      await setOverlayMode('expanded')
     } catch (error) {
-      console.error('[useActiveSessionController] Failed to restore overlay:', error)
-      void reconcileScreenStateFromMain()
+      console.error('[useActiveSession] Failed to restore overlay:', error)
     }
-  }, [clearMinimizedVoiceCollapseTimer, reconcileScreenStateFromMain, transitionScreen])
+  }, [clearMinimizedVoiceCollapseTimer, setOverlayMode])
 
   const handleMinimizeOverlay = useCallback(async (): Promise<void> => {
     clearMinimizedVoiceCollapseTimer()
@@ -693,28 +670,17 @@ export function useActiveSessionController({
     const nextMode: Exclude<OverlayMode, 'expanded'> = hasActiveResponse
       ? 'minimized-prompt-response'
       : 'minimized-compact'
-    transitionScreen({
-      type: 'MINIMIZE',
-      mode: nextMode,
-    })
 
     try {
-      if (nextMode === 'minimized-compact') {
-        await window.api.setOverlayMode('minimized-compact')
-        return
-      }
-
-      await window.api.setOverlayMode(nextMode)
+      await setOverlayMode(nextMode)
     } catch (error) {
-      console.error('[useActiveSessionController] Failed to minimize overlay:', error)
-      void reconcileScreenStateFromMain()
+      console.error('[useActiveSession] Failed to minimize overlay:', error)
     }
   }, [
     clearMinimizedVoiceCollapseTimer,
     errorMessage,
     latestResponseText,
-    reconcileScreenStateFromMain,
-    transitionScreen,
+    setOverlayMode,
   ])
 
   const handleStopSession = useCallback(async (): Promise<void> => {
@@ -747,7 +713,7 @@ export function useActiveSessionController({
     try {
       window.api.sidecarInterrupt()
     } catch (error) {
-      console.error('[useActiveSessionController] Failed to interrupt sidecar:', error)
+      console.error('[useActiveSession] Failed to interrupt sidecar:', error)
     }
 
     try {
@@ -756,8 +722,8 @@ export function useActiveSessionController({
       clearConversation()
       onSessionEndCommitted(nextEndedSessionData)
     } catch (error) {
-      console.error('[useActiveSessionController] Failed to stop session:', error)
-      void reconcileScreenStateFromMain()
+      console.error('[useActiveSession] Failed to stop session:', error)
+      void reconcileOverlayStateFromMain()
     }
   }, [
     cancelSpeechSynthesis,
@@ -768,7 +734,7 @@ export function useActiveSessionController({
     messages,
     onBeginSessionEnd,
     onSessionEndCommitted,
-    reconcileScreenStateFromMain,
+    reconcileOverlayStateFromMain,
     resetAssistantWaveform,
     sessionName,
     sessionStartTime,
@@ -797,7 +763,7 @@ export function useActiveSessionController({
         try {
           window.api.sidecarInterrupt()
         } catch (error) {
-          console.error('[useActiveSessionController] Failed to interrupt audio:', error)
+          console.error('[useActiveSession] Failed to interrupt audio:', error)
         }
       }
 

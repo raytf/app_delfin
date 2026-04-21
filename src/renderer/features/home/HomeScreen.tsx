@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import type { SessionListItem } from '../../../shared/types'
 import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { buildSessionDetailPath, ROUTES } from '../../navigation/routes'
-import { useOverlayStore } from '../../stores/overlayStore'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import LandingHomeScreen from './components/LandingHomeScreen'
@@ -12,8 +11,7 @@ import UserNameModal from './components/UserNameModal'
 export default function HomeScreen() {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const navigate = useNavigate()
-  const { overlayState } = useOverlayState()
-  const setOverlayState = useOverlayStore((state) => state.setOverlayState)
+  const { overlayState, setOverlayMode } = useOverlayState()
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearEndedSessionSnapshot = useSessionStore((state) => state.clearEndedSessionSnapshot)
   const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
@@ -48,16 +46,14 @@ export default function HomeScreen() {
     clearEndedSessionSnapshot()
     startSession()
     setActiveSessionName(sessionName)
-    setOverlayState({
-      mode: 'minimized-compact',
-    })
+    await setOverlayMode('minimized-compact')
     navigate(ROUTES.active, { replace: true })
   }, [
     clearConversation,
     clearEndedSessionSnapshot,
     navigate,
     setActiveSessionName,
-    setOverlayState,
+    setOverlayMode,
     startSession,
   ])
 
