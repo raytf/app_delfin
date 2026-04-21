@@ -8,9 +8,9 @@ interface SessionHistoryCardProps {
   variant?: 'compact' | 'detailed'
 }
 
-function formatDuration(startedAt: number, endedAt: number | null): string {
+function formatDuration(startedAt: number, endedAt: number | null, priorDurationMs = 0): string {
   const end = endedAt ?? Date.now()
-  const durationMs = end - startedAt
+  const durationMs = end - startedAt + priorDurationMs
   const minutes = Math.floor(durationMs / 60000)
 
   if (minutes < 60) {
@@ -124,7 +124,7 @@ export default function SessionHistoryCard({
                 <span>Duration</span>
               </div>
               <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
-                {formatDuration(session.startedAt, session.endedAt)}
+                {formatDuration(session.startedAt, session.endedAt, session.priorDurationMs)}
               </p>
             </div>
             <div className="rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3">
@@ -144,7 +144,7 @@ export default function SessionHistoryCard({
             </div>
             <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
               <Clock3 size={14} className="text-[var(--primary)]" />
-              <span className="font-medium">{formatDuration(session.startedAt, session.endedAt)}</span>
+              <span className="font-medium">{formatDuration(session.startedAt, session.endedAt, session.priorDurationMs)}</span>
             </div>
           </div>
           <p className="mt-3 text-xs text-[var(--text-secondary)]">

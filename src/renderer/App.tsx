@@ -901,6 +901,9 @@ export default function App() {
 
     await window.api.resumeSession({ sessionId })
 
+    // Prior session was deleted on the main process — remove it from the local list too
+    removeSessionHistoryItem(sessionId)
+
     aiStreamingStartedRef.current = false
     audioStartedForTurnRef.current = false
     clearMinimizedVoiceCollapseTimer()
@@ -913,7 +916,7 @@ export default function App() {
     ignoreIncomingSidecarAudioRef.current = false
     setCaptureSourceLabel(null)
 
-    loadMessages(detail.messages)
+    loadMessages(detail.messages, detail.session.endedAt !== null ? detail.session.endedAt - detail.session.startedAt : 0)
     setActiveSessionName(detail.session.sessionName)
     setHomeView('landing')
     setSelectedPastSession(null)

@@ -158,6 +158,8 @@ export interface SessionListItem {
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number
+  /** Accumulated duration (ms) from prior sessions this was continued from. */
+  priorDurationMs: number
 }
 
 export interface SessionDetail {

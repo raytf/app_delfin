@@ -35,6 +35,9 @@ export class SessionPersistenceService {
     const now = Date.now()
     const newSessionId = crypto.randomUUID()
 
+    const priorDurationMs =
+      (prior.endedAt !== null ? prior.endedAt - prior.startedAt : 0) + (prior.priorDurationMs ?? 0)
+
     const newRecord: SessionRecord = {
       id: newSessionId,
       startedAt: now,
@@ -45,6 +48,7 @@ export class SessionPersistenceService {
       sourceLabel: prior.sourceLabel,
       messageCount: priorConversation.length,
       lastUpdatedAt: now,
+      priorDurationMs,
     }
 
     await this.storage.createSession(newRecord)
@@ -56,6 +60,9 @@ export class SessionPersistenceService {
         sessionId: newSessionId,
       })
     }
+
+    // Delete the prior session so only the resumed (new) session appears in history
+    await this.storage.deleteSession(priorSessionId)
 
     this.activeSessionId = newSessionId
     this.activeAssistantDraft = null
@@ -78,6 +85,7 @@ export class SessionPersistenceService {
       sourceLabel: null,
       messageCount: 0,
       lastUpdatedAt: now,
+      priorDurationMs: 0,
     }
 
     await this.storage.createSession(sessionRecord)

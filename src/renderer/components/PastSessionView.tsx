@@ -11,9 +11,9 @@ interface PastSessionViewProps {
   session: SessionListItem
 }
 
-function formatDuration(startedAt: number, endedAt: number | null): string {
+function formatDuration(startedAt: number, endedAt: number | null, priorDurationMs = 0): string {
   const end = endedAt ?? Date.now()
-  const durationMs = end - startedAt
+  const durationMs = end - startedAt + priorDurationMs
   const minutes = Math.floor(durationMs / 60000)
   const hours = Math.floor(minutes / 60)
   const remainingMins = minutes % 60
@@ -110,7 +110,7 @@ export default function PastSessionView({
           </h2>
           <div className="mt-4 inline-flex w-fit items-center gap-2 rounded-2xl bg-[var(--bg-surface-2)] px-4 py-3 text-sm text-[var(--text-muted)]">
             <Clock size={16} />
-            <span className="font-medium">{formatDuration(session.startedAt, session.endedAt)}</span>
+            <span className="font-medium">{formatDuration(session.startedAt, session.endedAt, session.priorDurationMs)}</span>
           </div>
 
           <div className="mt-5 rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--bg-surface)] p-5 shadow-sm">

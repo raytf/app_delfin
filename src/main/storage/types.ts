@@ -12,6 +12,8 @@ export interface SessionRecord {
   sourceLabel: string | null
   messageCount: number
   lastUpdatedAt: number
+  /** Accumulated duration (ms) from prior sessions this was continued from. */
+  priorDurationMs: number
 }
 
 export interface ConversationMessageRecord {

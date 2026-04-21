@@ -15,7 +15,7 @@ interface SessionStoreState {
   clearConversation: () => void
   clearLatestResponse: () => void
   startSession: () => void
-  loadMessages: (messages: ChatMessage[]) => void
+  loadMessages: (messages: ChatMessage[], priorDurationMs?: number) => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   beginVoiceTurn: (input: { messageId: string }) => void
   appendAssistantText: (text: string) => void
@@ -66,14 +66,15 @@ export const useSessionStore = create<SessionStoreState>()(
           sessionStartTime: state.sessionStartTime ?? Date.now(),
         })),
 
-      loadMessages: (messages: ChatMessage[]) =>
+      loadMessages: (messages: ChatMessage[], priorDurationMs = 0) =>
         set({
           messages,
           errorMessage: null,
           isSubmitting: false,
           activeAssistantMessageId: null,
           minimizedResponseMessageId: null,
-          sessionStartTime: Date.now(),
+          // Shift startTime back by the prior duration so the timer continues from where it left off
+          sessionStartTime: Date.now() - priorDurationMs,
         }),
 
       beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
