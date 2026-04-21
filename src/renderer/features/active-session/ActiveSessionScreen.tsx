@@ -1,30 +1,27 @@
 import { useEffect, useReducer } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { EndedSessionSnapshot, OverlayState } from '../../../shared/types'
-import { OverlayLoadScreen, useOverlayRouteSync } from '../shared/hooks/useOverlayRouting'
+import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 import {
   activeScreenStateFromOverlayState,
   activeScreenStateReducer,
 } from '../../navigation/screenState'
-import { useOverlayStore } from '../../stores/overlayStore'
+import { useSessionStore } from '../../stores/sessionStore'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import { useActiveSessionController } from './hooks/useActiveSessionController'
 
 const FALLBACK_ACTIVE_OVERLAY_STATE: OverlayState = {
-  endedSessionData: null,
-  minimizedVariant: 'compact',
-  overlayMode: 'expanded',
-  sessionMode: 'active',
+  mode: 'expanded',
 }
 
 export default function ActiveSessionScreen() {
   const navigate = useNavigate()
-  const { overlayState, reconcileOverlayStateFromMain } = useOverlayRouteSync()
-  const activeSessionName = useOverlayStore((state) => state.activeSessionName)
-  const beginSessionEnd = useOverlayStore((state) => state.beginSessionEnd)
-  const commitSessionEnd = useOverlayStore((state) => state.commitSessionEnd)
+  const { overlayState, reconcileOverlayStateFromMain } = useOverlayState()
+  const activeSessionName = useSessionStore((state) => state.activeSessionName)
+  const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
+  const setEndedSessionSnapshot = useSessionStore((state) => state.setEndedSessionSnapshot)
   const reducerOverlayState = overlayState ?? FALLBACK_ACTIVE_OVERLAY_STATE
   const [screenState, transitionScreen] = useReducer(
     activeScreenStateReducer,
@@ -33,12 +30,13 @@ export default function ActiveSessionScreen() {
   )
 
   const handleBeginSessionEnd = (snapshot: EndedSessionSnapshot): void => {
-    beginSessionEnd(snapshot)
+    setEndedSessionSnapshot(snapshot)
     navigate(ROUTES.sessionEnded, { replace: true })
   }
 
   const handleSessionEndCommitted = (snapshot: EndedSessionSnapshot): void => {
-    commitSessionEnd(snapshot)
+    setActiveSessionName(null)
+    setEndedSessionSnapshot(snapshot)
     navigate(ROUTES.sessionEnded, { replace: true })
   }
 
@@ -47,7 +45,7 @@ export default function ActiveSessionScreen() {
     onSessionEndCommitted: handleSessionEndCommitted,
     reconcileScreenStateFromMain: reconcileOverlayStateFromMain,
     screenState,
-    sessionName: activeSessionName,
+    sessionName: activeSessionName ?? 'Study Session',
     transitionScreen,
   })
 
@@ -104,7 +102,7 @@ export default function ActiveSessionScreen() {
       isAudioPlaying={controller.isAudioPlaying}
       isSubmitting={controller.isSubmitting}
       messages={controller.messages}
-      sessionName={activeSessionName}
+      sessionName={activeSessionName ?? 'Study Session'}
       onMinimize={() => {
         void controller.handleMinimizeOverlay()
       }}

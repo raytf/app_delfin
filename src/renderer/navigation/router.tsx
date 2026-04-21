@@ -1,8 +1,8 @@
 import { createHashRouter } from 'react-router-dom'
 import ActiveSessionScreen from '../features/active-session/ActiveSessionScreen'
 import HomeScreen from '../features/home/HomeScreen'
-import SessionDetailScreen from '../features/session-detail/SessionDetailScreen'
 import SessionEndedScreen from '../features/active-session/SessionEndedScreen'
+import SessionDetailScreen from '../features/sessions/SessionDetailScreen'
 import SessionsScreen from '../features/sessions/SessionsScreen'
 import { ROUTES } from './routes'
 

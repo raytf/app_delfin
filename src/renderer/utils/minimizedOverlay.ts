@@ -1,9 +1,7 @@
-import type { MinimizedOverlayVariant, OverlayMode, SessionMode } from '../../shared/types'
+import type { MinimizedOverlayVariant, OverlayMode } from '../../shared/types'
 
 interface MinimizedOverlayContext {
-  minimizedVariant: MinimizedOverlayVariant
-  overlayMode: OverlayMode
-  sessionMode: SessionMode
+  mode: OverlayMode
 }
 
 interface AutoAdvanceMinimizedVariantContext extends MinimizedOverlayContext {
@@ -20,11 +18,9 @@ interface VoiceTurnCollapseContext extends MinimizedOverlayContext {
 }
 
 export function getVoiceTurnRevealVariant({
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
+  mode,
 }: MinimizedOverlayContext): MinimizedOverlayVariant | null {
-  if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant !== 'compact') {
+  if (mode !== 'minimized-compact') {
     return null
   }
 
@@ -35,13 +31,18 @@ export function getAutoAdvanceMinimizedVariant({
   errorMessage,
   isMinimizedPromptComposing,
   latestResponseText,
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
+  mode,
 }: AutoAdvanceMinimizedVariantContext): MinimizedOverlayVariant | null {
-  if (sessionMode !== 'active' || overlayMode !== 'minimized') {
+  if (mode === 'expanded') {
     return null
   }
+
+  const minimizedVariant =
+    mode === 'minimized-prompt-input'
+      ? 'prompt-input'
+      : mode === 'minimized-prompt-response'
+        ? 'prompt-response'
+        : 'compact'
 
   const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
   const shouldShowResponse = errorMessage !== null || hasResponseText
@@ -63,13 +64,19 @@ export function getVoiceTurnCompleteVariant({
   hasResponseText,
   isAudioPlaying,
   isSubmitting,
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
+  mode,
 }: VoiceTurnCollapseContext): MinimizedOverlayVariant | null {
+  const minimizedVariant =
+    mode === 'minimized-prompt-response'
+      ? 'prompt-response'
+      : mode === 'minimized-prompt-input'
+        ? 'prompt-input'
+        : mode === 'minimized-compact'
+          ? 'compact'
+          : null
+
   if (
-    sessionMode !== 'active' ||
-    overlayMode !== 'minimized' ||
+    minimizedVariant === null ||
     minimizedVariant !== 'prompt-response' ||
     isSubmitting ||
     isAudioPlaying ||

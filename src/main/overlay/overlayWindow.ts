@@ -1,6 +1,6 @@
 import { BrowserWindow, screen } from "electron";
 import { join } from "path";
-import type { MinimizedOverlayVariant, OverlayMode } from "../../shared/types";
+import type { OverlayMode } from "../../shared/types";
 
 const EXPANDED_WINDOW_WIDTH = 1100;
 const EXPANDED_WINDOW_HEIGHT = 760;
@@ -56,27 +56,18 @@ function getPromptResponseMinimizedBounds(): Electron.Rectangle {
   };
 }
 
-function getMinimizedBounds(
-  variant: MinimizedOverlayVariant,
-): Electron.Rectangle {
-  if (variant === "prompt-input") {
-    return getPromptInputMinimizedBounds();
+function getWindowBounds(mode: OverlayMode): Electron.Rectangle {
+  switch (mode) {
+    case "expanded":
+      return getExpandedBounds();
+    case "minimized-prompt-input":
+      return getPromptInputMinimizedBounds();
+    case "minimized-prompt-response":
+      return getPromptResponseMinimizedBounds();
+    case "minimized-compact":
+    default:
+      return getCompactMinimizedBounds();
   }
-
-  if (variant === "prompt-response") {
-    return getPromptResponseMinimizedBounds();
-  }
-
-  return getCompactMinimizedBounds();
-}
-
-function getWindowBounds(
-  mode: OverlayMode,
-  minimizedVariant: MinimizedOverlayVariant,
-): Electron.Rectangle {
-  return mode === "expanded"
-    ? getExpandedBounds()
-    : getMinimizedBounds(minimizedVariant);
 }
 
 function loadRenderer(window: BrowserWindow): void {
@@ -88,12 +79,9 @@ function loadRenderer(window: BrowserWindow): void {
   void window.loadFile(join(__dirname, "../renderer/index.html"));
 }
 
-export function createOverlayWindow(
-  mode: OverlayMode,
-  minimizedVariant: MinimizedOverlayVariant,
-): BrowserWindow {
-  const initialBounds = getWindowBounds(mode, minimizedVariant);
-  const isMinimizedMode = mode === "minimized";
+export function createOverlayWindow(mode: OverlayMode): BrowserWindow {
+  const initialBounds = getWindowBounds(mode);
+  const isMinimizedMode = mode !== "expanded";
 
   const window = new BrowserWindow({
     ...initialBounds,
@@ -129,16 +117,17 @@ export function createOverlayWindow(
 export function setOverlayMode(
   window: BrowserWindow,
   mode: OverlayMode,
-  minimizedVariant: MinimizedOverlayVariant,
 ): void {
-  window.setBounds(getWindowBounds(mode, minimizedVariant), true);
-  window.setAlwaysOnTop(mode === "minimized");
-  window.setSkipTaskbar(mode === "minimized");
+  const isMinimizedMode = mode !== "expanded";
+
+  window.setBounds(getWindowBounds(mode), true);
+  window.setAlwaysOnTop(isMinimizedMode);
+  window.setSkipTaskbar(isMinimizedMode);
   window.setResizable(mode === "expanded");
   window.setMinimizable(false);
   window.setFullScreenable(mode === "expanded");
   window.setHasShadow(mode === "expanded");
-  window.setBackgroundColor(mode === "minimized" ? "#00000000" : "#f8fcfd");
+  window.setBackgroundColor(isMinimizedMode ? "#00000000" : "#f8fcfd");
   if (!window.isVisible()) {
     window.show();
   }

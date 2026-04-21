@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { VOICE_TURN_TEXT } from '../../shared/constants'
-import type { ChatMessage, SessionListItem } from '../../shared/types'
+import type { ChatMessage, EndedSessionSnapshot, SessionListItem } from '../../shared/types'
 
 interface SessionStoreState {
+  activeSessionName: string | null
+  endedSessionSnapshot: EndedSessionSnapshot | null
   errorMessage: string | null
   isSubmitting: boolean
   messages: ChatMessage[]
@@ -13,7 +15,10 @@ interface SessionStoreState {
   minimizedResponseMessageId: string | null
   sessionStartTime: number | null
   clearConversation: () => void
+  clearEndedSessionSnapshot: () => void
   clearLatestResponse: () => void
+  setActiveSessionName: (sessionName: string | null) => void
+  setEndedSessionSnapshot: (snapshot: EndedSessionSnapshot | null) => void
   startSession: () => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   beginVoiceTurn: (input: { messageId: string }) => void
@@ -33,6 +38,8 @@ function createMessageId(): string {
 export const useSessionStore = create<SessionStoreState>()(
   persist(
     (set) => ({
+      activeSessionName: null,
+      endedSessionSnapshot: null,
       errorMessage: null,
       isSubmitting: false,
       messages: [],
@@ -44,6 +51,8 @@ export const useSessionStore = create<SessionStoreState>()(
 
       clearConversation: () =>
         set((state) => ({
+          activeSessionName: state.activeSessionName,
+          endedSessionSnapshot: state.endedSessionSnapshot,
           errorMessage: null,
           isSubmitting: false,
           messages: [],
@@ -54,9 +63,24 @@ export const useSessionStore = create<SessionStoreState>()(
           sessionStartTime: null,
         })),
 
+      clearEndedSessionSnapshot: () =>
+        set({
+          endedSessionSnapshot: null,
+        }),
+
       clearLatestResponse: () =>
         set({
           minimizedResponseMessageId: null,
+        }),
+
+      setActiveSessionName: (sessionName: string | null) =>
+        set({
+          activeSessionName: sessionName,
+        }),
+
+      setEndedSessionSnapshot: (snapshot: EndedSessionSnapshot | null) =>
+        set({
+          endedSessionSnapshot: snapshot,
         }),
 
       startSession: () =>

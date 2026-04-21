@@ -1,7 +1,5 @@
 import { useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { getRouteSyncTarget } from '../../../navigation/routes'
-import { useOverlayStore } from '../../../stores/overlayStore'
+import { useOverlayStore } from '../stores/overlayStore'
 
 export function OverlayLoadScreen({ message }: { message: string }) {
   return (
@@ -11,12 +9,10 @@ export function OverlayLoadScreen({ message }: { message: string }) {
   )
 }
 
-export function useOverlayRouteSync(): {
+export function useOverlayState(): {
   overlayState: ReturnType<typeof useOverlayStore.getState>['overlayState']
   reconcileOverlayStateFromMain: () => Promise<void>
 } {
-  const location = useLocation()
-  const navigate = useNavigate()
   const overlayState = useOverlayStore((state) => state.overlayState)
   const reconcileOverlayStateFromMain = useOverlayStore(
     (state) => state.reconcileOverlayStateFromMain,
@@ -29,17 +25,6 @@ export function useOverlayRouteSync(): {
 
     void reconcileOverlayStateFromMain()
   }, [overlayState, reconcileOverlayStateFromMain])
-
-  useEffect(() => {
-    if (overlayState === null) {
-      return
-    }
-
-    const nextRoute = getRouteSyncTarget(location.pathname, overlayState)
-    if (nextRoute !== null && nextRoute !== location.pathname) {
-      navigate(nextRoute, { replace: true })
-    }
-  }, [location.pathname, navigate, overlayState])
 
   return {
     overlayState,

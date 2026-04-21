@@ -1,5 +1,6 @@
 import type {
   MinimizedOverlayVariant,
+  OverlayMode,
   OverlayState,
 } from '../../shared/types'
 
@@ -13,13 +14,45 @@ export type ActiveScreenAction =
   | { type: 'RESTORE' }
   | { type: 'SHOW_MINIMIZED_VARIANT'; variant: MinimizedOverlayVariant }
 
+export function getOverlayModeForMinimizedVariant(
+  variant: MinimizedOverlayVariant,
+): OverlayMode {
+  switch (variant) {
+    case 'prompt-input':
+      return 'minimized-prompt-input'
+    case 'prompt-response':
+      return 'minimized-prompt-response'
+    case 'compact':
+    default:
+      return 'minimized-compact'
+  }
+}
+
+export function getMinimizedVariantFromOverlayMode(
+  mode: OverlayMode,
+): MinimizedOverlayVariant | null {
+  switch (mode) {
+    case 'minimized-prompt-input':
+      return 'prompt-input'
+    case 'minimized-prompt-response':
+      return 'prompt-response'
+    case 'minimized-compact':
+      return 'compact'
+    case 'expanded':
+    default:
+      return null
+  }
+}
+
 export function activeScreenStateFromOverlayState(
   overlayState: OverlayState,
 ): ActiveScreenState {
-  if (overlayState.overlayMode === 'minimized') {
+  const minimizedVariant = getMinimizedVariantFromOverlayMode(overlayState.mode)
+
+  if (minimizedVariant !== null) {
     return {
       kind: 'active-minimized',
-      variant: overlayState.minimizedVariant,
+      variant: minimizedVariant,
     }
   }
 

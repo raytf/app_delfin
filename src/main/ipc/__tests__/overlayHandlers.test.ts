@@ -10,11 +10,11 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS, type MinimizedOverlayVariant } from '../../../shared/types'
+import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS, type OverlayMode } from '../../../shared/types'
 import { registerOverlayIpcHandlers } from '../overlayHandlers'
 import type { RegisterIpcHandlersOptions } from '../types'
 
-type OverlayHandler = (_event: unknown, variant: MinimizedOverlayVariant) => Promise<void>
+type OverlayHandler = (_event: unknown, mode: OverlayMode) => Promise<void>
 
 function getRegisteredHandler(channel: string): OverlayHandler {
   const registeredHandler = handleMock.mock.calls.find(([registeredChannel]) => registeredChannel === channel)?.[1]
@@ -29,8 +29,8 @@ describe('registerOverlayIpcHandlers', () => {
     handleMock.mockReset()
   })
 
-  it('forwards overlay errors, reverts the previous variant, and rethrows', async () => {
-    let currentVariant: MinimizedOverlayVariant = 'compact'
+  it('forwards overlay errors, reverts the previous mode, and rethrows', async () => {
+    const currentMode: OverlayMode = 'expanded'
     const switchError = new Error('window switch failed')
     const send = vi.fn()
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -41,34 +41,28 @@ describe('registerOverlayIpcHandlers', () => {
         webContents: { send },
       }) as never,
       getOverlayState: () => ({
-        endedSessionData: null,
-        minimizedVariant: currentVariant,
-        overlayMode: 'expanded',
-        sessionMode: 'active',
+        mode: currentMode,
       }),
-      clearEndedSessionData: () => undefined,
       sessionPersistence: {} as never,
-      setEndedSessionData: () => undefined,
-      setMinimizedVariant: (variant) => {
-        currentVariant = variant
-      },
-      setSessionMode: () => undefined,
       sidecarWsUrl: 'ws://localhost:8321/ws',
-      switchOverlayMode: vi.fn().mockRejectedValue(switchError),
+      switchOverlayMode: vi.fn().mockImplementation(async (mode) => {
+        if (mode !== currentMode) {
+          throw switchError
+        }
+      }),
     }
 
     registerOverlayIpcHandlers(options)
 
-    const overlayHandler = getRegisteredHandler(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MINIMIZED_VARIANT)
+    const overlayHandler = getRegisteredHandler(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MODE)
 
-    await expect(overlayHandler({}, 'prompt-input')).rejects.toThrow('window switch failed')
+    await expect(overlayHandler({}, 'minimized-prompt-input')).rejects.toThrow('window switch failed')
 
-    expect(currentVariant).toBe('compact')
     expect(send).toHaveBeenCalledWith(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR, {
       message: 'window switch failed',
     })
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[overlayHandlers] Failed to set minimized overlay variant:',
+      '[overlayHandlers] Failed to set overlay mode:',
       switchError,
     )
   })

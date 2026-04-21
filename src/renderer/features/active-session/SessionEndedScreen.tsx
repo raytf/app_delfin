@@ -2,9 +2,10 @@ import { useCallback } from 'react'
 import { ArrowLeft, CheckCircle, Clock3, MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import delfinLogo from '../../assets/logo.png'
-import { OverlayLoadScreen, useOverlayRouteSync } from '../shared/hooks/useOverlayRouting'
+import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 import { useOverlayStore } from '../../stores/overlayStore'
+import { useSessionStore } from '../../stores/sessionStore'
 
 function formatDuration(durationMs: number): string {
   const minutes = Math.floor(durationMs / 60000)
@@ -20,22 +21,32 @@ function formatDuration(durationMs: number): string {
 
 export default function SessionEndedScreen() {
   const navigate = useNavigate()
-  const { overlayState } = useOverlayRouteSync()
-  const pendingEndedSession = useOverlayStore((state) => state.pendingEndedSession)
-  const resetToHome = useOverlayStore((state) => state.resetToHome)
+  const { overlayState } = useOverlayState()
+  const resetOverlayState = useOverlayStore((state) => state.resetOverlayState)
+  const clearConversation = useSessionStore((state) => state.clearConversation)
+  const clearEndedSessionSnapshot = useSessionStore((state) => state.clearEndedSessionSnapshot)
+  const endedSessionSnapshot = useSessionStore((state) => state.endedSessionSnapshot)
+  const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
 
-  const handleGoHomeFromEnded = useCallback(async (): Promise<void> => {
-    resetToHome()
+  const handleGoHomeFromEnded = useCallback((): void => {
+    resetOverlayState()
+    setActiveSessionName(null)
+    clearConversation()
+    clearEndedSessionSnapshot()
     navigate(ROUTES.home, { replace: true })
-    await window.api.clearEndedSession()
-  }, [navigate, resetToHome])
+  }, [
+    clearConversation,
+    clearEndedSessionSnapshot,
+    navigate,
+    resetOverlayState,
+    setActiveSessionName,
+  ])
 
   if (overlayState === null) {
     return <OverlayLoadScreen message="Loading session summary..." />
   }
 
-  const snapshot = overlayState.endedSessionData ?? pendingEndedSession
-  if (snapshot === null) {
+  if (endedSessionSnapshot === null) {
     return <OverlayLoadScreen message="Loading session summary..." />
   }
 
@@ -56,7 +67,7 @@ export default function SessionEndedScreen() {
         Session Complete
       </h1>
 
-      <p className="mt-2 text-lg text-[var(--text-secondary)]">{snapshot.sessionName}</p>
+      <p className="mt-2 text-lg text-[var(--text-secondary)]">{endedSessionSnapshot.sessionName}</p>
 
       <div className="mt-8 flex items-center gap-6">
         <div className="flex flex-col items-center rounded-2xl bg-[var(--bg-surface)] px-6 py-4 shadow-sm">
@@ -65,7 +76,7 @@ export default function SessionEndedScreen() {
             <span className="text-sm">Questions</span>
           </div>
           <p className="mt-1 text-2xl font-bold text-[var(--text-primary)]">
-            {snapshot.messageCount}
+            {endedSessionSnapshot.messageCount}
           </p>
         </div>
         <div className="flex flex-col items-center rounded-2xl bg-[var(--bg-surface)] px-6 py-4 shadow-sm">
@@ -74,7 +85,7 @@ export default function SessionEndedScreen() {
             <span className="text-sm">Duration</span>
           </div>
           <p className="mt-1 text-2xl font-bold text-[var(--text-primary)]">
-            {formatDuration(snapshot.duration)}
+            {formatDuration(endedSessionSnapshot.duration)}
           </p>
         </div>
       </div>

@@ -7,7 +7,12 @@ import {
   type MinimizedOverlayVariant,
 } from '../../../../shared/types'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
-import type { ActiveScreenAction, ActiveScreenState } from '../../../navigation/screenState'
+import {
+  getMinimizedVariantFromOverlayMode,
+  getOverlayModeForMinimizedVariant,
+  type ActiveScreenAction,
+  type ActiveScreenState,
+} from '../../../navigation/screenState'
 import { useSessionStore } from '../../../stores/sessionStore'
 import { decodeAudioChunk } from '../../../utils/audioUtils'
 import {
@@ -363,9 +368,11 @@ export function useActiveSessionController({
     userAudioLevel,
     userWaveformBars,
   })
-  const minimizedVariant =
-    screenState.kind === 'active-minimized' ? screenState.variant : 'compact'
-  const overlayMode = screenState.kind === 'active-minimized' ? 'minimized' : 'expanded'
+  const mode =
+    screenState.kind === 'active-minimized'
+      ? getOverlayModeForMinimizedVariant(screenState.variant)
+      : 'expanded'
+  const minimizedVariant = getMinimizedVariantFromOverlayMode(mode) ?? 'compact'
 
   useEffect(() => {
     if (!voiceEnabled || !isListening) {
@@ -437,7 +444,7 @@ export function useActiveSessionController({
       clearMinimizedVoiceCollapseTimer()
 
       try {
-        await window.api.setMinimizedOverlayVariant(variant)
+        await window.api.setOverlayMode(getOverlayModeForMinimizedVariant(variant))
 
         if (variant !== 'prompt-response') {
           clearLatestResponse()
@@ -463,12 +470,9 @@ export function useActiveSessionController({
   useEffect(() => {
     const nextVariant = getAutoAdvanceMinimizedVariant({
       errorMessage,
-      isMinimizedPromptComposing:
-        overlayMode === 'minimized' && minimizedVariant === 'prompt-input',
+      isMinimizedPromptComposing: mode === 'minimized-prompt-input',
       latestResponseText,
-      minimizedVariant,
-      overlayMode,
-      sessionMode: 'active',
+      mode,
     })
 
     if (nextVariant === null) {
@@ -476,7 +480,7 @@ export function useActiveSessionController({
     }
 
     void window.api
-      .setMinimizedOverlayVariant(nextVariant)
+      .setOverlayMode(getOverlayModeForMinimizedVariant(nextVariant))
       .catch(() => reconcileScreenStateFromMain())
     transitionScreen({
       type: 'SHOW_MINIMIZED_VARIANT',
@@ -485,8 +489,7 @@ export function useActiveSessionController({
   }, [
     errorMessage,
     latestResponseText,
-    minimizedVariant,
-    overlayMode,
+    mode,
     reconcileScreenStateFromMain,
     transitionScreen,
   ])
@@ -497,9 +500,7 @@ export function useActiveSessionController({
       hasResponseText: latestResponseText !== null && latestResponseText.trim().length > 0,
       isAudioPlaying,
       isSubmitting,
-      minimizedVariant,
-      overlayMode,
-      sessionMode: 'active',
+      mode,
     })
 
     clearMinimizedVoiceCollapseTimer()
@@ -523,8 +524,7 @@ export function useActiveSessionController({
     isAudioPlaying,
     isSubmitting,
     latestResponseText,
-    minimizedVariant,
-    overlayMode,
+    mode,
   ])
 
   useEffect(() => {
@@ -684,7 +684,7 @@ export function useActiveSessionController({
     clearMinimizedVoiceCollapseTimer()
     transitionScreen({ type: 'RESTORE' })
     try {
-      await window.api.restoreOverlay()
+      await window.api.setOverlayMode('expanded')
     } catch (error) {
       console.error('[useActiveSessionController] Failed to restore overlay:', error)
       void reconcileScreenStateFromMain()
@@ -704,11 +704,11 @@ export function useActiveSessionController({
 
     try {
       if (nextVariant === 'compact') {
-        await window.api.minimizeOverlay()
+        await window.api.setOverlayMode('minimized-compact')
         return
       }
 
-      await window.api.setMinimizedOverlayVariant(nextVariant)
+      await window.api.setOverlayMode(getOverlayModeForMinimizedVariant(nextVariant))
     } catch (error) {
       console.error('[useActiveSessionController] Failed to minimize overlay:', error)
       void reconcileScreenStateFromMain()
@@ -755,9 +755,7 @@ export function useActiveSessionController({
     }
 
     try {
-      await window.api.stopSession({
-        endedSessionData: nextEndedSessionData,
-      })
+      await window.api.stopSession()
 
       clearConversation()
       onSessionEndCommitted(nextEndedSessionData)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SessionListItem } from '../../../shared/types'
-import { OverlayLoadScreen, useOverlayRouteSync } from '../shared/hooks/useOverlayRouting'
+import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { buildSessionDetailPath, ROUTES } from '../../navigation/routes'
 import { useOverlayStore } from '../../stores/overlayStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -12,9 +12,11 @@ import UserNameModal from './components/UserNameModal'
 export default function HomeScreen() {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const navigate = useNavigate()
-  const { overlayState } = useOverlayRouteSync()
-  const markSessionStarted = useOverlayStore((state) => state.markSessionStarted)
+  const { overlayState } = useOverlayState()
+  const setOverlayState = useOverlayStore((state) => state.setOverlayState)
   const clearConversation = useSessionStore((state) => state.clearConversation)
+  const clearEndedSessionSnapshot = useSessionStore((state) => state.clearEndedSessionSnapshot)
+  const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
   const startSession = useSessionStore((state) => state.startSession)
   const setUserName = useSettingsStore((state) => state.setUserName)
   const userName = useSettingsStore((state) => state.userName)
@@ -43,10 +45,21 @@ export default function HomeScreen() {
   const handleStartSession = useCallback(async (sessionName: string): Promise<void> => {
     await window.api.startSession({ sessionName })
     clearConversation()
+    clearEndedSessionSnapshot()
     startSession()
-    markSessionStarted(sessionName)
+    setActiveSessionName(sessionName)
+    setOverlayState({
+      mode: 'minimized-compact',
+    })
     navigate(ROUTES.active, { replace: true })
-  }, [clearConversation, markSessionStarted, navigate, startSession])
+  }, [
+    clearConversation,
+    clearEndedSessionSnapshot,
+    navigate,
+    setActiveSessionName,
+    setOverlayState,
+    startSession,
+  ])
 
   if (overlayState === null) {
     return <OverlayLoadScreen message="Loading Delfin..." />

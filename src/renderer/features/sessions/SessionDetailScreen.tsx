@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { SessionDetail } from '../../shared/types'
+import type { SessionDetail } from '../../../shared/types'
 import PastSessionView from '../../components/PastSessionView'
-import { OverlayLoadScreen, useOverlayRouteSync } from '../shared/hooks/useOverlayRouting'
+import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 
 function SessionDetailLoadingState() {
@@ -18,7 +18,7 @@ export default function SessionDetailScreen() {
   const navigate = useNavigate()
   const params = useParams<{ sessionId: string }>()
   const sessionId = params.sessionId ?? null
-  const { overlayState } = useOverlayRouteSync()
+  const { overlayState } = useOverlayState()
 
   useEffect(() => {
     if (sessionId === null) {

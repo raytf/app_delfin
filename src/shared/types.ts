@@ -60,10 +60,6 @@ export interface EndedSessionSnapshot {
   messageCount: number
 }
 
-export interface SessionStopRequest {
-  endedSessionData: EndedSessionSnapshot | null
-}
-
 export interface WsInterruptMessage {
   type: 'interrupt'
 }
@@ -99,10 +95,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SIDECAR_SEND: 'sidecar:send',
   SIDECAR_INTERRUPT: 'sidecar:interrupt',
   OVERLAY_GET_STATE: 'overlay:get-state',
-  OVERLAY_MINIMIZE: 'overlay:minimize',
-  OVERLAY_RESTORE: 'overlay:restore',
-  OVERLAY_SET_MINIMIZED_VARIANT: 'overlay:set-minimized-variant',
-  OVERLAY_CLEAR_ENDED_SESSION: 'overlay:clear-ended-session',
+  OVERLAY_SET_MODE: 'overlay:set-mode',
   SESSION_START: 'session:start',
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
@@ -160,15 +153,15 @@ export interface SessionDetail {
   messages: ChatMessage[]
 }
 
-export type OverlayMode = 'expanded' | 'minimized'
+export type OverlayMode =
+  | 'expanded'
+  | 'minimized-compact'
+  | 'minimized-prompt-input'
+  | 'minimized-prompt-response'
 export type MinimizedOverlayVariant = 'compact' | 'prompt-input' | 'prompt-response'
-export type SessionMode = 'home' | 'active'
 
 export interface OverlayState {
-  overlayMode: OverlayMode
-  minimizedVariant: MinimizedOverlayVariant
-  sessionMode: SessionMode
-  endedSessionData: EndedSessionSnapshot | null
+  mode: OverlayMode
 }
 
 // Electron API exposed via contextBridge (window.api)
@@ -183,16 +176,13 @@ export interface ElectronAPI {
   sidecarInterrupt: () => void
   getOverlayState: () => Promise<OverlayState>
   startSession: (request: SessionStartRequest) => Promise<void>
-  stopSession: (request: SessionStopRequest) => Promise<void>
+  stopSession: () => Promise<void>
   submitSessionPrompt: (request: SessionPromptRequest) => Promise<SessionPromptResponse>
   listSessions: () => Promise<SessionListItem[]>
   getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>
   deleteSession: (request: SessionDeleteRequest) => Promise<void>
   getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
-  minimizeOverlay: () => Promise<void>
-  restoreOverlay: () => Promise<void>
-  setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) => Promise<void>
-  clearEndedSession: () => Promise<void>
+  setOverlayMode: (mode: OverlayMode) => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
