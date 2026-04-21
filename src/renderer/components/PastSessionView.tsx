@@ -1,4 +1,4 @@
-import { ArrowLeft, Clock, Trash2 } from 'lucide-react'
+import { ArrowLeft, Clock, Play, Trash2 } from 'lucide-react'
 import type { ChatMessage, SessionListItem } from '../../shared/types'
 import delfinLogo from '../assets/logo.png'
 import SessionConversation from './SessionConversation'
@@ -7,6 +7,7 @@ interface PastSessionViewProps {
   messages: ChatMessage[]
   onBack: () => void
   onDelete: () => void
+  onResume: () => void
   session: SessionListItem
 }
 
@@ -39,6 +40,7 @@ export default function PastSessionView({
   messages,
   onBack,
   onDelete,
+  onResume,
   session,
 }: PastSessionViewProps) {
   const sessionName = session.sessionName || session.sourceLabel || 'Untitled Session'
@@ -75,6 +77,17 @@ export default function PastSessionView({
             <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--primary)]">
               Delfin
             </h1>
+          </div>
+
+          <div className="absolute right-0">
+            <button
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+              onClick={onResume}
+              type="button"
+            >
+              <Play size={15} />
+              Continue Session
+            </button>
           </div>
         </div>
       </header>

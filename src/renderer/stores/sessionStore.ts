@@ -15,6 +15,7 @@ interface SessionStoreState {
   clearConversation: () => void
   clearLatestResponse: () => void
   startSession: () => void
+  loadMessages: (messages: ChatMessage[]) => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   beginVoiceTurn: (input: { messageId: string }) => void
   appendAssistantText: (text: string) => void
@@ -64,6 +65,16 @@ export const useSessionStore = create<SessionStoreState>()(
           ...state,
           sessionStartTime: state.sessionStartTime ?? Date.now(),
         })),
+
+      loadMessages: (messages: ChatMessage[]) =>
+        set({
+          messages,
+          errorMessage: null,
+          isSubmitting: false,
+          activeAssistantMessageId: null,
+          minimizedResponseMessageId: null,
+          sessionStartTime: Date.now(),
+        }),
 
       beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {

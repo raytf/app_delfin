@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { captureForegroundWindow } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
-import { sessionPromptRequestSchema } from '../../shared/schemas'
+import { sessionPromptRequestSchema, sessionResumeRequestSchema } from '../../shared/schemas'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
@@ -9,6 +9,7 @@ import {
   type SessionDeleteRequest,
   type SessionMessageImageRequest,
   type SessionPromptResponse,
+  type SessionResumeRequest,
   type SessionStartRequest,
   type SessionStopRequest,
 } from '../../shared/types'
@@ -93,6 +94,14 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_DELETE, async (_event, request: SessionDeleteRequest) =>
     options.sessionPersistence.deleteSession(request.sessionId),
   )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_RESUME, async (_event, rawRequest: SessionResumeRequest) => {
+    const request = sessionResumeRequestSchema.parse(rawRequest)
+    await options.sessionPersistence.resumeSession(request.sessionId)
+    options.setSessionMode('active')
+    options.setMinimizedVariant('compact')
+    await options.switchOverlayMode('minimized')
+  })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>
     options.sessionPersistence.getCaptureImageDataUrl(request.imagePath),

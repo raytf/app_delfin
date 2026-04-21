@@ -37,6 +37,10 @@ export interface SessionStartRequest {
   sessionName: string
 }
 
+export interface SessionResumeRequest {
+  sessionId: string
+}
+
 export interface SessionPromptResponse {
   imagePath: string
   messageId: string
@@ -110,6 +114,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_GET_DETAIL: 'session:get-detail',
   SESSION_DELETE: 'session:delete',
   SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
+  SESSION_RESUME: 'session:resume',
 } as const
 
 export const MAIN_TO_RENDERER_CHANNELS = {
@@ -188,6 +193,7 @@ export interface ElectronAPI {
   listSessions: () => Promise<SessionListItem[]>
   getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>
   deleteSession: (request: SessionDeleteRequest) => Promise<void>
+  resumeSession: (request: SessionResumeRequest) => Promise<void>
   getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
   minimizeOverlay: () => Promise<void>
   restoreOverlay: () => Promise<void>

@@ -24,6 +24,47 @@ export class SessionPersistenceService {
 
   constructor(private readonly storage: SessionStorage) {}
 
+  async resumeSession(priorSessionId: string): Promise<string> {
+    const prior = await this.storage.getSession(priorSessionId)
+
+    if (prior === null) {
+      throw new Error(`Cannot resume: session not found: ${priorSessionId}`)
+    }
+
+    const priorConversation = await this.storage.getConversation(priorSessionId)
+    const now = Date.now()
+    const newSessionId = crypto.randomUUID()
+
+    const newRecord: SessionRecord = {
+      id: newSessionId,
+      startedAt: now,
+      endedAt: null,
+      status: 'active',
+      presetId: prior.presetId,
+      sessionName: prior.sessionName,
+      sourceLabel: prior.sourceLabel,
+      messageCount: priorConversation.length,
+      lastUpdatedAt: now,
+    }
+
+    await this.storage.createSession(newRecord)
+
+    // Copy prior conversation messages into the new session
+    for (const message of priorConversation) {
+      await this.storage.appendConversationMessage({
+        ...message,
+        sessionId: newSessionId,
+      })
+    }
+
+    this.activeSessionId = newSessionId
+    this.activeAssistantDraft = null
+    this.messageCount = priorConversation.length
+    this.pendingFinalStatus = 'completed'
+
+    return newSessionId
+  }
+
   async startSession(sessionName: string): Promise<string> {
     const now = Date.now()
     const sessionId = crypto.randomUUID()

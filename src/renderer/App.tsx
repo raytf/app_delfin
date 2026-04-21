@@ -69,6 +69,7 @@ export default function App() {
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearLatestResponse = useSessionStore((state) => state.clearLatestResponse)
   const startSession = useSessionStore((state) => state.startSession)
+  const loadMessages = useSessionStore((state) => state.loadMessages)
   const beginPromptSubmission = useSessionStore((state) => state.beginPromptSubmission)
   const beginVoiceTurn = useSessionStore((state) => state.beginVoiceTurn)
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
@@ -894,6 +895,35 @@ export default function App() {
     }
   }
 
+  async function handleResumeSession(sessionId: string): Promise<void> {
+    // Load prior messages before resuming so the store is hydrated immediately
+    const detail = await window.api.getSessionDetail({ sessionId })
+
+    await window.api.resumeSession({ sessionId })
+
+    aiStreamingStartedRef.current = false
+    audioStartedForTurnRef.current = false
+    clearMinimizedVoiceCollapseTimer()
+    clearFallbackSpeechTimer()
+    cancelSpeechSynthesis()
+    stopScheduledAudioSources()
+    stopAssistantWaveformLoop()
+    resetAssistantWaveform()
+    finishAudioPlayback()
+    ignoreIncomingSidecarAudioRef.current = false
+    setCaptureSourceLabel(null)
+
+    loadMessages(detail.messages)
+    setActiveSessionName(detail.session.sessionName)
+    setHomeView('landing')
+    setSelectedPastSession(null)
+    setEndedSessionData(null)
+    setIsMinimizedPromptComposing(false)
+    setSessionMode('active')
+    setOverlayMode('minimized')
+    setMinimizedVariant('compact')
+  }
+
   async function handleAskAnother(): Promise<void> {
     clearMinimizedVoiceCollapseTimer()
     aiStreamingStartedRef.current = false
@@ -989,6 +1019,9 @@ export default function App() {
         }}
         onDelete={() => {
           void handleDeleteSession(selectedPastSession.session.id)
+        }}
+        onResume={() => {
+          void handleResumeSession(selectedPastSession.session.id)
         }}
         session={selectedPastSession.session}
       />

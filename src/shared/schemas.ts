@@ -29,6 +29,10 @@ export const sessionPromptRequestSchema = z.object({
   audio: z.string().optional(), // base64 WAV — present on voice turns
 })
 
+export const sessionResumeRequestSchema = z.object({
+  sessionId: z.string(),
+})
+
 export const captureFrameSchema = z.object({
   imageBase64: z.string(),
   width: z.number(),

@@ -13,6 +13,7 @@ import type {
   SessionMessageImageRequest,
   SessionPromptRequest,
   SessionPromptResponse,
+  SessionResumeRequest,
   SessionStartRequest,
   MinimizedOverlayVariant,
   SessionListItem,
@@ -56,6 +57,9 @@ const api: ElectronAPI = {
 
   deleteSession: (request: SessionDeleteRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_DELETE, request) as Promise<void>,
+
+  resumeSession: (request: SessionResumeRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_RESUME, request) as Promise<void>,
 
   getSessionMessageImage: (request: SessionMessageImageRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, request) as Promise<string>,
