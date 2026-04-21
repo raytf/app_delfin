@@ -4,12 +4,10 @@ import {
   type ChatMessage,
   type EndedSessionSnapshot,
   MAIN_TO_RENDERER_CHANNELS,
-  type MinimizedOverlayVariant,
+  type OverlayMode,
 } from '../../../../shared/types'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
 import {
-  getMinimizedVariantFromOverlayMode,
-  getOverlayModeForMinimizedVariant,
   type ActiveScreenAction,
   type ActiveScreenState,
 } from '../../../navigation/screenState'
@@ -58,7 +56,7 @@ interface ActiveSessionController {
   handleAskAnother: () => Promise<void>
   handleMinimizeOverlay: () => Promise<void>
   handleRestoreOverlay: () => Promise<void>
-  handleSetMinimizedVariant: (variant: MinimizedOverlayVariant) => Promise<void>
+  handleSetMode: (mode: Exclude<OverlayMode, 'expanded'>) => Promise<void>
   handleStopSession: () => Promise<void>
   handleSubmitPrompt: (text: string) => Promise<void>
   isAudioPlaying: boolean
@@ -368,11 +366,7 @@ export function useActiveSessionController({
     userAudioLevel,
     userWaveformBars,
   })
-  const mode =
-    screenState.kind === 'active-minimized'
-      ? getOverlayModeForMinimizedVariant(screenState.variant)
-      : 'expanded'
-  const minimizedVariant = getMinimizedVariantFromOverlayMode(mode) ?? 'compact'
+  const mode = screenState.kind === 'active-minimized' ? screenState.mode : 'expanded'
 
   useEffect(() => {
     if (!voiceEnabled || !isListening) {
@@ -439,23 +433,23 @@ export function useActiveSessionController({
     ],
   )
 
-  const handleSetMinimizedVariant = useCallback(
-    async (variant: MinimizedOverlayVariant): Promise<void> => {
+  const handleSetMode = useCallback(
+    async (nextMode: Exclude<OverlayMode, 'expanded'>): Promise<void> => {
       clearMinimizedVoiceCollapseTimer()
 
       try {
-        await window.api.setOverlayMode(getOverlayModeForMinimizedVariant(variant))
+        await window.api.setOverlayMode(nextMode)
 
-        if (variant !== 'prompt-response') {
+        if (nextMode !== 'minimized-prompt-response') {
           clearLatestResponse()
         }
 
         transitionScreen({
-          type: 'SHOW_MINIMIZED_VARIANT',
-          variant,
+          type: 'SHOW_MODE',
+          mode: nextMode,
         })
       } catch (error) {
-        console.error('[useActiveSessionController] Failed to set minimized variant:', error)
+        console.error('[useActiveSessionController] Failed to set overlay mode:', error)
         void reconcileScreenStateFromMain()
       }
     },
@@ -468,23 +462,23 @@ export function useActiveSessionController({
   )
 
   useEffect(() => {
-    const nextVariant = getAutoAdvanceMinimizedVariant({
+    const nextMode = getAutoAdvanceMinimizedVariant({
       errorMessage,
       isMinimizedPromptComposing: mode === 'minimized-prompt-input',
       latestResponseText,
       mode,
     })
 
-    if (nextVariant === null) {
+    if (nextMode === null) {
       return
     }
 
     void window.api
-      .setOverlayMode(getOverlayModeForMinimizedVariant(nextVariant))
+      .setOverlayMode(nextMode)
       .catch(() => reconcileScreenStateFromMain())
     transitionScreen({
-      type: 'SHOW_MINIMIZED_VARIANT',
-      variant: nextVariant,
+      type: 'SHOW_MODE',
+      mode: nextMode,
     })
   }, [
     errorMessage,
@@ -495,7 +489,7 @@ export function useActiveSessionController({
   ])
 
   useEffect(() => {
-    const nextVariant = getVoiceTurnCompleteVariant({
+    const nextMode = getVoiceTurnCompleteVariant({
       errorMessage,
       hasResponseText: latestResponseText !== null && latestResponseText.trim().length > 0,
       isAudioPlaying,
@@ -505,13 +499,13 @@ export function useActiveSessionController({
 
     clearMinimizedVoiceCollapseTimer()
 
-    if (nextVariant === null) {
+    if (nextMode === null) {
       return
     }
 
     minimizedVoiceCollapseTimerRef.current = window.setTimeout(() => {
       minimizedVoiceCollapseTimerRef.current = null
-      void handleSetMinimizedVariant(nextVariant)
+      void handleSetMode(nextMode)
     }, MINIMIZED_VOICE_COLLAPSE_DELAY_MS)
 
     return () => {
@@ -520,7 +514,7 @@ export function useActiveSessionController({
   }, [
     clearMinimizedVoiceCollapseTimer,
     errorMessage,
-    handleSetMinimizedVariant,
+    handleSetMode,
     isAudioPlaying,
     isSubmitting,
     latestResponseText,
@@ -696,19 +690,21 @@ export function useActiveSessionController({
     const hasActiveResponse =
       errorMessage !== null ||
       (latestResponseText !== null && latestResponseText.trim().length > 0)
-    const nextVariant: MinimizedOverlayVariant = hasActiveResponse ? 'prompt-response' : 'compact'
+    const nextMode: Exclude<OverlayMode, 'expanded'> = hasActiveResponse
+      ? 'minimized-prompt-response'
+      : 'minimized-compact'
     transitionScreen({
       type: 'MINIMIZE',
-      variant: nextVariant,
+      mode: nextMode,
     })
 
     try {
-      if (nextVariant === 'compact') {
+      if (nextMode === 'minimized-compact') {
         await window.api.setOverlayMode('minimized-compact')
         return
       }
 
-      await window.api.setOverlayMode(getOverlayModeForMinimizedVariant(nextVariant))
+      await window.api.setOverlayMode(nextMode)
     } catch (error) {
       console.error('[useActiveSessionController] Failed to minimize overlay:', error)
       void reconcileScreenStateFromMain()
@@ -848,14 +844,14 @@ export function useActiveSessionController({
     resetAssistantWaveform()
     finishAudioPlayback()
     clearLatestResponse()
-    await handleSetMinimizedVariant('prompt-input')
+    await handleSetMode('minimized-prompt-input')
   }, [
     cancelSpeechSynthesis,
     clearFallbackSpeechTimer,
     clearLatestResponse,
     clearMinimizedVoiceCollapseTimer,
     finishAudioPlayback,
-    handleSetMinimizedVariant,
+    handleSetMode,
     resetAssistantWaveform,
     stopAssistantWaveformLoop,
     stopScheduledAudioSources,
@@ -866,7 +862,7 @@ export function useActiveSessionController({
     handleAskAnother,
     handleMinimizeOverlay,
     handleRestoreOverlay,
-    handleSetMinimizedVariant,
+    handleSetMode,
     handleStopSession,
     handleSubmitPrompt,
     isAudioPlaying,

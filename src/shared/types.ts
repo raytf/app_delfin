@@ -158,7 +158,6 @@ export type OverlayMode =
   | 'minimized-compact'
   | 'minimized-prompt-input'
   | 'minimized-prompt-response'
-export type MinimizedOverlayVariant = 'compact' | 'prompt-input' | 'prompt-response'
 
 export interface OverlayState {
   mode: OverlayMode

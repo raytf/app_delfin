@@ -1,58 +1,25 @@
 import type {
-  MinimizedOverlayVariant,
   OverlayMode,
   OverlayState,
 } from '../../shared/types'
 
 export type ActiveScreenState =
   | { kind: 'active-expanded' }
-  | { kind: 'active-minimized'; variant: MinimizedOverlayVariant }
+  | { kind: 'active-minimized'; mode: Exclude<OverlayMode, 'expanded'> }
 
 export type ActiveScreenAction =
   | { type: 'SYNC_FROM_MAIN'; overlayState: OverlayState }
-  | { type: 'MINIMIZE'; variant: MinimizedOverlayVariant }
+  | { type: 'MINIMIZE'; mode: Exclude<OverlayMode, 'expanded'> }
   | { type: 'RESTORE' }
-  | { type: 'SHOW_MINIMIZED_VARIANT'; variant: MinimizedOverlayVariant }
-
-export function getOverlayModeForMinimizedVariant(
-  variant: MinimizedOverlayVariant,
-): OverlayMode {
-  switch (variant) {
-    case 'prompt-input':
-      return 'minimized-prompt-input'
-    case 'prompt-response':
-      return 'minimized-prompt-response'
-    case 'compact':
-    default:
-      return 'minimized-compact'
-  }
-}
-
-export function getMinimizedVariantFromOverlayMode(
-  mode: OverlayMode,
-): MinimizedOverlayVariant | null {
-  switch (mode) {
-    case 'minimized-prompt-input':
-      return 'prompt-input'
-    case 'minimized-prompt-response':
-      return 'prompt-response'
-    case 'minimized-compact':
-      return 'compact'
-    case 'expanded':
-    default:
-      return null
-  }
-}
+  | { type: 'SHOW_MODE'; mode: Exclude<OverlayMode, 'expanded'> }
 
 export function activeScreenStateFromOverlayState(
   overlayState: OverlayState,
 ): ActiveScreenState {
-  const minimizedVariant = getMinimizedVariantFromOverlayMode(overlayState.mode)
-
-  if (minimizedVariant !== null) {
+  if (overlayState.mode !== 'expanded') {
     return {
       kind: 'active-minimized',
-      variant: minimizedVariant,
+      mode: overlayState.mode,
     }
   }
 
@@ -67,10 +34,10 @@ export function activeScreenStateReducer(
     case 'SYNC_FROM_MAIN':
       return activeScreenStateFromOverlayState(action.overlayState)
     case 'MINIMIZE':
-    case 'SHOW_MINIMIZED_VARIANT':
+    case 'SHOW_MODE':
       return {
         kind: 'active-minimized',
-        variant: action.variant,
+        mode: action.mode,
       }
     case 'RESTORE':
       return { kind: 'active-expanded' }

@@ -73,15 +73,15 @@ export default function ActiveSessionScreen() {
         isMicListening={controller.isListening}
         isMicMuted={controller.isMuted}
         latestResponseText={controller.latestResponseText}
-        minimizedVariant={screenState.variant}
+        mode={screenState.mode}
         onAskAnother={() => {
           void controller.handleAskAnother()
         }}
         onOpen={() => {
           void controller.handleRestoreOverlay()
         }}
-        onSetPromptOpen={(isOpen) => {
-          void controller.handleSetMinimizedVariant(isOpen ? 'prompt-input' : 'compact')
+        onSetMode={(mode) => {
+          void controller.handleSetMode(mode)
         }}
         onSubmitPrompt={(text) => {
           void controller.handleSubmitPrompt(text)

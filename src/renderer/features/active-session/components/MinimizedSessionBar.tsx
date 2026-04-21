@@ -1,5 +1,5 @@
 import { ChevronDown, Maximize2, MessageCircle, Mic, MicOff, Square } from 'lucide-react'
-import type { MinimizedOverlayVariant } from '../../../../shared/types'
+import type { OverlayMode } from '../../../../shared/types'
 import type { WaveformVisualState } from '../../../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
 import ThinkingDots from '../../../components/ThinkingDots'
@@ -11,10 +11,10 @@ interface MinimizedSessionBarProps {
   isMicListening: boolean
   isMicMuted: boolean
   latestResponseText: string | null
-  minimizedVariant: MinimizedOverlayVariant
+  mode: Exclude<OverlayMode, 'expanded'>
   onAskAnother: () => void
   onOpen: () => void
-  onSetPromptOpen: (isOpen: boolean) => void
+  onSetMode: (mode: Exclude<OverlayMode, 'expanded'>) => void
   onSubmitPrompt: (text: string) => void
   onStop: () => void
   onToggleVadListening: () => void
@@ -44,18 +44,18 @@ export default function MinimizedSessionBar({
   isMicListening,
   isMicMuted,
   latestResponseText,
-  minimizedVariant,
+  mode,
   onAskAnother,
   onOpen,
-  onSetPromptOpen,
+  onSetMode,
   onSubmitPrompt,
   onStop,
   onToggleVadListening,
   vadListeningEnabled,
   waveformState,
 }: MinimizedSessionBarProps) {
-  const isPromptOpen = minimizedVariant !== 'compact'
-  const isResponseMode = minimizedVariant === 'prompt-response'
+  const isPromptOpen = mode !== 'minimized-compact'
+  const isResponseMode = mode === 'minimized-prompt-response'
   const voiceMode = resolveVoiceMode({
     isSubmitting,
     isAudioPlaying,
@@ -102,7 +102,7 @@ export default function MinimizedSessionBar({
           isResponseMode={isResponseMode}
           onAskAnother={onAskAnother}
           onOpen={onOpen}
-          onSetPromptOpen={onSetPromptOpen}
+          onSetMode={onSetMode}
           onStop={onStop}
           onToggleVadListening={onToggleVadListening}
           statusLabel={statusLabel}
@@ -119,7 +119,7 @@ interface CommandRowProps {
   isResponseMode: boolean
   onAskAnother: () => void
   onOpen: () => void
-  onSetPromptOpen: (isOpen: boolean) => void
+  onSetMode: (mode: Exclude<OverlayMode, 'expanded'>) => void
   onStop: () => void
   onToggleVadListening: () => void
   statusLabel: string
@@ -132,7 +132,7 @@ function CommandRow({
   isResponseMode,
   onAskAnother,
   onOpen,
-  onSetPromptOpen,
+  onSetMode,
   onStop,
   onToggleVadListening,
   statusLabel,
@@ -172,7 +172,7 @@ function CommandRow({
         <button
           aria-label="Ask Delfin"
           className="no-drag flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--primary)] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[var(--primary-hover)]"
-          onClick={() => onSetPromptOpen(true)}
+          onClick={() => onSetMode('minimized-prompt-input')}
           type="button"
         >
           <MessageCircle size={13} />
@@ -184,7 +184,7 @@ function CommandRow({
         <button
           aria-label="Collapse"
           className="no-drag flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-          onClick={() => onSetPromptOpen(false)}
+          onClick={() => onSetMode('minimized-compact')}
           type="button"
         >
           <ChevronDown size={14} />
