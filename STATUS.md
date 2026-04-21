@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-04-22 (overlay state flow simplified; active session reducer removed)
+> Last updated: 2026-04-22 (overlay state simplified; Ask Another now cancels stale turn output)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -65,7 +65,7 @@
 | `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state, and past-session deletion flow |
 | `src/renderer/hooks/useOverlayState.tsx` | ✅ | Overlay store reconciliation plus centralized optimistic `setOverlayMode()` helper with IPC rollback |
 | `src/renderer/features/active-session/ActiveSessionScreen.tsx` | ✅ | Renders directly from overlay store mode; local active-session reducer removed |
-| `src/renderer/features/active-session/hooks/useActiveSession.ts` | ✅ | Active-session state/actions hook; replaces `useActiveSessionController` and uses shared overlay hook |
+| `src/renderer/features/active-session/hooks/useActiveSession.ts` | ✅ | Active-session state/actions hook; replaces `useActiveSessionController`, uses shared overlay hook, and ignores stale cancelled-turn audio/fallback output |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button and recent-session deletion |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
