@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { EndedSessionSnapshot } from '../../../shared/types'
-import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
+import { useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 import { useSessionStore } from '../../stores/sessionStore'
 import ExpandedSessionView from './components/ExpandedSessionView'
@@ -30,10 +30,6 @@ export default function ActiveSessionScreen() {
     onSessionEndCommitted: handleSessionEndCommitted,
     sessionName: activeSessionName ?? 'Study Session',
   })
-
-  if (overlayState === null) {
-    return <OverlayLoadScreen message="Loading Delfin..." />
-  }
 
   if (overlayState.mode !== 'expanded') {
     return (

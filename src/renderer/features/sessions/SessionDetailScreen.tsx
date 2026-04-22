@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { SessionDetail } from '../../../shared/types'
 import PastSessionView from '../../components/PastSessionView'
-import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 
 function SessionDetailLoadingState() {
@@ -18,7 +17,6 @@ export default function SessionDetailScreen() {
   const navigate = useNavigate()
   const params = useParams<{ sessionId: string }>()
   const sessionId = params.sessionId ?? null
-  const { overlayState } = useOverlayState()
 
   useEffect(() => {
     if (sessionId === null) {
@@ -47,10 +45,6 @@ export default function SessionDetailScreen() {
     navigate(ROUTES.sessions, { replace: true })
   }, [navigate, sessionId])
 
-  if (overlayState === null) {
-    return <OverlayLoadScreen message="Loading Delfin..." />
-  }
-
   if (sessionId === null || detail === null) {
     return <SessionDetailLoadingState />
   }
@@ -59,7 +53,7 @@ export default function SessionDetailScreen() {
     <PastSessionView
       messages={detail.messages}
       onBack={() => {
-        navigate(-1)
+        navigate(-1) 
       }}
       onDelete={() => {
         void handleDelete()

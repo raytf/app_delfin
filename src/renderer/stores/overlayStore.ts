@@ -8,14 +8,14 @@ function createDefaultOverlayState(): OverlayState {
 }
 
 interface OverlayStoreState {
-  overlayState: OverlayState | null
+  overlayState: OverlayState
   setOverlayState: (overlayState: OverlayState) => void
   reconcileOverlayStateFromMain: () => Promise<void>
   resetOverlayState: () => void
 }
 
 export const useOverlayStore = create<OverlayStoreState>()((set) => ({
-  overlayState: null,
+  overlayState: createDefaultOverlayState(),
 
   setOverlayState: (overlayState) =>
     set({

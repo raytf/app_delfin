@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SessionListItem } from '../../../shared/types'
-import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
+import { useOverlayState } from '../../hooks/useOverlayState'
 import { buildSessionDetailPath, ROUTES } from '../../navigation/routes'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -11,7 +11,7 @@ import UserNameModal from './components/UserNameModal'
 export default function HomeScreen() {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const navigate = useNavigate()
-  const { overlayState, setOverlayMode } = useOverlayState()
+  const { setOverlayMode } = useOverlayState()
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearEndedSessionSnapshot = useSessionStore((state) => state.clearEndedSessionSnapshot)
   const setActiveSessionName = useSessionStore((state) => state.setActiveSessionName)
@@ -56,10 +56,6 @@ export default function HomeScreen() {
     setOverlayMode,
     startSession,
   ])
-
-  if (overlayState === null) {
-    return <OverlayLoadScreen message="Loading Delfin..." />
-  }
 
   return (
     <>

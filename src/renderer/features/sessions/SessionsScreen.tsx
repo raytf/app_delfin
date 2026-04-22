@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SessionListItem } from '../../../shared/types'
-import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { buildSessionDetailPath } from '../../navigation/routes'
 import AllSessionsPage from './components/AllSessionsPage'
 
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const navigate = useNavigate()
-  const { overlayState } = useOverlayState()
 
   useEffect(() => {
     let cancelled = false
@@ -31,14 +29,10 @@ export default function SessionsScreen() {
     )
   }, [])
 
-  if (overlayState === null) {
-    return <OverlayLoadScreen message="Loading Delfin..." />
-  }
-
   return (
     <AllSessionsPage
       onBack={() => {
-        navigate(-1)
+        navigate(-1) 
       }}
       onDeleteSession={(sessionId) => {
         void handleDeleteSession(sessionId)

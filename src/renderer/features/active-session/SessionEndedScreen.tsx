@@ -2,7 +2,6 @@ import { useCallback } from 'react'
 import { ArrowLeft, CheckCircle, Clock3, MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import delfinLogo from '../../assets/logo.png'
-import { OverlayLoadScreen, useOverlayState } from '../../hooks/useOverlayState'
 import { ROUTES } from '../../navigation/routes'
 import { useOverlayStore } from '../../stores/overlayStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -21,7 +20,6 @@ function formatDuration(durationMs: number): string {
 
 export default function SessionEndedScreen() {
   const navigate = useNavigate()
-  const { overlayState } = useOverlayState()
   const resetOverlayState = useOverlayStore((state) => state.resetOverlayState)
   const clearConversation = useSessionStore((state) => state.clearConversation)
   const clearEndedSessionSnapshot = useSessionStore((state) => state.clearEndedSessionSnapshot)
@@ -42,12 +40,12 @@ export default function SessionEndedScreen() {
     setActiveSessionName,
   ])
 
-  if (overlayState === null) {
-    return <OverlayLoadScreen message="Loading session summary..." />
-  }
-
   if (endedSessionSnapshot === null) {
-    return <OverlayLoadScreen message="Loading session summary..." />
+    return (
+      <div className="ocean-gradient flex min-h-screen items-center justify-center px-8 py-12 text-[var(--text-secondary)]">
+        Loading session summary...
+      </div>
+    )
   }
 
   return (
