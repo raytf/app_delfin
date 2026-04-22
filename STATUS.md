@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-13 (README + status refreshed against current codebase)
+> Last updated: 2026-04-22 (docs/explanations audit — all six explanation docs refreshed against current codebase)
 > Legend: ✅ Implemented · ⚠️ Partial / placeholder · ❌ Not started
 
 ---
@@ -174,3 +174,16 @@
 | Dockerfile for sidecar | ❌ | Not implemented |
 | `demo-content/` — slide screenshots | ❌ | Directory exists with only a README |
 | README — complete setup instructions | ✅ | Refreshed on 2026-04-13 |
+
+---
+
+## Documentation — Explanation Docs
+
+| File | Status | Notes |
+|---|---|---|
+| `docs/explanations/sidecar-flow.md` | ✅ | Refreshed 2026-04-22: removed Phase 1 stubs + respond_to_user tool section; added preprocess layer, message-ordering section, TTS flow |
+| `docs/explanations/session-overlay-state-machine.md` | ✅ | Refreshed 2026-04-22: fixed window dimensions (380×64 / 460×115 / 460×360); corrected resize-in-place vs destroy+recreate; window is always frameless |
+| `docs/explanations/electron-ipc-and-ws-message-flow.md` | ✅ | Refreshed 2026-04-22: updated beginPromptSubmission/submitSessionPrompt signatures; added recordUserPrompt persistence step; corrected audio_start shape |
+| `docs/explanations/react-zustand-state-flow.md` | ✅ | Refreshed 2026-04-22: settingsStore is not a stub; added minimizedResponseMessageId + sessionStartTime fields; expanded IPC cleanup channel list |
+| `docs/explanations/voice-audio-pipeline.md` | ✅ | Refreshed 2026-04-22: screenshot taken in main process not renderer; updated submitSessionPrompt shape; corrected barge-in (mute + threshold + grace); audio_start has no sentence_count |
+| `docs/explanations/screen-capture-and-window-filtering.md` | ✅ | No changes needed — consistent with current captureService implementation |
