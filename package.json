@@ -17,7 +17,12 @@
     "download:models": "node scripts/download-models.mjs",
     "check:env": "node scripts/check-env.mjs",
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:sidecar": "node scripts/build-sidecar.mjs",
+    "electron:build": "npm run build",
+    "electron:pack": "electron-builder --publish=never",
+    "electron:dist": "npm run build && npm run build:sidecar && npm run electron:pack",
+    "electron:dist:win": "npm run build && npm run electron:pack"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

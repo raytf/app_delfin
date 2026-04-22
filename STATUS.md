@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-13 (README + status refreshed against current codebase)
+> Last updated: 2026-04-22 (desktop-distribution-mvp-spec Gate 1 approved — Ollama backend added for native Windows)
 > Legend: ✅ Implemented · ⚠️ Partial / placeholder · ❌ Not started
 
 ---
@@ -170,7 +170,7 @@
 | Markdown rendering in chat box | ❌ | Conversation text is rendered as plain text |
 | Dark mode toggle | ❌ | Not implemented |
 | Manual window picker dropdown | ❌ | Not implemented |
-| Ollama fallback engine | ❌ | Not implemented |
+| Ollama fallback engine | ⚠️ | Spec complete in `docs/features/desktop-distribution-mvp-spec.md` — Gate 1 approved, ready for implementation (Windows native inference) |
 | Dockerfile for sidecar | ❌ | Not implemented |
 | `demo-content/` — slide screenshots | ❌ | Directory exists with only a README |
 | README — complete setup instructions | ✅ | Refreshed on 2026-04-13 |

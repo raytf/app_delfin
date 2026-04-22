@@ -19,7 +19,7 @@ docs/
 ├── SPEC.md                          ← Single source of truth. Read this first.
 ├── design-ai-spec.md                ← Product and brand brief
 ├── features/                        ← Independent feature specs (Gate 1→5 lifecycle, any phase)
-│   ├── desktop-distribution-mvp-spec.md   ← 🚧 In Progress
+│   ├── desktop-distribution-mvp-spec.md   ← ✅ Spec complete (Gate 1 approved)
 │   ├── waveform-ui-spec.md                ← ✅ Complete
 │   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
 │   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete

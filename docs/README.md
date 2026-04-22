@@ -38,7 +38,7 @@ Independent features that do not fit the numbered phase sequence. Each has a Gat
 
 | File | Status | Description |
 |---|---|---|
-| [`features/desktop-distribution-mvp-spec.md`](features/desktop-distribution-mvp-spec.md) | 🚧 In Progress | Native per-platform installers with a bundled Python sidecar and first-run model download. Gate 1 approved. |
+| [`features/desktop-distribution-mvp-spec.md`](features/desktop-distribution-mvp-spec.md) | ✅ Complete | Native per-platform installers with a bundled Python sidecar and first-run model download. Ollama backend for native Windows. Gate 1 approved. |
 | [`features/waveform-ui-spec.md`](features/waveform-ui-spec.md) | ✅ Complete | Reusable `VoiceWaveform` component — state-based colour, per-bar amplitude, user/AI/idle modes |
 | [`features/overlay-waveform-polish-spec.md`](features/overlay-waveform-polish-spec.md) | ✅ Complete | Compact overlay resize and shift to analyser-driven per-bar waveform rendering |
 | [`features/minimized-overlay-waveform-continuity-spec.md`](features/minimized-overlay-waveform-continuity-spec.md) | ✅ Complete | Persistent waveform/status chrome across all minimized overlay variants |

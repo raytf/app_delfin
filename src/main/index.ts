@@ -16,6 +16,7 @@ import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
 import { SessionPersistenceService } from "./session/sessionPersistenceService";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
+import { startSidecar, stopSidecar } from "./sidecar/sidecarProcess";
 import { validateEnv } from "./envValidation";
 import { FileSessionStorage } from "./storage/fileSessionStorage";
 import {
@@ -154,11 +155,18 @@ app.whenReady().then(() => {
   sessionPersistence = new SessionPersistenceService(
     new FileSessionStorage(join(app.getPath("userData"), "storage")),
   );
+  const sidecarResult = startSidecar();
+  if (!sidecarResult.success) {
+    console.warn("[main] Failed to auto-start sidecar:", sidecarResult.error);
+  }
+
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
     sessionPersistence,
-    sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
+    sidecarWsUrl: sidecarResult.success
+      ? sidecarResult.url
+      : (process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws"),
     clearEndedSessionData,
     setEndedSessionData,
     setMinimizedVariant,
@@ -178,6 +186,7 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   mainWindow = null;
   disconnectFromSidecar();
+  stopSidecar();
 
   if (process.platform !== "darwin") {
     app.quit();

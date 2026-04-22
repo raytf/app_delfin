@@ -123,6 +123,13 @@ LITERT_CACHE_DIR=/tmp/litert-cache
 VISION_TOKEN_BUDGET=280
 MAX_IMAGE_WIDTH=512
 
+# === Inference backend selection (packaged builds) ===
+# `litert`  → use LiteRT-LM engine (default on macOS / Linux)
+# `ollama`  → use Ollama HTTP backend (default on native Windows)
+INFERENCE_BACKEND=litert
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=gemma3:4b
+
 # === TTS ===
 TTS_ENABLED=false
 TTS_BACKEND=web-speech
