@@ -110,13 +110,18 @@ After the human approves the implementation, update **all** affected documentati
 | Doc | Update if… |
 |---|---|
 | `STATUS.md` | **Always** — update the status of every file or feature touched (✅ / ⚠️ / ❌) and bump the "Last updated" date |
+| `docs/README.md` | **Always** — update the status column for any feature or phase spec whose lifecycle state changed (🚧 → ✅). If a new spec file was created, add a row. If a doc became obsolete, move it to `docs/archive/` and update the row. |
 | `docs/SPEC.md` | New IPC channel, WebSocket message type, env var, or arch decision added |
-| Relevant `docs/phases/phase-N.md` | Verification checklist items completed; pseudocode drifted from reality |
+| Relevant `docs/phases/phase-N.md` or `docs/features/*.md` | Verification checklist items completed; Gate Resolution block updated to reflect new status and implemented date |
 | `AGENTS.md` §Validated Technical Decisions | A new confirmed technical fact was established during implementation |
 | `AGENTS.md` §Nice-to-Haves | A nice-to-have was implemented or explicitly ruled out |
 | `.env.example` | A new environment variable was introduced |
 
 Do **not** create new documentation files unless the spec explicitly called for one.
+
+**Doc lifecycle rule — when to archive vs. when to mark complete:**
+- Mark a spec ✅ Complete (in its Gate Resolution block and in `docs/README.md`) when implementation is done. Leave the file in place — completed specs are design decision records, not clutter.
+- Move a spec to `docs/archive/` only when it is **truly obsolete**: the feature was reversed, the interface it described no longer exists, or a newer spec fully supersedes it.
 
 ---
 
