@@ -1,6 +1,16 @@
 # Overlay + Waveform Polish Spec
 
-> Approved and implemented on 2026-04-11. This spec captured the compact overlay resize/simplification work and the shift from scalar waveform animation to analyser-driven per-bar bars for mic and AI TTS playback.
+## Gate Resolution
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ Complete — implemented |
+| **Approval date** | 2026-04-11 |
+| **Implemented date** | 2026-04-11 |
+| **Approver** | Human reviewer (project lead) |
+| **Summary** | Compact overlay resize/simplification and shift from scalar waveform animation to analyser-driven per-bar rendering for mic and AI TTS playback |
+
+
 
 ## Goal
 

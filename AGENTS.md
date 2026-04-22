@@ -15,19 +15,35 @@ A local, privacy-first AI desktop sidebar (Electron + React) that captures the f
 ```
 STATUS.md                            ← Live feature status tracker. Update after every implementation change.
 docs/
+├── README.md                        ← Doc index with status for every file. Check here first.
 ├── SPEC.md                          ← Single source of truth. Read this first.
-├── delfin-implementation-plan.md           ← Team/parallel-stream view (secondary)
-└── phases/
-    ├── phase-0-scaffold.md          ← Repo structure, deps, .env, setup scripts
-    ├── phase-1-sidecar.md           ← FastAPI sidecar, LiteRT-LM, tool calling
-    ├── phase-2-electron.md          ← Overlay window, desktopCapturer, WebSocket client
-    ├── phase-3-ui.md                ← React components, Zustand stores, streaming UI
-    ├── phase-4-integration.md       ← Wire all layers together, error handling
-    ├── phase-5-autorefresh-tts.md   ← Auto-refresh, TTS pipeline, audio playback
-    └── phase-6-polish.md            ← Visual polish, perf, demo prep
+├── design-ai-spec.md                ← Product and brand brief
+├── features/                        ← Independent feature specs (Gate 1→5 lifecycle, any phase)
+│   ├── desktop-distribution-mvp-spec.md   ← 🚧 In Progress
+│   ├── waveform-ui-spec.md                ← ✅ Complete
+│   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
+│   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete
+├── phases/                          ← Numbered product phases (completed in order)
+│   ├── phase-0-scaffold.md          ← ✅ Repo structure, deps, .env, setup scripts
+│   ├── phase-1-sidecar.md           ← ✅ FastAPI sidecar, LiteRT-LM, tool calling
+│   ├── phase-2-electron.md          ← ✅ Overlay window, desktopCapturer, WebSocket client
+│   ├── phase-3-ui.md                ← ✅ React components, Zustand stores, streaming UI
+│   ├── phase-4-integration.md       ← ✅ Wire all layers together, error handling
+│   ├── phase-5-autorefresh-tts.md   ← ✅ Auto-refresh, TTS pipeline, audio playback
+│   ├── phase-6-polish.md            ← ✅ Visual polish, perf, demo prep
+│   └── phase-7-memory.md            ← 🚧 Persistent on-device memory wiki
+├── explanations/                    ← Evergreen "how does X work" reference (no lifecycle)
+│   ├── electron-ipc-and-ws-message-flow.md
+│   ├── react-zustand-state-flow.md
+│   ├── screen-capture-and-window-filtering.md
+│   ├── session-overlay-state-machine.md
+│   ├── sidecar-flow.md
+│   └── voice-audio-pipeline.md
+└── archive/                         ← Obsolete docs preserved for history
+    └── delfin-implementation-plan.md ← 📦 Original hackathon team plan
 ```
 
-**Start with `docs/SPEC.md`** — it contains the architecture overview, tech stack, environment variable reference, WebSocket protocol, IPC channel table, and cross-cutting code rules that apply to every phase. Each phase doc in `docs/phases/` then contains detailed pseudocode and a verification checklist for that phase only.
+**Start with `docs/SPEC.md`** — it contains the architecture overview, tech stack, environment variable reference, WebSocket protocol, IPC channel table, and cross-cutting code rules that apply to every phase. Each phase doc in `docs/phases/` then contains detailed pseudocode and a verification checklist for that phase only. See `docs/README.md` for the full index with lifecycle status for every document.
 
 When `docs/SPEC.md` and any phase doc conflict, **SPEC.md wins**.
 

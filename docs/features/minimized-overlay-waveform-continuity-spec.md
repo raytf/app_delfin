@@ -1,6 +1,16 @@
 # Minimized Overlay Waveform Continuity Spec
 
-> Approved and implemented on 2026-04-11. This spec captured the minimized overlay continuity fix: persistent waveform/status chrome in prompt-open modes, a more voice-aware response layout, and automatic return to compact mode after assistant playback completes.
+## Gate Resolution
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ Complete — implemented |
+| **Approval date** | 2026-04-11 |
+| **Implemented date** | 2026-04-11 |
+| **Approver** | Human reviewer (project lead) |
+| **Summary** | Minimized overlay continuity fix: persistent waveform/status chrome in prompt-open modes, voice-aware response layout, automatic return to compact mode after assistant playback completes |
+
+
 
 ## Goal
 
