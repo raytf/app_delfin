@@ -28,17 +28,17 @@ export interface WaveformPresentation {
 }
 
 export function resolveWaveformPresentation(input: WaveformPresentationInput): WaveformPresentation {
-  if (input.isAssistantSpeaking) {
-    return {
-      bars: input.assistantWaveformBars,
-      state: 'assistant',
-    }
-  }
-
   if (input.isUserSpeaking) {
     return {
       bars: input.userWaveformBars,
       state: 'user',
+    }
+  }
+
+  if (input.isAssistantSpeaking) {
+    return {
+      bars: input.assistantWaveformBars,
+      state: 'assistant',
     }
   }
 

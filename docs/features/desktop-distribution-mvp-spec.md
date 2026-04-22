@@ -91,7 +91,7 @@ Allow students on the supported desktop platforms to download, install, and run 
 - On Windows, the sidecar uses an **Ollama HTTP backend** as the inference engine instead of `litert_lm.Engine`.
 - The sidecar connects to a local Ollama instance at `http://localhost:11434` (or the env-configured `OLLAMA_HOST`).
 - The Ollama backend sends the same `{ text, image_blob, preset_id }` payloads to Ollama’s `/api/generate` or `/api/chat` endpoint and translates the response into the existing WebSocket `type: "content"` / `type: "done"` stream.
-- On first launch, the bootstrap flow checks whether Ollama is installed and running; if not, it guides the user to install it (or offers a one-click `ollama pull gemma3:4b` if Ollama is present but the model is missing).
+- On first launch, the bootstrap flow checks whether Ollama is installed and running; if not, it guides the user to install it (or offers a one-click `ollama pull gemma4:e2b` if Ollama is present but the model is missing).
 - TTS remains server-side Kokoro (ONNX) on Windows — Ollama replaces only the text-inference layer, not audio generation.
 
 ## Execution track map
@@ -159,7 +159,7 @@ Potential packaged-runtime env vars passed from Electron to the sidecar:
 - `KOKORO_MODEL_PATH`
 - `KOKORO_VOICES_PATH`
 - `OLLAMA_HOST` (default `http://localhost:11434`)
-- `OLLAMA_MODEL` (default `gemma3:4b`)
+- `OLLAMA_MODEL` (default `gemma4:e2b`)
 - `INFERENCE_BACKEND` (`litert` | `ollama`, platform-selected at runtime)
 
 ### 4. Ollama backend contract

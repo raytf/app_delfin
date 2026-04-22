@@ -6,14 +6,14 @@ import {
 } from '../utils/minimizedOverlay'
 
 describe('getVoiceTurnRevealVariant', () => {
-  it('reveals prompt-response for a voice turn from minimized compact mode', () => {
+  it('reveals prompt-input for a voice turn from minimized compact mode', () => {
     expect(
       getVoiceTurnRevealVariant({
         minimizedVariant: 'compact',
         overlayMode: 'minimized',
         sessionMode: 'active',
       }),
-    ).toBe('prompt-response')
+    ).toBe('prompt-input')
   })
 
   it('does not auto-open outside active minimized compact mode', () => {
@@ -54,17 +54,17 @@ describe('getAutoAdvanceMinimizedVariant', () => {
     ).toBe('prompt-input')
   })
 
-  it('leaves compact mode unchanged for non-voice auto-advance logic', () => {
+  it('advances compact mode to prompt-response when streamed text arrives', () => {
     expect(
       getAutoAdvanceMinimizedVariant({
         errorMessage: null,
         isMinimizedPromptComposing: false,
-        latestResponseText: 'Answer should not auto-open compact mode here',
+        latestResponseText: 'Answer auto-opens compact mode here',
         minimizedVariant: 'compact',
         overlayMode: 'minimized',
         sessionMode: 'active',
       }),
-    ).toBeNull()
+    ).toBe('prompt-response')
   })
 })
 

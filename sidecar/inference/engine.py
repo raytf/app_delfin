@@ -1,23 +1,33 @@
-"""LiteRT-LM engine loader with CPU/GPU try-fallback and pre-warm."""
+"""Backend router — loads LiteRT-LM or Ollama depending on INFERENCE_BACKEND."""
 
 import logging
 import os
-
-from dotenv import find_dotenv, load_dotenv
-from huggingface_hub import hf_hub_download
-import litert_lm
-
-load_dotenv(find_dotenv())
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def load_engine() -> tuple[litert_lm.Engine, str]:
-    """Download (if needed) and load the LiteRT-LM engine.
+def load_engine() -> tuple[Any, str]:
+    """Load the inference engine based on the INFERENCE_BACKEND env var.
 
     Returns:
-        (engine, active_backend) where active_backend is "CPU" or "GPU".
+        (engine, active_backend) where active_backend is "CPU", "GPU", or "ollama".
     """
+    backend = os.environ.get("INFERENCE_BACKEND", "litert").strip().lower()
+    if backend == "ollama":
+        from inference.ollama_backend import OllamaBackend
+
+        return OllamaBackend.load()
+    return _load_litert_engine()
+
+
+def _load_litert_engine() -> tuple[Any, str]:
+    from dotenv import find_dotenv, load_dotenv
+    from huggingface_hub import hf_hub_download
+    import litert_lm
+
+    load_dotenv(find_dotenv())
+
     model_repo = os.environ["MODEL_REPO"]
     model_file = os.environ["MODEL_FILE"]
     requested_backend = os.environ.get("LITERT_BACKEND", "CPU").upper()
@@ -60,12 +70,17 @@ def load_engine() -> tuple[litert_lm.Engine, str]:
     return engine, "CPU"
 
 
-def pre_warm(engine: litert_lm.Engine) -> None:
-    """Send a throwaway prompt to warm up model caches."""
-    logger.info("Pre-warming engine …")
-    try:
-        with engine.create_conversation() as conv:
-            conv.send_message("hello")
-        logger.info("Pre-warm complete.")
-    except Exception as exc:
-        logger.warning("Pre-warm failed (non-fatal): %s", exc)
+def pre_warm(engine: Any) -> None:
+    """Send a throwaway prompt to warm up model caches (LiteRT only)."""
+    if hasattr(engine, "create_conversation") and not hasattr(
+        engine, "model"
+    ):  # LiteRT engine check
+        logger.info("Pre-warming engine …")
+        try:
+            with engine.create_conversation() as conv:
+                conv.send_message("hello")
+            logger.info("Pre-warm complete.")
+        except Exception as exc:
+            logger.warning("Pre-warm failed (non-fatal): %s", exc)
+    else:
+        logger.info("Ollama backend — skipping pre-warm.")

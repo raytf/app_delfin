@@ -92,7 +92,7 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
   mainWindow.focus();
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log("Delfin started");
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
@@ -155,7 +155,7 @@ app.whenReady().then(() => {
   sessionPersistence = new SessionPersistenceService(
     new FileSessionStorage(join(app.getPath("userData"), "storage")),
   );
-  const sidecarResult = startSidecar();
+  const sidecarResult = await startSidecar();
   if (!sidecarResult.success) {
     console.warn("[main] Failed to auto-start sidecar:", sidecarResult.error);
   }

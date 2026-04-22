@@ -128,7 +128,7 @@ MAX_IMAGE_WIDTH=512
 # `ollama`  → use Ollama HTTP backend (default on native Windows)
 INFERENCE_BACKEND=litert
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=gemma3:4b
+OLLAMA_MODEL=gemma4:e2b
 
 # === TTS ===
 TTS_ENABLED=false

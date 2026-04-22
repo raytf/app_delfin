@@ -16,14 +16,13 @@ const baseProps = {
   onStop: () => undefined,
   onSubmitPrompt: () => undefined,
   onToggleVadListening: () => undefined,
-  showVoiceWaveform: true,
   vadListeningEnabled: true,
   waveformBars: [0.12, 0.26, 0.18, 0.08],
   waveformState: 'idle' as const,
 }
 
 describe('MinimizedSessionBar', () => {
-  it('renders the compact waveform chrome in compact mode', () => {
+  it('renders the compact chrome in compact mode', () => {
     const markup = renderToStaticMarkup(
       createElement(MinimizedSessionBar, {
         ...baseProps,
@@ -31,11 +30,11 @@ describe('MinimizedSessionBar', () => {
       }),
     )
 
-    expect(markup).toContain('Compact speech waveform in idle mode')
+    expect(markup).toContain('animate-pulse')
     expect(markup).toContain('Ask')
   })
 
-  it('keeps the waveform visible in prompt-open input mode', () => {
+  it('renders the prompt input form in prompt-open input mode', () => {
     const markup = renderToStaticMarkup(
       createElement(MinimizedSessionBar, {
         ...baseProps,
@@ -43,11 +42,11 @@ describe('MinimizedSessionBar', () => {
       }),
     )
 
-    expect(markup).toContain('Expanded speech waveform in idle mode')
+    expect(markup).toContain('Ask Delfin')
     expect(markup).toContain('Collapse')
   })
 
-  it('keeps the waveform visible in prompt-response mode while showing voice actions', () => {
+  it('renders the response and voice actions in prompt-response mode', () => {
     const markup = renderToStaticMarkup(
       createElement(MinimizedSessionBar, {
         ...baseProps,
@@ -56,7 +55,7 @@ describe('MinimizedSessionBar', () => {
       }),
     )
 
-    expect(markup).toContain('Expanded speech waveform in idle mode')
+    expect(markup).toContain('Here is the latest response')
     expect(markup).toContain('Ask another')
   })
 })

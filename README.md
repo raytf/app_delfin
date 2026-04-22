@@ -286,7 +286,7 @@ LiteRT-LM (the default engine) only runs on Linux and macOS. For packaged Window
 
 The `docs/features/desktop-distribution-mvp-spec.md` describes the full plan. In short:
 1. The packaged sidecar on Windows uses `INFERENCE_BACKEND=ollama` and connects to `http://localhost:11434`.
-2. The first-run bootstrap checks for Ollama and guides the user to install it (or run `ollama pull gemma3:4b`) if missing.
+2. The first-run bootstrap checks for Ollama and guides the user to install it (or run `ollama pull gemma4:e2b`) if missing.
 3. The renderer-side WebSocket contract is identical — no UI changes are needed to switch backends.
 4. TTS remains server-side Kokoro (ONNX) on Windows.
 

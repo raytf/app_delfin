@@ -14,12 +14,14 @@ block_cipher = None
 # ---------------------------------------------------------------------------
 all_binaries = []
 all_datas = []
+all_hiddenimports = []
 
-for pkg in ("kokoro_onnx", "onnxruntime", "litert_lm"):
+for pkg in ("kokoro_onnx", "onnxruntime", "litert_lm", "language_tags"):
     try:
-        binaries, datas = collect_all(pkg)
+        binaries, datas, hiddenimports = collect_all(pkg)
         all_binaries.extend(binaries)
         all_datas.extend(datas)
+        all_hiddenimports.extend(hiddenimports)
     except Exception as exc:
         print(f"[delfin-sidecar.spec] Warning: could not collect {pkg}: {exc}")
 
@@ -27,9 +29,10 @@ for pkg in ("kokoro_onnx", "onnxruntime", "litert_lm"):
 import sys
 if sys.platform == "linux":
     try:
-        binaries, datas = collect_all("espeakng_loader")
+        binaries, datas, hiddenimports = collect_all("espeakng_loader")
         all_binaries.extend(binaries)
         all_datas.extend(datas)
+        all_hiddenimports.extend(hiddenimports)
     except Exception as exc:
         print(f"[delfin-sidecar.spec] Warning: could not collect espeakng_loader: {exc}")
 
@@ -68,6 +71,8 @@ a = Analysis(
         "PIL._imagingtk",
         "PIL._tkinter_finder",
         "numpy",
+        "requests",
+        "inference.ollama_backend",
         # Sidecar sub-packages
         "inference",
         "inference.engine",
@@ -77,7 +82,7 @@ a = Analysis(
         "prompts.lecture_slide",
         "prompts.presets",
         "tts",
-    ],
+    ] + all_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

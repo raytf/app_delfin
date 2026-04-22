@@ -44,36 +44,32 @@ describe('resolveWaveformPresentation', () => {
     })
   })
 
-  it('uses the most active non-speaking bars for processing and idle states', () => {
-    expect(
-      resolveWaveformPresentation({
-        assistantAudioLevel: 0,
-        assistantWaveformBars: [0.05, 0.03, 0.01],
-        isAssistantSpeaking: false,
-        isProcessing: true,
-        isUserSpeaking: false,
-        userAudioLevel: 0.22,
-        userWaveformBars: [0.08, 0.22, 0.11],
-      }),
-    ).toEqual({
-      bars: [0.08, 0.22, 0.11],
-      state: 'processing',
+  it('returns flat bars for processing and idle states', () => {
+    const processingResult = resolveWaveformPresentation({
+      assistantAudioLevel: 0,
+      assistantWaveformBars: [0.05, 0.03, 0.01],
+      isAssistantSpeaking: false,
+      isProcessing: true,
+      isUserSpeaking: false,
+      userAudioLevel: 0.22,
+      userWaveformBars: [0.08, 0.22, 0.11],
     })
+    expect(processingResult.state).toBe('processing')
+    expect(processingResult.bars.length).toBeGreaterThan(0)
+    expect(processingResult.bars.every((v) => v === 0)).toBe(true)
 
-    expect(
-      resolveWaveformPresentation({
-        assistantAudioLevel: 0.18,
-        assistantWaveformBars: [0.05, 0.18, 0.12],
-        isAssistantSpeaking: false,
-        isProcessing: false,
-        isUserSpeaking: false,
-        userAudioLevel: 0,
-        userWaveformBars: [0, 0, 0],
-      }),
-    ).toEqual({
-      bars: [0.05, 0.18, 0.12],
-      state: 'idle',
+    const idleResult = resolveWaveformPresentation({
+      assistantAudioLevel: 0.18,
+      assistantWaveformBars: [0.05, 0.18, 0.12],
+      isAssistantSpeaking: false,
+      isProcessing: false,
+      isUserSpeaking: false,
+      userAudioLevel: 0,
+      userWaveformBars: [0, 0, 0],
     })
+    expect(idleResult.state).toBe('idle')
+    expect(idleResult.bars.length).toBeGreaterThan(0)
+    expect(idleResult.bars.every((v) => v === 0)).toBe(true)
   })
 })
 
