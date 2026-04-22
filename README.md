@@ -225,6 +225,6 @@ If you’re developing inside WSL2:
 
 ## Documentation
 
+- [`docs/README.md`](docs/README.md) — full documentation index with lifecycle status for every spec, phase, and feature doc
 - [`docs/SPEC.md`](docs/SPEC.md) — architecture, protocols, IPC channels, and coding rules
-- [`docs/phases/`](docs/phases/) — phase-by-phase implementation plans
-- [`STATUS.md`](STATUS.md) — current implementation status against the codebase
+- [`STATUS.md`](STATUS.md) — per-file implementation status against the codebase

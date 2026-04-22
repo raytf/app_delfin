@@ -109,9 +109,11 @@ After the human approves the implementation, update **all** affected documentati
 
 | Doc | Update if… |
 |---|---|
-| `STATUS.md` | **Always** — update the status of every file or feature touched (✅ / ⚠️ / ❌) and bump the "Last updated" date |
-| `docs/README.md` | **Always** — update the status column for any feature or phase spec whose lifecycle state changed (🚧 → ✅). If a new spec file was created, add a row. If a doc became obsolete, move it to `docs/archive/` and update the row. |
-| `docs/SPEC.md` | New IPC channel, WebSocket message type, env var, or arch decision added |
+| `STATUS.md` | **Always** — add or update a row for every file touched; set status to ✅ / ⚠️ / ❌ and bump the "Last updated" date |
+| `docs/README.md` | **Always** — update the status column when a spec changes lifecycle state (🚧 → ✅). Add a row when a new spec is created. Move the row and file to `docs/archive/` when a doc becomes obsolete. |
+| `AGENTS.md` §Documentation Map | A new spec was added to `docs/features/` or `docs/phases/`, or a spec changed lifecycle state — keep the tree's status icons in sync with `docs/README.md` |
+| `README.md` | A user-visible capability was added or removed; the install or run flow changed; a new npm script was added; or a new env var was introduced that users need to know about |
+| `docs/SPEC.md` | New IPC channel, WebSocket message type, REST endpoint, env var, or arch decision added |
 | Relevant `docs/phases/phase-N.md` or `docs/features/*.md` | Verification checklist items completed; Gate Resolution block updated to reflect new status and implemented date |
 | `AGENTS.md` §Validated Technical Decisions | A new confirmed technical fact was established during implementation |
 | `AGENTS.md` §Nice-to-Haves | A nice-to-have was implemented or explicitly ruled out |
