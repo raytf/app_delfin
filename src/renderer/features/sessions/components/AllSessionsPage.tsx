@@ -16,8 +16,8 @@ export default function AllSessionsPage({
   sessions,
 }: AllSessionsPageProps) {
   return (
-    <div className="ocean-gradient relative min-h-screen text-[var(--text-primary)]">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-8 py-10">
+    <div className="ocean-gradient relative h-full text-[var(--text-primary)]">
+      <div className="mx-auto flex h-full max-w-5xl flex-col px-8 py-10">
         <header className="flex items-start justify-between gap-6">
           <div>
             <button

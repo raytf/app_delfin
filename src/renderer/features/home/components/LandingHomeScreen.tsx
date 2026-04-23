@@ -180,10 +180,10 @@ export default function HomeScreen({
   }
 
   return (
-    <div className="ocean-gradient relative min-h-screen text-[var(--text-primary)]">
+    <div className="ocean-gradient relative h-full text-[var(--text-primary)]">
       <WaveDecoration />
 
-      <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-8 py-12">
+      <div className="relative mx-auto flex h-full max-w-4xl flex-col px-8 py-12">
         {/* Hero Section - Centered */}
         <main className="flex flex-1 flex-col items-center justify-center pb-8 pt-4 text-center">
           <div className="flex items-center gap-2">

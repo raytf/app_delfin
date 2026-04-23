@@ -42,14 +42,14 @@ export default function SessionEndedScreen() {
 
   if (endedSessionSnapshot === null) {
     return (
-      <div className="ocean-gradient flex min-h-screen items-center justify-center px-8 py-12 text-[var(--text-secondary)]">
+      <div className="ocean-gradient flex h-full items-center justify-center px-8 py-12 text-[var(--text-secondary)]">
         Loading session summary...
       </div>
     )
   }
 
   return (
-    <div className="ocean-gradient flex min-h-screen flex-col items-center justify-center px-8 py-12 text-center">
+    <div className="ocean-gradient flex h-full flex-col items-center justify-center px-8 py-12 text-center">
       <div className="relative mb-6">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[var(--success-soft)]">
           <CheckCircle size={48} className="text-[var(--success)]" />

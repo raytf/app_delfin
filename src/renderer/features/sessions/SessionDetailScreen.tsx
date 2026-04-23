@@ -6,7 +6,7 @@ import { ROUTES } from '../../navigation/routes'
 
 function SessionDetailLoadingState() {
   return (
-    <div className="ocean-gradient flex min-h-screen items-center justify-center px-8 py-12 text-[var(--text-secondary)]">
+    <div className="ocean-gradient flex h-full items-center justify-center px-8 py-12 text-[var(--text-secondary)]">
       Loading session...
     </div>
   )

@@ -36,4 +36,39 @@ export function registerOverlayIpcHandlers(options: RegisterIpcHandlersOptions):
       throw (error instanceof Error ? error : new Error(errorMessage))
     }
   })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.WINDOW_MINIMIZE, async () => {
+    const mainWindow = options.getMainWindow()
+
+    if (mainWindow === null || mainWindow.isDestroyed()) {
+      throw new Error('Main window is not available.')
+    }
+
+    mainWindow.minimize()
+  })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.WINDOW_TOGGLE_MAXIMIZE, async () => {
+    const mainWindow = options.getMainWindow()
+
+    if (mainWindow === null || mainWindow.isDestroyed()) {
+      throw new Error('Main window is not available.')
+    }
+
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize()
+      return
+    }
+
+    mainWindow.maximize()
+  })
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE, async () => {
+    const mainWindow = options.getMainWindow()
+
+    if (mainWindow === null || mainWindow.isDestroyed()) {
+      throw new Error('Main window is not available.')
+    }
+
+    mainWindow.close()
+  })
 }

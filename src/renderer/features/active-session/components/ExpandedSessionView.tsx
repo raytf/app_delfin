@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Clock, Minimize2, Square } from 'lucide-react'
 import type { ChatMessage } from '../../../../shared/types'
-import delfinLogo from '../../../assets/logo.png'
 import SessionConversation from '../../../components/SessionConversation'
 import { useSessionStore } from '../../../stores/sessionStore'
 import type { WaveformVisualState } from '../../../utils/waveformState'
@@ -96,16 +95,7 @@ export default function ExpandedSessionView({
   })
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
-      <header className="relative border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-4">
-        <div className="flex items-center justify-center gap-3">
-          <img alt="Delfin logo" className="h-10 w-10 object-contain" src={delfinLogo} />
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--primary)]">
-            Delfin
-          </h1>
-        </div>
-      </header>
-
+    <div className="flex h-full flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col border-r border-[var(--border-soft)]">
           <div className="min-h-0 flex-1 overflow-hidden">

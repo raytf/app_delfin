@@ -96,6 +96,9 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SIDECAR_INTERRUPT: 'sidecar:interrupt',
   OVERLAY_GET_STATE: 'overlay:get-state',
   OVERLAY_SET_MODE: 'overlay:set-mode',
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_TOGGLE_MAXIMIZE: 'window:toggle-maximize',
+  WINDOW_CLOSE: 'window:close',
   SESSION_START: 'session:start',
   SESSION_STOP: 'session:stop',
   SESSION_SUBMIT_PROMPT: 'session:submit-prompt',
@@ -182,6 +185,9 @@ export interface ElectronAPI {
   deleteSession: (request: SessionDeleteRequest) => Promise<void>
   getSessionMessageImage: (request: SessionMessageImageRequest) => Promise<string>
   setOverlayMode: (mode: OverlayMode) => Promise<void>
+  minimizeWindow: () => Promise<void>
+  toggleMaximizeWindow: () => Promise<void>
+  closeWindow: () => Promise<void>
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void

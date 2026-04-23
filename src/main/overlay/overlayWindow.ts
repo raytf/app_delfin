@@ -88,8 +88,8 @@ export function createOverlayWindow(mode: OverlayMode): BrowserWindow {
     frame: false,
     alwaysOnTop: isMinimizedMode,
     resizable: mode === "expanded",
-    maximizable: false,
-    minimizable: false,
+    maximizable: mode === "expanded",
+    minimizable: mode === "expanded",
     fullscreenable: mode === "expanded",
     skipTaskbar: isMinimizedMode,
     show: false,
@@ -124,7 +124,8 @@ export function setOverlayMode(
   window.setAlwaysOnTop(isMinimizedMode);
   window.setSkipTaskbar(isMinimizedMode);
   window.setResizable(mode === "expanded");
-  window.setMinimizable(false);
+  window.setMinimizable(mode === "expanded");
+  window.setMaximizable(mode === "expanded");
   window.setFullScreenable(mode === "expanded");
   window.setHasShadow(mode === "expanded");
   window.setBackgroundColor(isMinimizedMode ? "#00000000" : "#f8fcfd");

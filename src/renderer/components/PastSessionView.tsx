@@ -44,7 +44,7 @@ export default function PastSessionView({
   const sessionName = session.sessionName || session.sourceLabel || 'Untitled Session'
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
+    <div className="flex h-full flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
       <header className="border-b border-[var(--border-soft)] bg-[var(--bg-surface)] px-6 py-5">
         <div className="relative flex items-center justify-center">
           <div className="absolute left-0 flex items-center gap-3">

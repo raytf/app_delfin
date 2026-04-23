@@ -61,6 +61,15 @@ const api: ElectronAPI = {
   setOverlayMode: (mode: OverlayMode) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MODE, mode),
 
+  minimizeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_MINIMIZE),
+
+  toggleMaximizeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_TOGGLE_MAXIMIZE),
+
+  closeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE),
+
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
 
