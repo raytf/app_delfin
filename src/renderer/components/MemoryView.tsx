@@ -25,7 +25,11 @@ interface SearchResult {
   preview: string
 }
 
-export default function MemoryView() {
+interface MemoryViewProps {
+  onBack?: () => void
+}
+
+export default function MemoryView({ onBack }: MemoryViewProps) {
   const [stats, setStats] = useState<MemoryStats | null>(null)
   const [pages, setPages] = useState<WikiPage[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,7 +133,17 @@ export default function MemoryView() {
   if (loading) {
     return (
       <div className="p-4">
-        <h2 className="text-xl font-semibold mb-4">Memory Wiki</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Memory Wiki</h2>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+            >
+              ← Back to Menu
+            </button>
+          )}
+        </div>
         <p>Loading memory system...</p>
       </div>
     )
@@ -138,7 +152,17 @@ export default function MemoryView() {
   if (error) {
     return (
       <div className="p-4">
-        <h2 className="text-xl font-semibold mb-4">Memory Wiki</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Memory Wiki</h2>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+            >
+              ← Back to Menu
+            </button>
+          )}
+        </div>
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error:</strong>
           <span className="block sm:inline"> {error}</span>
@@ -149,7 +173,17 @@ export default function MemoryView() {
 
   return (
     <div className="p-4">
-      <h2 className="text-xl font-semibold mb-4">Memory Wiki</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Memory Wiki</h2>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+          >
+            ← Back to Menu
+          </button>
+        )}
+      </div>
       
       <div className="mb-4">
         <div className="flex space-x-2 mb-4">

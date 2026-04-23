@@ -72,31 +72,45 @@ class IngestPipeline:
         self.index = MemoryIndex(self.store)
         self.logbook = Logbook(memory_dir)
         self.ingest_lock = asyncio.Lock()
+        self.ws_connection = None
         
     async def ingest_session(
         self, 
         session_id: str, 
-        progress_cb: Optional[Callable[[str, float], Coroutine[Any, Any, None]]] = None
+        job_id: str = "auto"
     ) -> None:
         """Ingest a completed session into the memory system."""
         async with self.ingest_lock:
             try:
+                # Generate job ID if not provided
+                if job_id == "auto":
+                    job_id = f"ingest-{int(time.time())}-{session_id}"
+                
                 # Load session data
-                if progress_cb:
-                    await progress_cb("Loading session data", 0.0)
+                await self._send_ws_progress(
+                    job_id, "ingest", "extract", 
+                    f"session-{session_id}", 0.0, 
+                    "Loading session data"
+                )
                 
                 session_data = self._load_session_data(session_id)
                 
                 # Step 1: Extract entities
-                if progress_cb:
-                    await progress_cb("Extracting entities", 0.1)
+                await self._send_ws_progress(
+                    job_id, "ingest", "extract", 
+                    f"session-{session_id}", 0.1, 
+                    "Extracting entities"
+                )
                 
                 entity_extraction = await self._extract_entities(session_data)
                 
                 if not entity_extraction.relevant:
                     # Create source page only, skip entity/concept extraction
-                    if progress_cb:
-                        await progress_cb("Creating source page (low relevance)", 0.5)
+                    await self._send_ws_progress(
+                        job_id, "ingest", "apply", 
+                        f"session-{session_id}", 0.5, 
+                        "Creating source page (low relevance)"
+                    )
                     
                     source_draft = await self._draft_source_page(session_data)
                     self._create_source_page(session_id, source_draft, session_data)
@@ -107,40 +121,58 @@ class IngestPipeline:
                         f"Low relevance session ingested as source only"
                     )
                     
-                    if progress_cb:
-                        await progress_cb("Completed", 1.0)
+                    await self._send_ws_progress(
+                        job_id, "ingest", "done", 
+                        f"session-{session_id}", 1.0, 
+                        "Completed"
+                    )
                     return
                 
                 # Step 2: Draft source page
-                if progress_cb:
-                    await progress_cb("Drafting source page", 0.3)
+                await self._send_ws_progress(
+                    job_id, "ingest", "summarize", 
+                    f"session-{session_id}", 0.3, 
+                    "Drafting source page"
+                )
                 
                 source_draft = await self._draft_source_page(session_data)
                 source_path = self._create_source_page(session_id, source_draft, session_data)
                 
                 # Step 3: Process entities
-                if progress_cb:
-                    await progress_cb("Processing entities", 0.5)
+                await self._send_ws_progress(
+                    job_id, "ingest", "propose_update", 
+                    f"session-{session_id}", 0.5, 
+                    "Processing entities"
+                )
                 
                 entity_paths = []
                 for i, entity in enumerate(entity_extraction.entities):
                     progress = 0.5 + (i / len(entity_extraction.entities)) * 0.3
-                    if progress_cb:
-                        await progress_cb(f"Processing entity {i+1}/{len(entity_extraction.entities)}", progress)
+                    await self._send_ws_progress(
+                        job_id, "ingest", "propose_update", 
+                        f"Processing entity {i+1}/{len(entity_extraction.entities)}", progress, 
+                        f"Processing entity {entity.name}"
+                    )
                     
                     entity_path = await self._process_entity(entity, source_path)
                     if entity_path:
                         entity_paths.append(entity_path)
                 
                 # Step 4: Extract and process concepts
-                if progress_cb:
-                    await progress_cb("Extracting concepts", 0.8)
+                await self._send_ws_progress(
+                    job_id, "ingest", "extract", 
+                    f"session-{session_id}", 0.8, 
+                    "Extracting concepts"
+                )
                 
                 concept_paths = await self._extract_and_process_concepts(session_data, source_path)
                 
                 # Step 5: Update index
-                if progress_cb:
-                    await progress_cb("Updating index", 0.9)
+                await self._send_ws_progress(
+                    job_id, "ingest", "apply", 
+                    f"session-{session_id}", 0.9, 
+                    "Updating index"
+                )
                 
                 self._update_index_for_new_pages([source_path] + entity_paths + concept_paths)
                 
@@ -151,8 +183,11 @@ class IngestPipeline:
                     f"Successfully ingested: {len(entity_paths)} entities, {len(concept_paths)} concepts"
                 )
                 
-                if progress_cb:
-                    await progress_cb("Completed", 1.0)
+                await self._send_ws_progress(
+                    job_id, "ingest", "done", 
+                    f"session-{session_id}", 1.0, 
+                    "Completed"
+                )
                     
             except Exception as e:
                 error_msg = f"Ingest failed: {str(e)}"
@@ -475,6 +510,35 @@ Only return the JSON object, no other text.
             })
         
         return "{}"
+    
+    def set_ws_connection(self, ws):
+        """Set WebSocket connection for progress updates."""
+        self.ws_connection = ws
+    
+    async def _send_ws_progress(
+        self, 
+        job_id: str, 
+        op: str, 
+        phase: str, 
+        subject: str = "", 
+        pct: float = 0.0, 
+        message: str = ""
+    ) -> None:
+        """Send progress update via WebSocket if connection is available."""
+        if self.ws_connection:
+            try:
+                await self.ws_connection.send_json({
+                    "type": "memory_progress",
+                    "job_id": job_id,
+                    "op": op,
+                    "phase": phase,
+                    "subject": subject,
+                    "pct": pct,
+                    "message": message
+                })
+            except Exception as e:
+                # Don't fail ingest if WebSocket fails
+                print(f"WebSocket progress update failed: {e}")
     
     def _create_slug(self, title: str) -> str:
         """Create a URL-friendly slug from a title."""

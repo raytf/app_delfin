@@ -26,6 +26,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { MAIN_TO_RENDERER_CHANNELS } from '../../shared/types'
 
 interface IngestJob {
   jobId: string
@@ -40,99 +41,78 @@ interface IngestStatusCardProps {
   onClose: () => void
 }
 
+interface WsMemoryProgress {
+  type: 'memory_progress'
+  job_id: string
+  op: 'ingest' | 'lint'
+  phase: 'extract' | 'summarize' | 'propose_update' | 'apply' | 'done' | 'error'
+  subject?: string
+  pct?: number
+  message?: string
+}
+
 export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
   const [jobs, setJobs] = useState<IngestJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchIngestStatus = async () => {
-    try {
-      const response = await fetch('http://localhost:8321/memory/ingest/status')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
-      
-      // For now, we'll use mock data since the backend doesn't track jobs yet
-      // In production, this would come from the API
-      const mockJobs: IngestJob[] = []
-      
-      // Check if there are any active jobs in localStorage (simulated)
-      const activeJobId = localStorage.getItem('activeIngestJob')
-      if (activeJobId) {
-        mockJobs.push({
-          jobId: activeJobId,
-          sessionId: activeJobId.replace('job-', ''),
-          status: 'running',
-          progress: Math.random() * 100,
-          message: 'Processing session data...',
-          createdAt: new Date().toISOString()
+  // Handle WebSocket memory progress updates
+  useEffect(() => {
+    const handleMemoryProgress = (progress: WsMemoryProgress) => {
+      if (progress.op === 'ingest') {
+        setJobs(prevJobs => {
+          const existingJobIndex = prevJobs.findIndex(job => job.jobId === progress.job_id)
+          
+          if (existingJobIndex >= 0) {
+            // Update existing job
+            const updatedJobs = [...prevJobs]
+            updatedJobs[existingJobIndex] = {
+              ...updatedJobs[existingJobIndex],
+              status: progress.phase === 'error' ? 'failed' : 
+                     progress.phase === 'done' ? 'completed' : 'running',
+              progress: Math.round((progress.pct || 0) * 100),
+              message: progress.message || getProgressMessage(progress.phase, progress.subject)
+            }
+            return updatedJobs
+          } else {
+            // Add new job
+            return [{
+              jobId: progress.job_id,
+              sessionId: progress.subject || progress.job_id,
+              status: progress.phase === 'error' ? 'failed' : 'running',
+              progress: Math.round((progress.pct || 0) * 100),
+              message: progress.message || getProgressMessage(progress.phase, progress.subject),
+              createdAt: new Date().toISOString()
+            }]
+          }
         })
       }
-      
-      setJobs(mockJobs)
-    } catch (err) {
-      setError(`Failed to fetch ingest status: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setLoading(false)
+    }
+    
+    window.api.onSidecarMemoryProgress(handleMemoryProgress)
+    
+    return () => {
+      window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_MEMORY_PROGRESS)
+    }
+  }, [])
+
+
+
+  const getProgressMessage = (phase: string, subject?: string): string => {
+    switch (phase) {
+      case 'extract': return subject ? `Extracting from ${subject}...` : 'Extracting entities...'
+      case 'summarize': return subject ? `Summarizing ${subject}...` : 'Drafting source page...'
+      case 'propose_update': return subject ? `Processing ${subject}...` : 'Processing entities...'
+      case 'apply': return subject ? `Applying changes to ${subject}...` : 'Updating index...'
+      case 'done': return 'Completed successfully!'
+      case 'error': return 'Error occurred'
+      default: return 'Processing...'
     }
   }
 
-  const startMockIngest = async (sessionId: string) => {
-    try {
-      const jobId = `job-${sessionId}`
-      localStorage.setItem('activeIngestJob', jobId)
-      
-      // Simulate ingest process
-      const mockJob: IngestJob = {
-        jobId,
-        sessionId,
-        status: 'running',
-        progress: 0,
-        message: 'Starting ingestion...',
-        createdAt: new Date().toISOString()
-      }
-      
-      setJobs([mockJob])
-      
-      // Simulate progress updates
-      for (let i = 10; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        setJobs([{
-          ...mockJob,
-          progress: i,
-          message: getProgressMessage(i)
-        }])
-      }
-      
-      // Complete the job
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setJobs([{
-        ...mockJob,
-        status: 'completed',
-        progress: 100,
-        message: 'Ingestion completed successfully!'
-      }])
-      
-      localStorage.removeItem('activeIngestJob')
-      
-    } catch (err) {
-      setError(`Ingest failed: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  const getProgressMessage = (progress: number): string => {
-    if (progress < 20) return 'Loading session data...'
-    if (progress < 40) return 'Extracting entities...'
-    if (progress < 60) return 'Drafting source page...'
-    if (progress < 80) return 'Processing entities...'
-    return 'Finalizing and updating index...'
-  }
-
+  // No polling needed - we use WebSocket events now
   useEffect(() => {
-    fetchIngestStatus()
-    const interval = setInterval(fetchIngestStatus, 5000)
-    return () => clearInterval(interval)
+    setLoading(false)
   }, [])
 
   if (loading) {
@@ -186,13 +166,8 @@ export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
         </div>
         <p className="text-green-600">No active ingest jobs. System ready.</p>
         
-        <div className="mt-4 flex space-x-2">
-          <button
-            onClick={() => startMockIngest('test-session-123')}
-            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-          >
-            Test Ingest
-          </button>
+        <div className="mt-4">
+          <p className="text-sm text-gray-500">Waiting for ingest operations...</p>
         </div>
       </div>
     )

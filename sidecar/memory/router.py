@@ -43,12 +43,23 @@ from .xdg_utils import resolve_memory_dir
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
+
+def set_active_ws_connection(ws):
+    """Set the active WebSocket connection for progress updates."""
+    global active_ws_connection
+    active_ws_connection = ws
+
 # Global ingest pipeline instance (will be initialized when engine is available)
 # TECHNICAL NOTE: Singleton pattern for engine access efficiency.
 # The pipeline is initialized during FastAPI lifespan startup to ensure
 # the LLM engine is ready before any ingest requests are processed.
 # This avoids per-request engine loading overhead.
 ingest_pipeline: Optional[IngestPipeline] = None
+
+# WebSocket connections for progress updates
+# TECHNICAL NOTE: In production, this would use a connection manager
+# For now, we store the latest connection for simplicity
+active_ws_connection = None
 
 
 def get_memory_dir() -> Path:
@@ -394,6 +405,10 @@ async def ingest_session(
         if ingest_pipeline is None:
             raise HTTPException(status_code=500, detail="Ingest pipeline not initialized")
         
+        # Set WebSocket connection for progress updates
+        if active_ws_connection:
+            ingest_pipeline.set_ws_connection(active_ws_connection)
+        
         # For now, run synchronously
         # In production, this would spawn a background task
         await ingest_pipeline.ingest_session(session_id)
@@ -401,7 +416,8 @@ async def ingest_session(
         return {
             "success": True,
             "message": f"Session {session_id} ingested successfully",
-            "session_id": session_id
+            "session_id": session_id,
+            "job_id": f"ingest-{int(time.time())}-{session_id}"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to ingest session: {e}")

@@ -194,5 +194,8 @@
 | M1: Integration | ✅ | Wired into main application with HomeScreen button |
 | M2: Session ingestion pipeline | ✅ | IngestPipeline class with entity extraction, source page creation, and index updating |
 | M2: Ingest REST endpoints | ✅ | /memory/ingest/session and /memory/ingest/status endpoints |
-| M2: Ingest status UI | ✅ | IngestStatusCard component with progress tracking |
+| M2: WebSocket progress events | ✅ | Real-time memory_progress WebSocket messages with full IPC wiring |
+| M2: Ingest status UI | ✅ | IngestStatusCard component with WebSocket-based progress tracking |
+| M2: Preload API integration | ✅ | onSidecarMemoryProgress handler added to preload bridge |
+| M2: Navigation UI | ✅ | Back button added to MemoryView for returning to main menu |
 | Wiki search tools | ❌ | Not started |

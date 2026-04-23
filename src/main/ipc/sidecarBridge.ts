@@ -106,6 +106,13 @@ export function registerSidecarBridge(
             message: message.message ?? "Unknown error",
           });
           return;
+        case "memory_progress":
+          // Forward memory progress updates to renderer
+          mainWindow.webContents.send(
+            MAIN_TO_RENDERER_CHANNELS.SIDECAR_MEMORY_PROGRESS,
+            message,
+          );
+          return;
       }
     } catch (error) {
       console.error(

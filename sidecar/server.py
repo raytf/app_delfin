@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from inference.engine import load_engine, pre_warm
 from inference.preprocess import resize_image_blob
-from memory.router import router as memory_router
+from memory.router import router as memory_router, set_active_ws_connection
 from prompts.presets import PRESETS
 from tts import TTSPipeline, split_sentences
 
@@ -298,6 +298,8 @@ async def health() -> dict:
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     await ws.accept()
+    # Set this WebSocket connection for memory progress updates
+    set_active_ws_connection(ws)
     interrupted = asyncio.Event()
 
     preset_id = "lecture-slide"
@@ -333,6 +335,25 @@ async def ws_endpoint(ws: WebSocket) -> None:
             await msg_queue.put(None)  # sentinel to unblock the main loop
 
     recv_task = asyncio.create_task(receiver())
+
+    async def send_memory_progress(
+        job_id: str, 
+        op: str, 
+        phase: str, 
+        subject: str = "", 
+        pct: float = 0.0, 
+        message: str = ""
+    ) -> None:
+        """Send memory progress update to client."""
+        await ws.send_json({
+            "type": "memory_progress",
+            "job_id": job_id,
+            "op": op,
+            "phase": phase,
+            "subject": subject,
+            "pct": pct,
+            "message": message
+        })
 
     try:
         while True:

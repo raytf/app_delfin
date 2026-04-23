@@ -76,6 +76,7 @@ export type WsInboundType =
   | 'audio_end'
   | 'done'
   | 'error'
+  | 'memory_progress'
 
 export interface WsInboundMessage {
   type: WsInboundType
@@ -90,6 +91,17 @@ export interface WsInboundMessage {
   index?: number
   /** Present on audio_end — total TTS synthesis time in seconds. */
   tts_time?: number
+}
+
+// Memory progress updates (Sidecar → Electron)
+export interface WsMemoryProgress {
+  type: 'memory_progress'
+  job_id: string
+  op: 'ingest' | 'lint'
+  phase: 'extract' | 'summarize' | 'propose_update' | 'apply' | 'done' | 'error'
+  subject?: string // e.g. "entities/Alan Turing.md"
+  pct?: number // 0..1
+  message?: string // human-readable status or error detail
 }
 
 // IPC channel names (as const for type safety)
@@ -122,6 +134,7 @@ export const MAIN_TO_RENDERER_CHANNELS = {
   SIDECAR_DONE: 'sidecar:done',
   SIDECAR_ERROR: 'sidecar:error',
   SIDECAR_STATUS: 'sidecar:status',
+  SIDECAR_MEMORY_PROGRESS: 'sidecar:memory_progress',
 } as const
 
 // Presets

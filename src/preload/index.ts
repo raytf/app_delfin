@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { MAIN_TO_RENDERER_CHANNELS, RENDERER_TO_MAIN_CHANNELS } from '../shared/types'
 import type {
   WsOutboundMessage,
+  WsMemoryProgress,
   CaptureFrame,
   SidecarStatus,
   ElectronAPI,
@@ -97,6 +98,9 @@ const api: ElectronAPI = {
 
   onSidecarStatus: (cb: (data: SidecarStatus) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, (_event, data) => cb(data)),
+
+  onSidecarMemoryProgress: (cb: (data: WsMemoryProgress) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_MEMORY_PROGRESS, (_event, data) => cb(data)),
 
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel),

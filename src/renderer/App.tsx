@@ -1015,7 +1015,7 @@ export default function App() {
 
   if (homeView === 'memory') {
     return (
-      <MemoryView />
+      <MemoryView onBack={() => setHomeView('landing')} />
     )
   }
   
