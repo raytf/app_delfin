@@ -56,6 +56,7 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
     const imagePath = await options.sessionPersistence.recordUserPrompt({
       imageBase64: frame.imageBase64,
+      isVoiceTurn,
       messageId: request.messageId,
       text,
       presetId: request.presetId,

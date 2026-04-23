@@ -20,6 +20,7 @@ export interface ConversationMessageRecord {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  isVoiceTurn?: boolean
   imagePath?: string
   errorMessage?: string
 }
