@@ -48,6 +48,7 @@ export default function PastSessionView({
         <main className="flex min-w-0 flex-1 flex-col border-r border-[var(--border-soft)]">
           <div className="min-h-0 flex-1 overflow-hidden">
             <SessionConversation
+              isAudioPlaying={false}
               className="h-full"
               emptyMessage="No conversation was saved for this session."
               isSubmitting={false}
