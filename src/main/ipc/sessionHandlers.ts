@@ -12,6 +12,7 @@ import {
   type SessionStartRequest,
   type SessionStopRequest,
 } from '../../shared/types'
+import { memoryClient } from './memoryClient'
 import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
@@ -34,6 +35,20 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     options.setSessionMode('home')
     options.setMinimizedVariant('compact')
     await options.switchOverlayMode('expanded')
+    
+    // Auto-ingest: Trigger memory ingestion if enabled
+    if (process.env.MEMORY_AUTO_INGEST === 'true') {
+      try {
+        const sessionId = request.endedSessionData.session.id
+        console.log(`[Memory] Auto-ingest triggered for session ${sessionId}`)
+        
+        // Enqueue the session for background ingestion
+        await memoryClient.ingestSession(sessionId)
+        console.log(`[Memory] Session ${sessionId} enqueued for auto-ingest`)
+      } catch (error) {
+        console.error(`[Memory] Auto-ingest failed for session ${request.endedSessionData.session.id}:`, error)
+      }
+    }
   })
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, async (_event, rawRequest): Promise<SessionPromptResponse> => {
@@ -96,5 +111,34 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>
     options.sessionPersistence.getCaptureImageDataUrl(request.imagePath),
+  )
+
+  // Memory client IPC handlers
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_CHECK_HEALTH, async () =>
+    memoryClient.checkMemoryHealth(),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_INGEST_SESSION, async (_event, { sessionId }) =>
+    memoryClient.ingestSession(sessionId),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_GET_INGEST_STATUS, async () =>
+    memoryClient.getIngestStatus(),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_LIST_INGEST_JOBS, async () =>
+    memoryClient.listIngestJobs(),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_GET_INGEST_JOB, async (_event, { jobId }) =>
+    memoryClient.getIngestJob(jobId),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_CANCEL_INGEST_JOB, async (_event, { jobId }) =>
+    memoryClient.cancelIngestJob(jobId),
+  )
+
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.MEMORY_CLEAR_COMPLETED_JOBS, async () =>
+    memoryClient.clearCompletedJobs(),
   )
 }

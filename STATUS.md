@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2024-04-23 (Phase 7 M1 implementation completed)
+> Last updated: 2024-04-23 (Phase 7 M2 implementation completed - 90% complete)
 > Legend: ✅ Implemented · ⚠️ Partial / placeholder · ❌ Not started
 
 ---
@@ -200,4 +200,6 @@
 | M2: Navigation UI | ✅ | Back button added to MemoryView for returning to main menu |
 | M2: Background job processing | ✅ | JobQueue class with async task management and persistence |
 | M2: Job management endpoints | ✅ | REST endpoints for job listing, status, and cancellation |
+| M2: Pipeline integration | ✅ | JobQueue connected to real IngestPipeline for execution |
+| M2: Auto-ingest triggering | ✅ | Session completion wired to automatic job enqueueing |
 | Wiki search tools | ❌ | Not started |

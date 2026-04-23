@@ -17,6 +17,7 @@ import type {
   SessionStartRequest,
   MinimizedOverlayVariant,
   SessionListItem,
+  MemoryHealth,
 } from '../shared/types'
 
 const api: ElectronAPI = {
@@ -104,6 +105,74 @@ const api: ElectronAPI = {
 
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel),
+
+  // Memory client methods
+  checkMemoryHealth: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_CHECK_HEALTH) as Promise<MemoryHealth>,
+
+  ingestSession: (sessionId: string) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_INGEST_SESSION, { sessionId }) as Promise<{
+      success: boolean
+      message: string
+      session_id: string
+      job_id: string
+      background: boolean
+    }>,
+
+  getIngestStatus: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_GET_INGEST_STATUS) as Promise<{
+      active_jobs: number
+      pending_jobs: number
+      completed_jobs: number
+      failed_jobs: number
+      last_completed: string | null
+      status: string
+    }>,
+
+  listIngestJobs: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_LIST_INGEST_JOBS) as Promise<{
+      jobs: Array<{
+        job_id: string
+        session_id: string
+        status: string
+        progress: number
+        phase: string
+        message: string
+        created_at: number
+        started_at: number | null
+        completed_at: number | null
+        error: string | null
+      }>
+    }>,
+
+  getIngestJob: (jobId: string) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_GET_INGEST_JOB, { jobId }) as Promise<{
+      job_id: string
+      session_id: string
+      status: string
+      progress: number
+      phase: string
+      message: string
+      created_at: number
+      started_at: number | null
+      completed_at: number | null
+      error: string | null
+      retry_count: number
+      max_retries: number
+    }>,
+
+  cancelIngestJob: (jobId: string) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_CANCEL_INGEST_JOB, { jobId }) as Promise<{
+      success: boolean
+      message: string
+    }>,
+
+  clearCompletedJobs: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MEMORY_CLEAR_COMPLETED_JOBS) as Promise<{
+      success: boolean
+      message: string
+      cleared_count: number
+    }>,
 }
 
 contextBridge.exposeInMainWorld('api', api)

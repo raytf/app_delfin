@@ -58,13 +58,16 @@ class IngestStepError(IngestError):
 class IngestPipeline:
     """Orchestrates the multi-step ingestion pipeline."""
     
-    def __init__(self, memory_dir: Path, engine: Any):
+    def __init__(self, memory_dir: Path, engine: Any, job_queue: Optional['JobQueue'] = None):
         """Initialize the ingest pipeline.
         
         TECHNICAL NOTE: The ingest_lock ensures that only one ingest operation
         runs at a time. This prevents concurrent LLM calls and maintains data
         consistency. Future enhancement: Allow concurrent ingests when engine
         supports parallel requests.
+        
+        When job_queue is provided, ingest operations are managed through the
+        queue system for background processing and persistence.
         """
         self.memory_dir = memory_dir
         self.engine = engine
@@ -73,6 +76,7 @@ class IngestPipeline:
         self.logbook = Logbook(memory_dir)
         self.ingest_lock = asyncio.Lock()
         self.ws_connection = None
+        self.job_queue = job_queue
         
     async def ingest_session(
         self, 

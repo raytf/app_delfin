@@ -60,7 +60,16 @@ ingest_pipeline: Optional[IngestPipeline] = None
 # Job queue for background processing
 # TECHNICAL NOTE: Job queue provides async task management with persistence.
 # Jobs survive sidecar restarts and provide real-time progress updates.
-job_queue: Optional[JobQueue] = None
+_job_queue: Optional[JobQueue] = None
+
+def get_job_queue() -> Optional[JobQueue]:
+    """Get the current job queue instance."""
+    return _job_queue
+
+def set_job_queue(queue: JobQueue) -> None:
+    """Set the job queue instance."""
+    global _job_queue
+    _job_queue = queue
 
 # WebSocket connections for progress updates
 # TECHNICAL NOTE: In production, this would use a connection manager
@@ -408,6 +417,7 @@ async def clear_memory_log() -> dict:
 async def get_ingest_status() -> dict:
     """Get current ingest status and queue."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         
@@ -430,6 +440,7 @@ async def ingest_session(
 ) -> dict:
     """Ingest a completed session into the memory system."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         
@@ -450,6 +461,7 @@ async def ingest_session(
 async def list_ingest_jobs() -> dict:
     """List all ingest jobs."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         
@@ -477,6 +489,7 @@ async def list_ingest_jobs() -> dict:
 async def get_ingest_job(job_id: str) -> dict:
     """Get details about a specific ingest job."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         
@@ -506,6 +519,7 @@ async def get_ingest_job(job_id: str) -> dict:
 async def cancel_ingest_job(job_id: str) -> dict:
     """Cancel a running ingest job."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         
@@ -525,6 +539,7 @@ async def cancel_ingest_job(job_id: str) -> dict:
 async def clear_completed_jobs() -> dict:
     """Clear completed jobs from the queue."""
     try:
+        job_queue = get_job_queue()
         if job_queue is None:
             raise HTTPException(status_code=500, detail="Job queue not initialized")
         

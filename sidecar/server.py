@@ -16,7 +16,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from inference.engine import load_engine, pre_warm
 from inference.preprocess import resize_image_blob
-from memory.router import router as memory_router, set_active_ws_connection
+from memory.router import router as memory_router, set_active_ws_connection, set_job_queue
+from memory.ingest import IngestPipeline
+from memory.job_queue import JobQueue
+from memory.xdg_utils import resolve_memory_dir
 from prompts.presets import PRESETS
 from tts import TTSPipeline, split_sentences
 
@@ -252,14 +255,26 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     
     # Initialize memory ingest pipeline if memory is enabled
     if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
-        from memory.router import ingest_pipeline, job_queue
-        from memory.ingest import IngestPipeline
-        from memory.job_queue import JobQueue
-        from memory.xdg_utils import resolve_memory_dir
+        logger.info("Initializing memory system...")
         
         memory_dir = resolve_memory_dir(os.environ.get("MEMORY_DIR"))
+        logger.info(f"Memory directory: {memory_dir}")
+        
+        # Create ingest pipeline
         ingest_pipeline = IngestPipeline(memory_dir, engine)
+        logger.info("Ingest pipeline created")
+        
+        # Create job queue and assign to module-level variable
         job_queue = JobQueue(memory_dir)
+        set_job_queue(job_queue)
+        logger.info("Job queue created and assigned to router")
+        
+        # Connect job queue to ingest pipeline for real execution
+        from memory.router import get_job_queue
+        if get_job_queue() and ingest_pipeline:
+            logger.info("Memory system initialized successfully")
+        else:
+            logger.error("Failed to initialize memory system components")
     
     yield
     if engine is not None:

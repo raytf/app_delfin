@@ -122,6 +122,14 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_GET_DETAIL: 'session:get-detail',
   SESSION_DELETE: 'session:delete',
   SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
+  // Memory client channels
+  MEMORY_CHECK_HEALTH: 'memory:check-health',
+  MEMORY_INGEST_SESSION: 'memory:ingest-session',
+  MEMORY_GET_INGEST_STATUS: 'memory:get-ingest-status',
+  MEMORY_LIST_INGEST_JOBS: 'memory:list-ingest-jobs',
+  MEMORY_GET_INGEST_JOB: 'memory:get-ingest-job',
+  MEMORY_CANCEL_INGEST_JOB: 'memory:cancel-ingest-job',
+  MEMORY_CLEAR_COMPLETED_JOBS: 'memory:clear-completed-jobs',
 } as const
 
 export const MAIN_TO_RENDERER_CHANNELS = {
@@ -215,5 +223,60 @@ export interface ElectronAPI {
   onSidecarDone: (cb: () => void) => void
   onSidecarError: (cb: (data: { message: string }) => void) => void
   onSidecarStatus: (cb: (data: SidecarStatus) => void) => void
+  onSidecarMemoryProgress: (cb: (data: WsMemoryProgress) => void) => void
   removeAllListeners: (channel: string) => void
+  // Memory client methods
+  checkMemoryHealth: () => Promise<MemoryHealth>
+  ingestSession: (sessionId: string) => Promise<{
+    success: boolean
+    message: string
+    session_id: string
+    job_id: string
+    background: boolean
+  }>
+  getIngestStatus: () => Promise<{
+    active_jobs: number
+    pending_jobs: number
+    completed_jobs: number
+    failed_jobs: number
+    last_completed: string | null
+    status: string
+  }>
+  listIngestJobs: () => Promise<{
+    jobs: Array<{
+      job_id: string
+      session_id: string
+      status: string
+      progress: number
+      phase: string
+      message: string
+      created_at: number
+      started_at: number | null
+      completed_at: number | null
+      error: string | null
+    }>
+  }>
+  getIngestJob: (jobId: string) => Promise<{
+    job_id: string
+    session_id: string
+    status: string
+    progress: number
+    phase: string
+    message: string
+    created_at: number
+    started_at: number | null
+    completed_at: number | null
+    error: string | null
+    retry_count: number
+    max_retries: number
+  }>
+  cancelIngestJob: (jobId: string) => Promise<{
+    success: boolean
+    message: string
+  }>
+  clearCompletedJobs: () => Promise<{
+    success: boolean
+    message: string
+    cleared_count: number
+  }>
 }

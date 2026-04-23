@@ -178,7 +178,7 @@ class JobQueue:
                 if self.max_concurrency == 1:
                     break
     
-    def _start_job(self, job_id: str) -> None:
+    def _start_job(self, job_id: str, pipeline: Optional['IngestPipeline'] = None) -> None:
         """Start a job execution."""
         if job_id not in self.jobs:
             return
@@ -192,59 +192,138 @@ class JobQueue:
         
         print(f"Starting ingest job {job_id} for session {job.session_id}")
         
-        # This would call the actual ingest pipeline
-        # For now, we'll simulate it
-        task = asyncio.create_task(self._execute_job_simulation(job_id))
+        # Use real pipeline if available, otherwise simulate
+        if pipeline:
+            task = asyncio.create_task(self._execute_job_with_pipeline(job_id, pipeline))
+        else:
+            # Fallback to simulation if no pipeline provided
+            task = asyncio.create_task(self._execute_job_simulation(job_id))
+        
         self.active_jobs[job_id] = task
         
         # Clean up completed tasks
         task.add_done_callback(lambda t: self._cleanup_job(job_id, t))
     
     async def _execute_job_simulation(self, job_id: str) -> None:
-        """Simulate job execution (replace with real ingest call)."""
+        """Simulate job execution for testing/demonstration purposes."""
+        if job_id not in self.jobs:
+            return
+        
+        job = self.jobs[job_id]
+        
+        # Get WebSocket connection for progress updates
+        from memory.router import active_ws_connection
+        
+        # Simulate progress with WebSocket updates
+        job.phase = 'extracting'
+        job.progress = 10
+        self._save_queue()
+        
+        if active_ws_connection:
+            try:
+                await active_ws_connection.send_json({
+                    "type": "memory_progress",
+                    "job_id": job_id,
+                    "op": "ingest",
+                    "phase": "extract",
+                    "subject": job.session_id,
+                    "pct": 0.1,
+                    "message": f"Extracting from {job.session_id}..."
+                })
+            except Exception as e:
+                print(f"Failed to send WebSocket update: {e}")
+        
+        await asyncio.sleep(1)
+        
+        job.phase = 'analyzing'
+        job.progress = 50
+        self._save_queue()
+        
+        if active_ws_connection:
+            try:
+                await active_ws_connection.send_json({
+                    "type": "memory_progress",
+                    "job_id": job_id,
+                    "op": "ingest",
+                    "phase": "summarize",
+                    "subject": job.session_id,
+                    "pct": 0.5,
+                    "message": f"Summarizing {job.session_id}..."
+                })
+            except Exception as e:
+                print(f"Failed to send WebSocket update: {e}")
+        
+        await asyncio.sleep(1)
+        
+        job.phase = 'storing'
+        job.progress = 90
+        self._save_queue()
+        
+        if active_ws_connection:
+            try:
+                await active_ws_connection.send_json({
+                    "type": "memory_progress",
+                    "job_id": job_id,
+                    "op": "ingest",
+                    "phase": "apply",
+                    "subject": job.session_id,
+                    "pct": 0.9,
+                    "message": f"Applying changes to {job.session_id}..."
+                })
+            except Exception as e:
+                print(f"Failed to send WebSocket update: {e}")
+        
+        await asyncio.sleep(1)
+        
+        job.phase = 'completed'
+        job.progress = 100
+        job.status = 'completed'
+        job.completed_at = time.time()
+        self._save_queue()
+        
+        if active_ws_connection:
+            try:
+                await active_ws_connection.send_json({
+                    "type": "memory_progress",
+                    "job_id": job_id,
+                    "op": "ingest",
+                    "phase": "done",
+                    "subject": job.session_id,
+                    "pct": 1.0,
+                    "message": "Completed successfully!"
+                })
+            except Exception as e:
+                print(f"Failed to send WebSocket update: {e}")
+        
+        print(f"Simulated completion of job {job_id}")
+
+    async def _execute_job_with_pipeline(self, job_id: str, pipeline: 'IngestPipeline') -> None:
+        """Execute job using the real ingest pipeline."""
         if job_id not in self.jobs:
             return
         
         job = self.jobs[job_id]
         
         try:
-            # Simulate the ingest phases
-            phases = [
-                ('extract', 'Loading session data', 0.0, 1.0),
-                ('extract', 'Extracting entities', 0.1, 0.3),
-                ('summarize', 'Drafting source page', 0.3, 0.5),
-                ('propose_update', 'Processing entities', 0.5, 0.8),
-                ('apply', 'Updating index', 0.8, 0.95),
-                ('done', 'Completed', 0.95, 1.0)
-            ]
+            # Set WebSocket connection for progress updates
+            if hasattr(pipeline, 'set_ws_connection'):
+                from memory.router import active_ws_connection
+                if active_ws_connection:
+                    pipeline.set_ws_connection(active_ws_connection)
             
-            for phase, message, start_pct, end_pct in phases:
-                if job_id not in self.jobs:
-                    break
-                
-                job.phase = phase
-                job.message = message
-                
-                # Simulate progress
-                steps = 5
-                for i in range(steps + 1):
-                    if job_id not in self.jobs:
-                        break
-                    
-                    job.progress = start_pct + (end_pct - start_pct) * (i / steps)
-                    self._save_queue()
-                    
-                    # In real implementation, this would call WebSocket progress updates
-                    # For simulation, we'll just wait
-                    await asyncio.sleep(0.5)
-                
-                self._save_queue()
+            # Extract session ID from job
+            session_id = job.session_id
             
-            # Mark as completed
+            # Run the actual ingest with progress tracking
+            await pipeline.ingest_session(session_id, job_id)
+            
+            # Mark as completed if still in queue
             if job_id in self.jobs:
                 job.status = 'completed'
                 job.completed_at = time.time()
                 job.progress = 1.0
+                job.phase = 'done'
+                job.message = 'Ingestion completed successfully'
                 self._save_queue()
                 print(f"Completed ingest job {job_id}")
                 
@@ -255,6 +334,11 @@ class JobQueue:
                 job.completed_at = time.time()
                 self._save_queue()
                 print(f"Failed ingest job {job_id}: {e}")
+                
+                # Log the error
+                from memory.logbook import Logbook
+                logbook = Logbook(self.memory_dir)
+                logbook.append_log('ingest_error', session_id, str(e))
     
     def _cleanup_job(self, job_id: str, task: asyncio.Task) -> None:
         """Clean up completed job."""

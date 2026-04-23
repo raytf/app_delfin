@@ -151,6 +151,22 @@ export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
     )
   }
 
+  const handleManualIngest = async () => {
+    try {
+      // For now, we'll use a hardcoded session ID for testing
+      // In production, this would come from user selection or current session
+      const testSessionId = 'test-session-' + Date.now()
+      
+      const result = await window.api.ingestSession(testSessionId)
+      console.log('Manual ingest started:', result)
+      
+      // The WebSocket will handle progress updates automatically
+    } catch (error) {
+      console.error('Failed to start manual ingest:', error)
+      setError(`Failed to start manual ingest: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   if (jobs.length === 0) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -168,6 +184,12 @@ export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
         
         <div className="mt-4">
           <p className="text-sm text-gray-500">Waiting for ingest operations...</p>
+          <button
+            onClick={handleManualIngest}
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm transition-colors"
+          >
+            Start Manual Ingest
+          </button>
         </div>
       </div>
     )
