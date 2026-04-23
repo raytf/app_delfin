@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { captureForegroundWindow } from '../capture/captureService'
+import { captureForegroundWindow, capturePrimaryScreen } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
 import { sessionPromptRequestSchema } from '../../shared/schemas'
 import {
@@ -47,7 +47,10 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
       throw new Error('Prompt cannot be empty.')
     }
 
-    const frame = await captureForegroundWindow()
+    const frame =
+      options.getOverlayState().mode === 'expanded'
+        ? await captureForegroundWindow()
+        : await capturePrimaryScreen()
 
     mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
 
