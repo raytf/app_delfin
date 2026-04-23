@@ -461,12 +461,12 @@ export function useActiveSession({
     async (nextMode: Exclude<OverlayMode, 'expanded'>): Promise<void> => {
       clearMinimizedVoiceCollapseTimer()
 
+      if (nextMode !== 'minimized-prompt-response') {
+        clearLatestResponse()
+      }
+
       try {
         await setOverlayMode(nextMode)
-
-        if (nextMode !== 'minimized-prompt-response') {
-          clearLatestResponse()
-        }
       } catch (error) {
         console.error('[useActiveSession] Failed to set overlay mode:', error)
       }
