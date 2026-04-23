@@ -44,8 +44,8 @@ export default function WikiPageReader() {
   }, [pageId, kind])
 
   const renderMarkdown = (content: string) => {
-    // Simple markdown rendering - in a real app you'd use a proper markdown library
-    return content
+    // Simple markdown rendering with wikilink support
+    let result = content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/# (.*?)\n/g, '<h1>$1</h1>')
@@ -53,6 +53,13 @@ export default function WikiPageReader() {
       .replace(/### (.*?)\n/g, '<h3>$1</h3>')
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>')
+    
+    // Handle wikilinks [[Page Name]]
+    result = result.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
+      return `<a href="#" class="text-blue-600 hover:underline" onClick="event.preventDefault(); window.api.memory.openPage('${pageName}')">${pageName}</a>`;
+    });
+    
+    return result;
   }
 
   if (loading) {

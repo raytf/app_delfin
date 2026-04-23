@@ -86,8 +86,8 @@ class MemoryIndex:
         return metadata
     
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search the wiki using the store's search functionality."""
-        return self.store.search_pages(query, limit)
+        """Search the wiki using advanced search with relevance scoring."""
+        return self.advanced_search(query, limit)
     
     def advanced_search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Advanced search with better ranking and metadata extraction."""

@@ -8,6 +8,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from .logbook import Logbook
 from .schemas import EntityExtraction, SourcePageDraft
 from .xdg_utils import resolve_memory_dir
 
@@ -173,30 +174,47 @@ async def get_wiki_page(
             "metadata": {}
         }
         
-        # Simple frontmatter parsing
+        # Robust frontmatter parsing with YAML-like handling
         if content.startswith('---'):
             lines = content.split('\n')
             frontmatter_lines = []
-            in_frontmatter = True
+            in_frontmatter = False  # Start as False, first --- starts frontmatter
             content_start = 0
+            frontmatter_start = -1
             
             for i, line in enumerate(lines):
                 if line.strip() == '---':
-                    if in_frontmatter:
+                    if not in_frontmatter:
+                        # First --- starts frontmatter
+                        in_frontmatter = True
+                        frontmatter_start = i + 1
+                    else:
+                        # Second --- ends frontmatter
                         in_frontmatter = False
                         content_start = i + 1
-                        break
-                    else:
                         break
                 elif in_frontmatter:
                     frontmatter_lines.append(line)
             
-            # Parse frontmatter
+            # Parse frontmatter with better handling
             frontmatter = {}
             for line in frontmatter_lines:
                 if ':' in line:
                     key, value = line.split(':', 1)
-                    frontmatter[key.strip()] = value.strip()
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # Handle list values like tags: [tag1, tag2]
+                    if value.startswith('[') and value.endswith(']'):
+                        try:
+                            # Remove brackets and split by commas
+                            list_content = value[1:-1].strip()
+                            items = [item.strip() for item in list_content.split(',') if item.strip()]
+                            frontmatter[key] = items
+                        except:
+                            frontmatter[key] = value
+                    else:
+                        frontmatter[key] = value
             
             page_data["metadata"] = frontmatter
             page_data["content"] = '\n'.join(lines[content_start:])
@@ -298,3 +316,33 @@ async def get_memory_stats() -> dict:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get memory stats: {e}")
+
+
+@router.get("/log")
+async def get_memory_log(limit: int = Query(50, description="Maximum number of log entries")) -> dict:
+    """Get memory operation log entries."""
+    try:
+        logbook = Logbook()
+        entries = logbook.read_log(limit)
+        
+        return {
+            "entries": [entry.to_dict() for entry in entries],
+            "stats": logbook.get_log_stats()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get memory log: {e}")
+
+
+@router.post("/log/clear")
+async def clear_memory_log() -> dict:
+    """Clear the memory operation log."""
+    try:
+        logbook = Logbook()
+        logbook.clear_log()
+        
+        return {
+            "success": True,
+            "message": "Memory log cleared successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear memory log: {e}")

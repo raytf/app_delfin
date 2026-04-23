@@ -76,8 +76,15 @@ def ensure_memory_dir_exists(memory_dir: Path) -> None:
     # Create initial files if they don't exist
     agents_file = memory_dir / "AGENTS.md"
     if not agents_file.exists():
-        # Create default AGENTS.md template
-        default_agents_content = """# Delfin Memory Wiki - Agent Conventions
+        # Read the template from the package
+        import importlib.resources
+        try:
+            # Try to read from package resources
+            from . import AGENTS_template
+            default_agents_content = AGENTS_template.read_text()
+        except (ImportError, AttributeError):
+            # Fallback to embedded content
+            default_agents_content = """# Delfin Memory Wiki - Agent Conventions
 
 This file describes the conventions that the LLM agents follow when maintaining your personal knowledge wiki.
 

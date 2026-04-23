@@ -1,6 +1,7 @@
 """Memory system package initialization."""
 
 from .index import MemoryIndex
+from .logbook import LogEntry, Logbook
 from .router import router
 from .schemas import (
     ConceptUpdateProposal,
@@ -22,6 +23,8 @@ from .xdg_utils import (
 __all__ = [
     "MemoryStore",
     "MemoryIndex",
+    "Logbook",
+    "LogEntry",
     "router",
     "EntityExtraction",
     "ExtractedEntity",

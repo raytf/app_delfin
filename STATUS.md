@@ -185,8 +185,12 @@
 | M1: Read-only wiki infrastructure | ✅ | FastAPI router with REST endpoints implemented |
 | M1: Memory store | ✅ | File I/O operations in `sidecar/memory/store.py` |
 | M1: Memory index | ✅ | Wiki indexing and search in `sidecar/memory/index.py` |
-| M1: REST endpoints | ✅ | `/memory/health`, `/memory/index`, `/memory/page`, `/memory/search`, `/memory/stats` |
+| M1: REST endpoints | ✅ | `/memory/health`, `/memory/index`, `/memory/page`, `/memory/search`, `/memory/stats`, `/memory/log`, `/memory/log/clear` |
 | M1: Memory UI | ✅ | `MemoryView.tsx` and `WikiPageReader.tsx` components |
+| M1: Logbook | ✅ | `logbook.py` with operation logging and log endpoints |
+| M1: AGENTS.md Template | ✅ | Seeded with user-editable conventions |
+| M1: Wikilink Support | ✅ | `[[Page Name]]` navigation in WikiPageReader |
+| M1: Frontmatter Parsing | ✅ | Robust YAML-like frontmatter handling with list support |
 | M1: Integration | ✅ | Wired into main application with HomeScreen button |
 | Session ingestion pipeline | ❌ | Not started |
 | Wiki search tools | ❌ | Not started |
