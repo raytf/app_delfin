@@ -252,12 +252,14 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     
     # Initialize memory ingest pipeline if memory is enabled
     if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
-        from memory.router import ingest_pipeline
+        from memory.router import ingest_pipeline, job_queue
         from memory.ingest import IngestPipeline
+        from memory.job_queue import JobQueue
         from memory.xdg_utils import resolve_memory_dir
         
         memory_dir = resolve_memory_dir(os.environ.get("MEMORY_DIR"))
         ingest_pipeline = IngestPipeline(memory_dir, engine)
+        job_queue = JobQueue(memory_dir)
     
     yield
     if engine is not None:

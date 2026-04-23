@@ -198,4 +198,6 @@
 | M2: Ingest status UI | ✅ | IngestStatusCard component with WebSocket-based progress tracking |
 | M2: Preload API integration | ✅ | onSidecarMemoryProgress handler added to preload bridge |
 | M2: Navigation UI | ✅ | Back button added to MemoryView for returning to main menu |
+| M2: Background job processing | ✅ | JobQueue class with async task management and persistence |
+| M2: Job management endpoints | ✅ | REST endpoints for job listing, status, and cancellation |
 | Wiki search tools | ❌ | Not started |

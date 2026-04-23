@@ -37,6 +37,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from .ingest import IngestPipeline
+from .job_queue import JobQueue
 from .logbook import Logbook
 from .schemas import EntityExtraction, SourcePageDraft
 from .xdg_utils import resolve_memory_dir
@@ -55,6 +56,11 @@ def set_active_ws_connection(ws):
 # the LLM engine is ready before any ingest requests are processed.
 # This avoids per-request engine loading overhead.
 ingest_pipeline: Optional[IngestPipeline] = None
+
+# Job queue for background processing
+# TECHNICAL NOTE: Job queue provides async task management with persistence.
+# Jobs survive sidecar restarts and provide real-time progress updates.
+job_queue: Optional[JobQueue] = None
 
 # WebSocket connections for progress updates
 # TECHNICAL NOTE: In production, this would use a connection manager
@@ -395,45 +401,139 @@ async def clear_memory_log() -> dict:
         raise HTTPException(status_code=500, detail=f"Failed to clear memory log: {e}")
 
 
-@router.post("/ingest/session")
-async def ingest_session(
-    session_id: str = Query(..., description="Session ID to ingest"),
-    background: bool = Query(False, description="Run in background")
-) -> dict:
-    """Ingest a completed session into the memory system."""
-    try:
-        if ingest_pipeline is None:
-            raise HTTPException(status_code=500, detail="Ingest pipeline not initialized")
-        
-        # Set WebSocket connection for progress updates
-        if active_ws_connection:
-            ingest_pipeline.set_ws_connection(active_ws_connection)
-        
-        # For now, run synchronously
-        # In production, this would spawn a background task
-        await ingest_pipeline.ingest_session(session_id)
-        
-        return {
-            "success": True,
-            "message": f"Session {session_id} ingested successfully",
-            "session_id": session_id,
-            "job_id": f"ingest-{int(time.time())}-{session_id}"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to ingest session: {e}")
+
 
 
 @router.get("/ingest/status")
 async def get_ingest_status() -> dict:
     """Get current ingest status and queue."""
     try:
-        # For now, return simple status
-        # In production, this would show queue and progress
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
         return {
-            "active_jobs": 0,
-            "pending_jobs": 0,
-            "last_completed": None,
+            "active_jobs": len(job_queue.get_active_jobs()),
+            "pending_jobs": len(job_queue.get_pending_jobs()),
+            "completed_jobs": len(job_queue.get_completed_jobs()),
+            "failed_jobs": len(job_queue.get_failed_jobs()),
+            "last_completed": None,  # TODO: Track last completed job
             "status": "ready"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get ingest status: {e}")
+
+
+@router.post("/ingest/session")
+async def ingest_session(
+    session_id: str = Query(..., description="Session ID to ingest"),
+    background: bool = Query(True, description="Run in background")
+) -> dict:
+    """Ingest a completed session into the memory system."""
+    try:
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
+        # Enqueue the job
+        job = job_queue.enqueue_job(session_id)
+        
+        return {
+            "success": True,
+            "message": f"Session {session_id} enqueued for ingestion",
+            "session_id": session_id,
+            "job_id": job.job_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to enqueue session: {e}")
+
+
+@router.get("/ingest/jobs")
+async def list_ingest_jobs() -> dict:
+    """List all ingest jobs."""
+    try:
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
+        jobs = job_queue.get_all_jobs()
+        
+        return {
+            "jobs": [{
+                "job_id": job.job_id,
+                "session_id": job.session_id,
+                "status": job.status,
+                "progress": job.progress,
+                "phase": job.phase,
+                "message": job.message,
+                "created_at": job.created_at,
+                "started_at": job.started_at,
+                "completed_at": job.completed_at,
+                "error": job.error
+            } for job in jobs]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list jobs: {e}")
+
+
+@router.get("/ingest/jobs/{job_id}")
+async def get_ingest_job(job_id: str) -> dict:
+    """Get details about a specific ingest job."""
+    try:
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
+        job = job_queue.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        return {
+            "job_id": job.job_id,
+            "session_id": job.session_id,
+            "status": job.status,
+            "progress": job.progress,
+            "phase": job.phase,
+            "message": job.message,
+            "created_at": job.created_at,
+            "started_at": job.started_at,
+            "completed_at": job.completed_at,
+            "error": job.error,
+            "retry_count": job.retry_count,
+            "max_retries": job.max_retries
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get job: {e}")
+
+
+@router.post("/ingest/jobs/{job_id}/cancel")
+async def cancel_ingest_job(job_id: str) -> dict:
+    """Cancel a running ingest job."""
+    try:
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
+        success = job_queue.cancel_job(job_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Job not found or already completed")
+        
+        return {
+            "success": True,
+            "message": f"Job {job_id} cancelled successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel job: {e}")
+
+
+@router.post("/ingest/jobs/clear")
+async def clear_completed_jobs() -> dict:
+    """Clear completed jobs from the queue."""
+    try:
+        if job_queue is None:
+            raise HTTPException(status_code=500, detail="Job queue not initialized")
+        
+        count = job_queue.clear_completed_jobs()
+        
+        return {
+            "success": True,
+            "message": f"Cleared {count} completed jobs",
+            "cleared_count": count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear jobs: {e}")
