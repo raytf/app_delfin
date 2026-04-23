@@ -8,6 +8,7 @@ interface HomeScreenProps {
   onStartSession: (sessionName: string) => void
   onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
+  onViewMemory: () => void
   sessions: SessionListItem[]
   userName: string | null
 }
@@ -168,6 +169,7 @@ export default function HomeScreen({
   onStartSession,
   onSelectSession,
   onViewAllSessions,
+  onViewMemory,
   sessions,
   userName,
 }: HomeScreenProps) {
@@ -217,14 +219,23 @@ export default function HomeScreen({
             </p>
           )}
 
-          {/* Start Session Button */}
-          <button
-            className="btn-ocean mt-8 cursor-pointer rounded-2xl px-8 py-4 text-base font-semibold text-white shadow-lg"
-            onClick={() => setIsModalOpen(true)}
-            type="button"
-          >
-            Start Studying
-          </button>
+          {/* Action Buttons */}
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+            <button
+              className="btn-ocean cursor-pointer rounded-2xl px-8 py-4 text-base font-semibold text-white shadow-lg"
+              onClick={() => setIsModalOpen(true)}
+              type="button"
+            >
+              Start Studying
+            </button>
+            <button
+              className="cursor-pointer rounded-2xl bg-white px-8 py-4 text-base font-semibold text-[var(--primary)] shadow-lg hover:bg-gray-50"
+              onClick={onViewMemory}
+              type="button"
+            >
+              Memory Wiki
+            </button>
+          </div>
         </main>
 
         {/* Recent Sessions Section */}

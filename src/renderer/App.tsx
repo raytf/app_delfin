@@ -14,6 +14,7 @@ import { VOICE_TURN_TEXT } from '../shared/constants'
 import AllSessionsPage from './components/AllSessionsPage'
 import ExpandedSessionView from './components/ExpandedSessionView'
 import HomeScreen from './components/HomeScreen'
+import MemoryView from './components/MemoryView'
 import MinimizedSessionBar from './components/MinimizedSessionBar'
 import PastSessionView from './components/PastSessionView'
 import SessionEndedView from './components/SessionEndedView'
@@ -50,7 +51,7 @@ function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null 
 }
 
 export default function App() {
-  const [homeView, setHomeView] = useState<'landing' | 'all-sessions'>('landing')
+  const [homeView, setHomeView] = useState<'landing' | 'all-sessions' | 'memory'>('landing')
   const [selectedPastSession, setSelectedPastSession] = useState<SessionDetail | null>(null)
   const [activeSessionName, setActiveSessionName] = useState('Study Session')
   const [sessionMode, setSessionMode] = useState<SessionMode>('home')
@@ -1012,6 +1013,12 @@ export default function App() {
     )
   }
 
+  if (homeView === 'memory') {
+    return (
+      <MemoryView />
+    )
+  }
+  
   return (
     <>
       <HomeScreen
@@ -1026,6 +1033,9 @@ export default function App() {
         }}
         onViewAllSessions={() => {
           setHomeView('all-sessions')
+        }}
+        onViewMemory={() => {
+          setHomeView('memory')
         }}
         sessions={sessionHistory}
         userName={userName}

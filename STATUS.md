@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-13 (README + status refreshed against current codebase)
+> Last updated: 2024-04-23 (Phase 7 M1 implementation completed)
 > Legend: ✅ Implemented · ⚠️ Partial / placeholder · ❌ Not started
 
 ---
@@ -182,6 +182,11 @@
 | M0 viability spike | ✅ | Implemented with engine support and comprehensive testing |
 | Memory schemas | ✅ | Pydantic models in `sidecar/memory/schemas.py` |
 | XDG directory structure | ✅ | Proper XDG_DATA_HOME usage in `sidecar/memory/xdg_utils.py` |
+| M1: Read-only wiki infrastructure | ✅ | FastAPI router with REST endpoints implemented |
+| M1: Memory store | ✅ | File I/O operations in `sidecar/memory/store.py` |
+| M1: Memory index | ✅ | Wiki indexing and search in `sidecar/memory/index.py` |
+| M1: REST endpoints | ✅ | `/memory/health`, `/memory/index`, `/memory/page`, `/memory/search`, `/memory/stats` |
+| M1: Memory UI | ✅ | `MemoryView.tsx` and `WikiPageReader.tsx` components |
+| M1: Integration | ✅ | Wired into main application with HomeScreen button |
 | Session ingestion pipeline | ❌ | Not started |
 | Wiki search tools | ❌ | Not started |
-| Memory UI | ❌ | Not started |

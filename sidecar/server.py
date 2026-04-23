@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from inference.engine import load_engine, pre_warm
 from inference.preprocess import resize_image_blob
+from memory.router import router as memory_router
 from prompts.presets import PRESETS
 from tts import TTSPipeline, split_sentences
 
@@ -264,6 +265,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include memory router
+app.include_router(memory_router)
 
 
 @app.get("/health")
