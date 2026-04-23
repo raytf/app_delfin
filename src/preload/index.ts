@@ -103,6 +103,9 @@ const api: ElectronAPI = {
   onSidecarMemoryProgress: (cb: (data: WsMemoryProgress) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_MEMORY_PROGRESS, (_event, data) => cb(data)),
 
+  onSidecarToolResult: (cb: (data: { tool_name: string; result: any }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOOL_RESULT, (_event, data) => cb(data)),
+
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel),
 

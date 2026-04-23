@@ -3,13 +3,13 @@
  * 
  * TECHNICAL DECISIONS:
  * 
- * 1. POLLING STRATEGY: Uses setInterval for progress updates (5s interval)
- *    - Simple and reliable for development
- *    - Future: Replace with WebSocket push notifications for real-time updates
+ * 1. REAL-TIME UPDATES: Uses WebSocket push notifications for real-time progress
+ *    - Efficient and responsive user experience
+ *    - No polling needed - events are pushed from backend
  * 
- * 2. MOCK DATA: Currently simulates ingest process for development
- *    - Demonstrates UI flow without requiring full backend implementation
- *    - Production: Will connect to real /memory/ingest/status endpoint
+ * 2. REAL SESSION INTEGRATION: Works with actual completed sessions
+ *    - Uses most recent completed session for manual ingest
+ *    - Future: Could add session picker UI for user selection
  * 
  * 3. STATE MANAGEMENT: Local component state for simplicity
  *    - Sufficient for current requirements
@@ -18,6 +18,7 @@
  * 4. ERROR HANDLING: Graceful degradation with user-friendly messages
  *    - Network errors show helpful feedback
  *    - Failed jobs display clearly with error context
+ *    - Handles cases where no sessions are available
  * 
  * 5. UI DESIGN: Follows system patterns with consistent styling
  *    - Color-coded status indicators
@@ -96,8 +97,6 @@ export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
     }
   }, [])
 
-
-
   const getProgressMessage = (phase: string, subject?: string): string => {
     switch (phase) {
       case 'extract': return subject ? `Extracting from ${subject}...` : 'Extracting entities...'
@@ -153,12 +152,27 @@ export default function IngestStatusCard({ onClose }: IngestStatusCardProps) {
 
   const handleManualIngest = async () => {
     try {
-      // For now, we'll use a hardcoded session ID for testing
-      // In production, this would come from user selection or current session
-      const testSessionId = 'test-session-' + Date.now()
+      // Get list of available sessions for user to choose from
+      const sessions = await window.api.listSessions()
       
-      const result = await window.api.ingestSession(testSessionId)
-      console.log('Manual ingest started:', result)
+      if (sessions.length === 0) {
+        setError('No sessions available for ingestion')
+        return
+      }
+      
+      // For now, use the most recent completed session
+      // In production, this could be enhanced with a session picker UI
+      const recentCompletedSession = sessions
+        .filter(session => session.status === 'completed')
+        .sort((a, b) => b.endedAt - a.endedAt)[0]
+      
+      if (!recentCompletedSession) {
+        setError('No completed sessions available for ingestion')
+        return
+      }
+      
+      const result = await window.api.ingestSession(recentCompletedSession.id)
+      console.log('Manual ingest started for session:', recentCompletedSession.id, result)
       
       // The WebSocket will handle progress updates automatically
     } catch (error) {

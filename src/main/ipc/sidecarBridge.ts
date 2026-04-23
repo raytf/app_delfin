@@ -113,6 +113,16 @@ export function registerSidecarBridge(
             message,
           );
           return;
+        case "tool_result":
+          // Forward tool result to renderer
+          mainWindow.webContents.send(
+            MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOOL_RESULT,
+            {
+              tool_name: message.tool_name,
+              result: message.result,
+            },
+          );
+          return;
       }
     } catch (error) {
       console.error(

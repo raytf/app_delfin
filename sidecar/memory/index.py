@@ -130,6 +130,21 @@ class MemoryIndex:
             with open(index_file, 'w', encoding='utf-8') as f:
                 f.write(content)
     
+    def search_index(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Search the wiki index with relevance scoring.
+        
+        This method is designed for tool calling and returns results in a format
+        suitable for the search_wiki tool response.
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of search results with path, title, kind, snippet, and score
+        """
+        return self.advanced_search(query, limit)
+    
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search the wiki using advanced search with relevance scoring."""
         return self.advanced_search(query, limit)

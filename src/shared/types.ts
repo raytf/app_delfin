@@ -77,6 +77,7 @@ export type WsInboundType =
   | 'done'
   | 'error'
   | 'memory_progress'
+  | 'tool_result'
 
 export interface WsInboundMessage {
   type: WsInboundType
@@ -91,6 +92,9 @@ export interface WsInboundMessage {
   index?: number
   /** Present on audio_end — total TTS synthesis time in seconds. */
   tts_time?: number
+  // Tool result fields
+  tool_name?: string
+  result?: any
 }
 
 // Memory progress updates (Sidecar → Electron)
@@ -143,6 +147,7 @@ export const MAIN_TO_RENDERER_CHANNELS = {
   SIDECAR_ERROR: 'sidecar:error',
   SIDECAR_STATUS: 'sidecar:status',
   SIDECAR_MEMORY_PROGRESS: 'sidecar:memory_progress',
+  SIDECAR_TOOL_RESULT: 'sidecar:tool_result',
 } as const
 
 // Presets
@@ -224,6 +229,7 @@ export interface ElectronAPI {
   onSidecarError: (cb: (data: { message: string }) => void) => void
   onSidecarStatus: (cb: (data: SidecarStatus) => void) => void
   onSidecarMemoryProgress: (cb: (data: WsMemoryProgress) => void) => void
+  onSidecarToolResult: (cb: (data: { tool_name: string; result: any }) => void) => void
   removeAllListeners: (channel: string) => void
   // Memory client methods
   checkMemoryHealth: () => Promise<MemoryHealth>

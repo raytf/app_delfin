@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const wsInboundMessageSchema = z.object({
-  type: z.enum(['token', 'audio_start', 'audio_chunk', 'audio_end', 'done', 'error', 'memory_progress']),
+  type: z.enum(['token', 'audio_start', 'audio_chunk', 'audio_end', 'done', 'error', 'memory_progress', 'tool_result']),
   text: z.string().optional(),
   audio: z.string().optional(),
   message: z.string().optional(),
@@ -15,6 +15,9 @@ export const wsInboundMessageSchema = z.object({
   phase: z.enum(['extract', 'summarize', 'propose_update', 'apply', 'done', 'error']).optional(),
   subject: z.string().optional(),
   pct: z.number().optional(),
+  // Tool result fields
+  tool_name: z.string().optional(),
+  result: z.any().optional(),
 })
 
 export const wsOutboundMessageSchema = z.object({

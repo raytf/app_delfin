@@ -33,6 +33,67 @@ active_backend: str = "CPU"
 tts_pipeline: TTSPipeline | None = None
 
 
+async def _handle_tool_calls(ws: WebSocket, conversation: Any, interrupted: asyncio.Event) -> None:
+    """Handle tool calls from the model if the engine supports tool calling."""
+    try:
+        # Check if the conversation has tool calls that need to be executed
+        if hasattr(conversation, 'get_tool_calls') and callable(getattr(conversation, 'get_tool_calls')):
+            tool_calls = conversation.get_tool_calls()
+            
+            if tool_calls:
+                logger.info(f"[handle_turn] Handling {len(tool_calls)} tool call(s)")
+                
+                # Import tools if memory is enabled
+                if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
+                    from memory.tools import execute_tool
+                    from memory.router import get_memory_dir
+                    
+                    # Execute each tool call
+                    for tool_call in tool_calls:
+                        if interrupted.is_set():
+                            logger.info("[handle_turn] Tool execution interrupted")
+                            break
+                            
+                        try:
+                            # Execute the tool
+                            result = await execute_tool(
+                                name=tool_call.get("name", ""),
+                                args=tool_call.get("args", {}),
+                                wiki_dir=get_memory_dir()
+                            )
+                            
+                            # Submit the tool result back to the conversation
+                            if hasattr(conversation, 'submit_tool_result'):
+                                conversation.submit_tool_result(tool_call.get("id", ""), result)
+                                logger.info(f"[handle_turn] Submitted result for tool {tool_call.get('name', '')}")
+                                
+                                # Send tool result to client for transparency
+                                await ws.send_json({
+                                    "type": "tool_result",
+                                    "tool_name": tool_call.get("name", ""),
+                                    "result": result
+                                })
+                            
+                        except Exception as tool_error:
+                            logger.error(f"[handle_turn] Tool execution failed: {tool_error}")
+                            error_result = json.dumps({
+                                "success": False,
+                                "error": f"Tool execution failed: {str(tool_error)}"
+                            })
+                            if hasattr(conversation, 'submit_tool_result'):
+                                conversation.submit_tool_result(tool_call.get("id", ""), error_result)
+                
+                # After handling tools, get the final response from the model
+                if hasattr(conversation, 'get_final_response_after_tools'):
+                    final_response = conversation.get_final_response_after_tools()
+                    if final_response:
+                        await ws.send_json({"type": "token", "text": final_response})
+                        await ws.send_json({"type": "done"})
+                        
+    except Exception as e:
+        logger.error(f"[handle_turn] Tool handling failed: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Handle a single inference turn
 # ---------------------------------------------------------------------------
@@ -143,6 +204,9 @@ async def handle_turn(
         logger.info("[handle_turn] +%.3fs sending done", time.monotonic() - turn_t0)
         await ws.send_json({"type": "done"})
         logger.info("[handle_turn] done sent")
+        
+        # Handle tool calls if the engine supports them
+        await _handle_tool_calls(ws, conversation, interrupted)
 
     except Exception as exc:
         logger.exception("Inference error: %s", exc)
@@ -322,8 +386,33 @@ async def ws_endpoint(ws: WebSocket) -> None:
     preset_id = "lecture-slide"
     system_prompt = PRESETS[preset_id]
 
+    # Add memory tool instructions to system prompt if memory is enabled
+    if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
+        memory_tool_instructions = """
+
+You have access to two tools: search_wiki and read_wiki_page.
+Use search_wiki when the user asks about something that may appear in their personal knowledge wiki
+(past sessions, topics they have studied, people or concepts they mentioned before).
+Use read_wiki_page to read a full page after search_wiki identifies a relevant result.
+Always cite the wiki page path when you use information from it.
+"""
+        system_prompt += memory_tool_instructions
+
+    # Initialize tools if memory is enabled
+    tools = []
+    if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
+        from memory.tools import create_search_wiki_tool, create_read_wiki_page_tool
+        from memory.router import get_memory_dir
+        
+        # Create callable tool functions for LiteRT-LM
+        # LiteRT-LM expects just the callable functions, not the full tool schemas
+        search_tool_func = create_search_wiki_tool(get_memory_dir())['func']
+        read_tool_func = create_read_wiki_page_tool(get_memory_dir())['func']
+        tools = [search_tool_func, read_tool_func]
+
     conversation = engine.create_conversation(
         messages=[{"role": "system", "content": [{"type": "text", "text": system_prompt}]}],
+        tools=tools if tools else None
     )
     conversation.__enter__()
 
