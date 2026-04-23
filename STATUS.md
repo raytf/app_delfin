@@ -174,3 +174,14 @@
 | Dockerfile for sidecar | ❌ | Not implemented |
 | `demo-content/` — slide screenshots | ❌ | Directory exists with only a README |
 | README — complete setup instructions | ✅ | Refreshed on 2026-04-13 |
+
+## Phase 7 — Memory System (LLM Wiki)
+
+| Feature | Status | Notes |
+|---|---|---|
+| M0 viability spike | ✅ | Implemented with engine support and comprehensive testing |
+| Memory schemas | ✅ | Pydantic models in `sidecar/memory/schemas.py` |
+| XDG directory structure | ✅ | Proper XDG_DATA_HOME usage in `sidecar/memory/xdg_utils.py` |
+| Session ingestion pipeline | ❌ | Not started |
+| Wiki search tools | ❌ | Not started |
+| Memory UI | ❌ | Not started |

@@ -8,3 +8,4 @@ huggingface-hub
 python-dotenv
 requests
 kokoro-onnx
+pydantic
