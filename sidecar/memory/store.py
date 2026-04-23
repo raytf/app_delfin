@@ -56,6 +56,56 @@ class MemoryStore:
         with open(page_path, 'r', encoding='utf-8') as f:
             return f.read()
     
+    def read_page_metadata(self, page_path: Path) -> tuple[dict, str]:
+        """Read page metadata (frontmatter) and body from a page path."""
+        if not page_path.exists():
+            raise FileNotFoundError(f"Page {page_path} not found")
+        
+        with open(page_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Parse frontmatter
+        if content.startswith('---'):
+            lines = content.split('\n')
+            frontmatter_lines = []
+            in_frontmatter = False
+            content_start = 0
+            frontmatter_start = -1
+            
+            for i, line in enumerate(lines):
+                if line.strip() == '---':
+                    if not in_frontmatter:
+                        in_frontmatter = True
+                        frontmatter_start = i + 1
+                    else:
+                        in_frontmatter = False
+                        content_start = i + 1
+                        break
+                elif in_frontmatter:
+                    frontmatter_lines.append(line)
+            
+            # Parse frontmatter
+            frontmatter = {}
+            for line in frontmatter_lines:
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # Handle list values
+                    if value.startswith('[') and value.endswith(']'):
+                        list_content = value[1:-1].strip()
+                        items = [item.strip() for item in list_content.split(',') if item.strip()]
+                        frontmatter[key] = items
+                    else:
+                        frontmatter[key] = value
+            
+            body = '\n'.join(lines[content_start:])
+            return frontmatter, body
+        
+        # No frontmatter
+        return {}, content
+    
     def write_page(self, page_id: str, kind: str, content: str) -> None:
         """Write a wiki page."""
         page_path = self.get_page_path(page_id, kind)

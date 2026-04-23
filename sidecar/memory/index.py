@@ -85,6 +85,51 @@ class MemoryIndex:
         
         return metadata
     
+    def add_to_index(
+        self, 
+        path: str, 
+        kind: str, 
+        title: str, 
+        summary: str, 
+        tags: List[str], 
+        source_count: int, 
+        updated: str
+    ) -> None:
+        """Add a page to the wiki index."""
+        index_file = self.store.memory_dir / "wiki" / "index.md"
+        
+        # Read existing index
+        if index_file.exists():
+            with open(index_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = "# Wiki Index\n\nThis file is automatically maintained by the system.\n\n## Pages\n\n| Path | Title | Summary | Tags | Sources | Updated |\n|------|-------|---------|------|---------|---------|\n"
+        
+        # Check if page already exists in index
+        lines = content.split('\n')
+        page_exists = any(f"| {path} |" in line for line in lines)
+        
+        if not page_exists:
+            # Add new page entry
+            new_entry = f"| {path} | {title} | {summary} | {','.join(tags)} | {source_count} | {updated} |\n"
+            
+            # Find the table and add the entry before the last line
+            table_start = None
+            for i, line in enumerate(lines):
+                if line.startswith('| Path | Title |'):
+                    table_start = i
+                    break
+            
+            if table_start is not None:
+                # Insert after the header
+                lines.insert(table_start + 1, new_entry)
+                content = '\n'.join(lines)
+            else:
+                content += new_entry + "\n"
+            
+            with open(index_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+    
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search the wiki using advanced search with relevance scoring."""
         return self.advanced_search(query, limit)

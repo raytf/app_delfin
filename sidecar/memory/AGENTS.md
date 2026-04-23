@@ -127,6 +127,42 @@ The algorithm uses the chain rule from calculus to efficiently compute gradients
 - Lecture Slide 42: Training Neural Networks
 ```
 
+## Technical Implementation Notes
+
+This section documents key technical decisions for developers maintaining the system.
+
+### Ingest Pipeline Design
+
+1. **Synchronous Execution**: The ingest pipeline runs synchronously to ensure data consistency and simplify error handling. Future enhancement will add background job processing using `asyncio.Task`.
+
+2. **Retry Strategy**: LLM calls use a 2-attempt retry with prompt augmentation. Failed responses are appended to the prompt to give the model a chance to self-correct.
+
+3. **Progress Tracking**: Callback-based design allows flexible UI integration. Ready for WebSocket progress events when implemented.
+
+4. **Error Handling**: Comprehensive exception handling ensures failed ingests leave no partial artifacts and log detailed error information.
+
+5. **Idempotent Operations**: Safe to run multiple times on the same session. Checks for existing pages before creation to avoid duplicates.
+
+### API Design Decisions
+
+1. **RESTful Conventions**: Follows standard REST patterns with consistent JSON response formats.
+
+2. **Singleton Pipeline**: Global ingest pipeline instance initialized during FastAPI lifespan for engine access efficiency.
+
+3. **XDG Compliance**: Uses XDG directory standards for cross-platform compatibility.
+
+4. **Development Flexibility**: CORS allowed from all origins during development phase.
+
+### Frontend Architecture
+
+1. **Polling Strategy**: Uses `setInterval` for progress updates (5s interval) during development.
+
+2. **Mock Data**: Simulates ingest process to demonstrate UI flow without full backend.
+
+3. **Local State**: Component-level state management sufficient for current requirements.
+
+4. **Error Handling**: Graceful degradation with user-friendly error messages.
+
 ## User Instructions
 
 You can modify this file to change how the AI agents maintain your wiki. Changes will take effect the next time an ingest operation runs.

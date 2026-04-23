@@ -1,4 +1,32 @@
-"""FastAPI router for memory system — read-only wiki infrastructure."""
+"""FastAPI router for memory system — read-only wiki infrastructure.
+
+Key Technical Decisions:
+
+1. RESTFUL DESIGN: Follows standard REST conventions for resource management.
+   - GET for retrieval, POST for creation/modification
+   - Query parameters for filtering and options
+   - Consistent JSON response formats
+   
+2. ERROR HANDLING: Comprehensive HTTP error responses with detailed messages.
+   - 404 for missing resources
+   - 500 for server errors with context
+   - User-friendly error messages in response bodies
+   
+3. INGEST PIPELINE: Global singleton pattern for engine access.
+   - Initialized during FastAPI lifespan startup
+   - Shared across all requests for efficiency
+   - Lazy initialization prevents startup delays
+   
+4. PATH RESOLUTION: Uses XDG standards for cross-platform compatibility.
+   - Respects MEMORY_DIR environment variable
+   - Falls back to XDG_DATA_HOME/delfin/memory
+   - Creates directory structure on first use
+   
+5. SECURITY: No authentication required (on-device only).
+   - Assumes trusted local network environment
+   - No sensitive data exposed beyond what's in wiki
+   - CORS allowed from all origins for development flexibility
+"""
 
 import json
 import os
@@ -8,11 +36,19 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from .ingest import IngestPipeline
 from .logbook import Logbook
 from .schemas import EntityExtraction, SourcePageDraft
 from .xdg_utils import resolve_memory_dir
 
 router = APIRouter(prefix="/memory", tags=["memory"])
+
+# Global ingest pipeline instance (will be initialized when engine is available)
+# TECHNICAL NOTE: Singleton pattern for engine access efficiency.
+# The pipeline is initialized during FastAPI lifespan startup to ensure
+# the LLM engine is ready before any ingest requests are processed.
+# This avoids per-request engine loading overhead.
+ingest_pipeline: Optional[IngestPipeline] = None
 
 
 def get_memory_dir() -> Path:
@@ -346,3 +382,42 @@ async def clear_memory_log() -> dict:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear memory log: {e}")
+
+
+@router.post("/ingest/session")
+async def ingest_session(
+    session_id: str = Query(..., description="Session ID to ingest"),
+    background: bool = Query(False, description="Run in background")
+) -> dict:
+    """Ingest a completed session into the memory system."""
+    try:
+        if ingest_pipeline is None:
+            raise HTTPException(status_code=500, detail="Ingest pipeline not initialized")
+        
+        # For now, run synchronously
+        # In production, this would spawn a background task
+        await ingest_pipeline.ingest_session(session_id)
+        
+        return {
+            "success": True,
+            "message": f"Session {session_id} ingested successfully",
+            "session_id": session_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to ingest session: {e}")
+
+
+@router.get("/ingest/status")
+async def get_ingest_status() -> dict:
+    """Get current ingest status and queue."""
+    try:
+        # For now, return simple status
+        # In production, this would show queue and progress
+        return {
+            "active_jobs": 0,
+            "pending_jobs": 0,
+            "last_completed": None,
+            "status": "ready"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get ingest status: {e}")

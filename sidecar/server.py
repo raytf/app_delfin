@@ -249,6 +249,16 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     await loop.run_in_executor(None, pre_warm, engine)
     if os.environ.get("TTS_ENABLED", "false").lower() == "true":
         tts_pipeline = TTSPipeline()
+    
+    # Initialize memory ingest pipeline if memory is enabled
+    if os.environ.get("MEMORY_ENABLED", "false").lower() == "true":
+        from memory.router import ingest_pipeline
+        from memory.ingest import IngestPipeline
+        from memory.xdg_utils import resolve_memory_dir
+        
+        memory_dir = resolve_memory_dir(os.environ.get("MEMORY_DIR"))
+        ingest_pipeline = IngestPipeline(memory_dir, engine)
+    
     yield
     if engine is not None:
         engine.__exit__(None, None, None)

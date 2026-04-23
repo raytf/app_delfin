@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import IngestStatusCard from './IngestStatusCard'
 
 interface MemoryStats {
   sources: number
@@ -32,6 +33,7 @@ export default function MemoryView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'search'>('overview')
+  const [showIngestStatus, setShowIngestStatus] = useState(true)
 
   // Fetch memory stats
   const fetchStats = async () => {
@@ -171,6 +173,12 @@ export default function MemoryView() {
           </button>
         </div>
       </div>
+      
+      {showIngestStatus && (
+        <div className="mb-6">
+          <IngestStatusCard onClose={() => setShowIngestStatus(false)} />
+        </div>
+      )}
 
       {activeTab === 'overview' && (
         <div className="mb-6">

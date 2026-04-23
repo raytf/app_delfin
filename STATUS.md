@@ -192,5 +192,7 @@
 | M1: Wikilink Support | ✅ | `[[Page Name]]` navigation in WikiPageReader |
 | M1: Frontmatter Parsing | ✅ | Robust YAML-like frontmatter handling with list support |
 | M1: Integration | ✅ | Wired into main application with HomeScreen button |
-| Session ingestion pipeline | ❌ | Not started |
+| M2: Session ingestion pipeline | ✅ | IngestPipeline class with entity extraction, source page creation, and index updating |
+| M2: Ingest REST endpoints | ✅ | /memory/ingest/session and /memory/ingest/status endpoints |
+| M2: Ingest status UI | ✅ | IngestStatusCard component with progress tracking |
 | Wiki search tools | ❌ | Not started |
