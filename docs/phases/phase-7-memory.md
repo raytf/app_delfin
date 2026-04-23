@@ -67,10 +67,10 @@ If no-go: revisit prompt design, tighter JSON schemas, or chain-of-thought reduc
 
 ## 7.1 Directory layout
 
-All memory lives under a single data directory, configurable via `MEMORY_DIR` env var (default: `~/.delfin/memory/`).
+All memory lives under a single data directory, configurable via `MEMORY_DIR` env var (default: `$XDG_DATA_HOME/delfin/memory/` or `$HOME/.local/share/delfin/memory/` if `XDG_DATA_HOME` is not set).
 
 ```
-~/.delfin/memory/
+$XDG_DATA_HOME/delfin/memory/
 ├── AGENTS.md                    ← schema: conventions the model follows (user-editable)
 ├── wiki/
 │   ├── index.md                 ← catalogue: every page, one-line summary, tags, source_ids
@@ -102,7 +102,7 @@ All memory lives under a single data directory, configurable via `MEMORY_DIR` en
 ```env
 # === Memory ===
 MEMORY_ENABLED=true
-MEMORY_DIR=                        # default: $HOME/.delfin/memory
+MEMORY_DIR=                        # default: $XDG_DATA_HOME/delfin/memory (or $HOME/.local/share/delfin/memory if XDG_DATA_HOME is not set)
 MEMORY_AUTO_INGEST=true            # ingest automatically when a session ends
 MEMORY_INGEST_CONCURRENCY=1        # keep at 1; E2B cannot share the engine
 MEMORY_MAX_PAGE_BYTES=32768        # max size of any single model-written page
