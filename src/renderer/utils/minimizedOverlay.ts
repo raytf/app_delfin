@@ -1,9 +1,7 @@
-import type { MinimizedOverlayVariant, OverlayMode, SessionMode } from '../../shared/types'
+import type { OverlayMode } from '../../shared/types'
 
 interface MinimizedOverlayContext {
-  minimizedVariant: MinimizedOverlayVariant
-  overlayMode: OverlayMode
-  sessionMode: SessionMode
+  mode: OverlayMode
 }
 
 interface AutoAdvanceMinimizedVariantContext extends MinimizedOverlayContext {
@@ -20,42 +18,40 @@ interface VoiceTurnCollapseContext extends MinimizedOverlayContext {
 }
 
 export function getVoiceTurnRevealVariant({
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
-}: MinimizedOverlayContext): MinimizedOverlayVariant | null {
-  if (sessionMode !== 'active' || overlayMode !== 'minimized' || minimizedVariant !== 'compact') {
+  mode,
+}: MinimizedOverlayContext): Exclude<OverlayMode, 'expanded'> | null {
+  if (mode !== 'minimized-compact') {
     return null
   }
 
-  return 'prompt-input'
+  return 'minimized-prompt-input'
 }
 
 export function getAutoAdvanceMinimizedVariant({
   errorMessage,
   isMinimizedPromptComposing,
   latestResponseText,
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
-}: AutoAdvanceMinimizedVariantContext): MinimizedOverlayVariant | null {
-  if (sessionMode !== 'active' || overlayMode !== 'minimized') {
+  mode,
+}: AutoAdvanceMinimizedVariantContext): Exclude<OverlayMode, 'expanded'> | null {
+  if (mode === 'expanded') {
     return null
   }
 
   const hasResponseText = latestResponseText !== null && latestResponseText.length > 0
   const shouldShowResponse = errorMessage !== null || hasResponseText
-  if (minimizedVariant === 'compact' && shouldShowResponse) {
-    return 'prompt-response'
+  if (mode === 'minimized-compact' && shouldShowResponse) {
+    return 'minimized-prompt-response'
   }
 
-  if (minimizedVariant === 'compact') {
+  if (mode === 'minimized-compact') {
     return null
   }
 
-  const nextVariant: MinimizedOverlayVariant = shouldShowResponse ? 'prompt-response' : 'prompt-input'
+  const nextMode: Exclude<OverlayMode, 'expanded'> = shouldShowResponse
+    ? 'minimized-prompt-response'
+    : 'minimized-prompt-input'
 
-  return nextVariant === minimizedVariant ? null : nextVariant
+  return nextMode === mode ? null : nextMode
 }
 
 export function getVoiceTurnCompleteVariant({
@@ -63,14 +59,10 @@ export function getVoiceTurnCompleteVariant({
   hasResponseText,
   isAudioPlaying,
   isSubmitting,
-  minimizedVariant,
-  overlayMode,
-  sessionMode,
-}: VoiceTurnCollapseContext): MinimizedOverlayVariant | null {
+  mode,
+}: VoiceTurnCollapseContext): Exclude<OverlayMode, 'expanded'> | null {
   if (
-    sessionMode !== 'active' ||
-    overlayMode !== 'minimized' ||
-    minimizedVariant !== 'prompt-response' ||
+    mode !== 'minimized-prompt-response' ||
     isSubmitting ||
     isAudioPlaying ||
     errorMessage !== null ||
@@ -79,5 +71,5 @@ export function getVoiceTurnCompleteVariant({
     return null
   }
 
-  return 'compact'
+  return 'minimized-compact'
 }

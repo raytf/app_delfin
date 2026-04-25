@@ -1,7 +1,7 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-22 (docs/explanations audit — all six explanation docs refreshed against current codebase)
-> Legend: ✅ Implemented · ⚠️ Partial / placeholder · ❌ Not started
+> Last updated: 2026-04-22 (overlay defaults expanded; overlay load screens removed; shared goBack helper added)
+> Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
 
@@ -70,20 +70,26 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/renderer/App.tsx` | ✅ | Main orchestration: overlay routing, session flow, VAD wiring, audio playback, history loading, and deletion |
-| `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen, session naming modal, recent sessions, and quick deletion |
-| `src/renderer/components/AllSessionsPage.tsx` | ✅ | Full session-history browser |
-| `src/renderer/components/PastSessionView.tsx` | ✅ | Past-session replay with metadata sidebar and delete action |
-| `src/renderer/components/SessionEndedView.tsx` | ✅ | End-of-session summary screen |
-| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Main active-session conversation view with voice state and controls |
-| `src/renderer/components/MinimizedSessionBar.tsx` + `MinimizedPromptPanel.tsx` | ✅ | Compact/minimized overlay experience for ask/respond loops |
-| `src/renderer/components/SessionConversation.tsx` + `SessionPromptComposer.tsx` | ✅ | Reusable conversation rendering and prompt entry |
-| `src/renderer/components/SessionHistoryCard.tsx`, `UserNameModal.tsx`, `ThinkingDots.tsx`, `VoiceWaveform.tsx` | ✅ | Supporting UI for identity, session history, loading, and waveform display |
-| `src/renderer/components/ChatPanel.tsx`, `ChatInput.tsx`, `CapturePreview.tsx`, `QuickActions.tsx`, `PresetPicker.tsx`, `StatusIndicator.tsx`, `StopButton.tsx`, `MinimizeToggle.tsx` | ⚠️ | Legacy phase-plan placeholders; current UI is implemented through newer components |
-| `src/renderer/stores/sessionStore.ts` | ✅ | Active conversation state, minimized-response state, and persisted session history cache |
-| `src/renderer/stores/settingsStore.ts` | ✅ | Persists the user name locally |
-| `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder |
-| `src/renderer/types/assets.d.ts` | ✅ | Renderer asset declarations for strict TypeScript |
+| `src/renderer/App.tsx` | ✅ | Session/overlay mode routing, all IPC listeners, streaming state, and past-session deletion flow |
+| `src/renderer/navigation/goBack.ts` | ✅ | Shared history-back helper with fallback route support |
+| `src/renderer/hooks/useOverlayState.tsx` | ✅ | Overlay store reconciliation plus centralized optimistic `setOverlayMode()` helper with IPC rollback; overlay state defaults to expanded |
+| `src/renderer/features/active-session/ActiveSessionScreen.tsx` | ✅ | Renders directly from overlay store mode; local active-session reducer removed |
+| `src/renderer/features/active-session/hooks/useActiveSession.ts` | ✅ | Active-session state/actions hook; replaces `useActiveSessionController`, uses shared overlay hook, and ignores stale cancelled-turn audio/fallback output |
+| `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button and recent-session deletion |
+| `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
+| `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
+| `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/QuickActions.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/PresetPicker.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/StatusIndicator.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/StopButton.tsx` | ⚠️ | Placeholder |
+| `src/renderer/components/MinimizeToggle.tsx` | ⚠️ | Placeholder |
+| `src/renderer/stores/sessionStore.ts` | ✅ | Active conversation state plus persisted session history updates, including deletion |
+| `src/renderer/stores/settingsStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/stores/captureStore.ts` | ⚠️ | Placeholder — returns empty object |
+| `src/renderer/types/assets.d.ts` | ✅ | Renderer asset module declarations for strict TypeScript imports |
 
 ---
 

@@ -87,6 +87,19 @@ body {
   -webkit-app-region: no-drag;
 }
 
+.window-control-button {
+  -webkit-app-region: no-drag;
+}
+
+.window-control-button > span:first-child {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.window-control-button:hover > span:first-child {
+  opacity: 1;
+}
+
 /* Ocean wave background pattern */
 .ocean-gradient {
   background:

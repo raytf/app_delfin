@@ -49,6 +49,7 @@ export class SessionPersistenceService {
 
   async recordUserPrompt(input: {
     imageBase64: string
+    isVoiceTurn?: boolean
     messageId: string
     text: string
     presetId: PresetId
@@ -68,6 +69,7 @@ export class SessionPersistenceService {
       role: 'user',
       content: input.text,
       timestamp,
+      isVoiceTurn: input.isVoiceTurn,
       imagePath,
     }
 
@@ -183,6 +185,7 @@ export class SessionPersistenceService {
         id: message.id,
         role: message.role,
         content: message.content,
+        isVoiceTurn: message.isVoiceTurn,
         timestamp: message.timestamp,
         imagePath: message.imagePath,
       })),

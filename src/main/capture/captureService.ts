@@ -1,6 +1,6 @@
 import type { NativeImage } from 'electron'
 import type { CaptureFrame } from '../../shared/types'
-import { getActiveWindowSource } from './focusDetector'
+import { getActiveWindowSource, getPrimaryScreenSource } from './focusDetector'
 
 /**
  * Sample a 4×4 grid of pixels across the image and return true if every
@@ -38,6 +38,15 @@ function isThumbnailBlank(image: NativeImage): boolean {
 
 export async function captureForegroundWindow(): Promise<CaptureFrame> {
   const source = await getActiveWindowSource()
+  return captureSource(source, true)
+}
+
+export async function capturePrimaryScreen(): Promise<CaptureFrame> {
+  const source = await getPrimaryScreenSource()
+  return captureSource(source, false)
+}
+
+function captureSource(source: { name: string; thumbnail: NativeImage }, isWindowCapture: boolean): CaptureFrame {
   const { width, height } = source.thumbnail.getSize()
 
   if (width === 0 || height === 0) {
@@ -49,8 +58,10 @@ export async function captureForegroundWindow(): Promise<CaptureFrame> {
       `Screenshot from "${source.name}" is blank (all black). ` +
       'This is a known WSL2 limitation: the display compositor does not support ' +
       'pixel readback via desktopCapturer. ' +
-      'Try running the app on native Linux or Windows, or open a Linux GUI app ' +
-      '(e.g. a browser) in the same WSLg session so it appears as a capturable window.',
+      (isWindowCapture
+        ? 'Try running the app on native Linux or Windows, or open a Linux GUI app ' +
+          '(e.g. a browser) in the same WSLg session so it appears as a capturable window.'
+        : 'Try running the app on native Linux or Windows, or capture from a display/compositor that supports screen thumbnails.'),
     )
   }
 

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { captureForegroundWindow } from '../capture/captureService'
+import { captureForegroundWindow, capturePrimaryScreen } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
 import { sessionPromptRequestSchema } from '../../shared/schemas'
 import {
@@ -10,7 +10,6 @@ import {
   type SessionMessageImageRequest,
   type SessionPromptResponse,
   type SessionStartRequest,
-  type SessionStopRequest,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
@@ -23,16 +22,11 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
     }
 
     await options.sessionPersistence.startSession(sessionName)
-    options.setSessionMode('active')
-    options.setMinimizedVariant('compact')
-    await options.switchOverlayMode('minimized')
+    await options.switchOverlayMode('minimized-compact')
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async (_event, request: SessionStopRequest) => {
-    options.setEndedSessionData(request.endedSessionData)
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
     await options.sessionPersistence.stopSession('completed')
-    options.setSessionMode('home')
-    options.setMinimizedVariant('compact')
     await options.switchOverlayMode('expanded')
   })
 
@@ -53,12 +47,16 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
       throw new Error('Prompt cannot be empty.')
     }
 
-    const frame = await captureForegroundWindow()
+    const frame =
+      options.getOverlayState().mode === 'expanded'
+        ? await captureForegroundWindow()
+        : await capturePrimaryScreen()
 
     mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
 
     const imagePath = await options.sessionPersistence.recordUserPrompt({
       imageBase64: frame.imageBase64,
+      isVoiceTurn,
       messageId: request.messageId,
       text,
       presetId: request.presetId,

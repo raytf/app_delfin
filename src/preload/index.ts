@@ -6,7 +6,6 @@ import type {
   SidecarStatus,
   ElectronAPI,
   OverlayState,
-  SessionStopRequest,
   SessionDetail,
   SessionDetailRequest,
   SessionDeleteRequest,
@@ -14,7 +13,7 @@ import type {
   SessionPromptRequest,
   SessionPromptResponse,
   SessionStartRequest,
-  MinimizedOverlayVariant,
+  OverlayMode,
   SessionListItem,
 } from '../shared/types'
 
@@ -42,8 +41,7 @@ const api: ElectronAPI = {
   startSession: (request: SessionStartRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START, request),
 
-  stopSession: (request: SessionStopRequest) =>
-    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, request),
+  stopSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP),
 
   submitSessionPrompt: (request: SessionPromptRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request) as Promise<SessionPromptResponse>,
@@ -60,14 +58,17 @@ const api: ElectronAPI = {
   getSessionMessageImage: (request: SessionMessageImageRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, request) as Promise<string>,
 
-  minimizeOverlay: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_MINIMIZE),
+  setOverlayMode: (mode: OverlayMode) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MODE, mode),
 
-  restoreOverlay: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_RESTORE),
+  minimizeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_MINIMIZE),
 
-  setMinimizedOverlayVariant: (variant: MinimizedOverlayVariant) =>
-    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_SET_MINIMIZED_VARIANT, variant),
+  toggleMaximizeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_TOGGLE_MAXIMIZE),
 
-  clearEndedSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_CLEAR_ENDED_SESSION),
+  closeWindow: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE),
 
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),

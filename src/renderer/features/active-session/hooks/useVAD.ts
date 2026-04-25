@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { float32ToWavBase64 } from '../utils/audioUtils'
+import { float32ToWavBase64 } from '../../../utils/audioUtils'
 import {
   createWaveformBars,
   getWaveformActivityLevel,
@@ -23,7 +23,7 @@ import {
   smoothWaveformBars,
   WAVEFORM_BAR_COUNT,
   type WaveformBars,
-} from '../utils/waveformState'
+} from '../../../utils/waveformState'
 
 const POSITIVE_SPEECH_THRESHOLD_NORMAL = 0.5
 const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
