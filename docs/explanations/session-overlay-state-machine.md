@@ -18,28 +18,34 @@ The main process holds the authoritative copy. The renderer initialises from it 
 
 | sessionMode | overlayMode | minimizedVariant | Component rendered | Window |
 |---|---|---|---|---|
-| `home` | `expanded` | `compact` | `HomeScreen` | 1100×760, centred, with frame |
-| `active` | `expanded` | `compact` | `ExpandedSessionView` | 1100×760, centred, with frame |
-| `active` | `minimized` | `compact` | `MinimizedSessionBar` | 320×88, bottom-right, no frame, always-on-top |
-| `active` | `minimized` | `prompt-input` | `MinimizedSessionBar` | 420×120, bottom-right, no frame, always-on-top |
-| `active` | `minimized` | `prompt-response` | `MinimizedSessionBar` | 420×420, bottom-right, no frame, always-on-top |
+| `home` | `expanded` | `compact` | `HomeScreen` | 1100×760, centred, frameless, resizable |
+| `active` | `expanded` | `compact` | `ExpandedSessionView` | 1100×760, centred, frameless, resizable |
+| `active` | `minimized` | `compact` | `MinimizedSessionBar` | 380×64, bottom-right, frameless, always-on-top, transparent |
+| `active` | `minimized` | `prompt-input` | `MinimizedSessionBar` | 460×115, bottom-right, frameless, always-on-top, transparent |
+| `active` | `minimized` | `prompt-response` | `MinimizedSessionBar` | 460×360, bottom-right, frameless, always-on-top, transparent |
 
 > **home + minimized** is invalid — you can't be on the home screen and minimized at the same time. Session start always restores a specific window shape.
 
+The window is always created with `frame: false` and `transparent: true`. The visible differences between expanded and minimized modes come from toggling `alwaysOnTop`, `skipTaskbar`, `resizable`, `fullscreenable`, `hasShadow`, and the `backgroundColor` at runtime — not from recreating the window.
+
 ---
 
-## The Window Rebuild Trick
+## Switching Modes Without a Rebuild
 
-Switching between `expanded` and `minimized` doesn't resize the window — it **destroys and recreates it**. This is because `expanded` has a frame, is resizable, and appears in the taskbar; `minimized` is transparent, frameless, always-on-top, and skips the taskbar. These properties cannot all be changed on a live `BrowserWindow`.
+Switching between `expanded` and `minimized` (and between the three `minimized` variants) does **not** destroy the window. `setOverlayMode(window, mode, variant)` in `overlayWindow.ts` updates the live `BrowserWindow` in place:
 
 ```
-switchOverlayMode('minimized'):
-  1. createWindow('minimized')   → new BrowserWindow with minimized config
-  2. previousWindow.destroy()    → old window gone
-  3. nextWindow.focus()
+setOverlayMode(window, mode, variant):
+  window.setBounds(getWindowBounds(mode, variant), true)
+  window.setAlwaysOnTop(mode === 'minimized')
+  window.setSkipTaskbar(mode === 'minimized')
+  window.setResizable(mode === 'expanded')
+  window.setFullScreenable(mode === 'expanded')
+  window.setHasShadow(mode === 'expanded')
+  window.setBackgroundColor(mode === 'minimized' ? '#00000000' : '#f8fcfd')
 ```
 
-The new window loads the same React app. On mount, `App.tsx` calls `getOverlayState()` and the renderer picks up where it left off.
+`switchOverlayMode` in `src/main/index.ts` only creates a fresh `BrowserWindow` when the main window is `null` or destroyed — the normal path is an in-place resize. The renderer keeps running; `App.tsx` listens for `overlay:state` updates from the main process and updates its local mirrors without remounting.
 
 ---
 
@@ -52,7 +58,7 @@ The new window loads the same React app. On mount, `App.tsx` calls `getOverlaySt
 handleStartSession() in App.tsx
   → window.api.startSession()
   → [IPC] sessionHandlers.ts: switchOverlayMode('minimized')
-  → [Window destroyed + recreated as 320×88 compact pill]
+  → [Window resized in place to 380×64 compact pill via setOverlayMode]
   → setSessionMode('active'), setOverlayMode('minimized'), setMinimizedVariant('compact')
   → sessionStore.clearConversation()
 ```
@@ -64,7 +70,7 @@ handleStartSession() in App.tsx
 handleStopSession() in App.tsx
   → window.api.stopSession()
   → [IPC] sessionHandlers.ts: switchOverlayMode('expanded')
-  → [Window destroyed + recreated as 1100×760 centred window]
+  → [Window resized in place to 1100×760 centred via setOverlayMode]
   → setSessionMode('home'), setOverlayMode('expanded')
   → sessionStore.clearConversation()
 ```
@@ -76,7 +82,7 @@ handleStopSession() in App.tsx
 handleRestoreOverlay() in App.tsx
   → window.api.restoreOverlay()
   → [IPC] overlayHandlers.ts: switchOverlayMode('expanded')
-  → [Window recreated as 1100×760]
+  → [Window resized in place to 1100×760]
   → setOverlayMode('expanded')
 ```
 
@@ -87,7 +93,7 @@ handleRestoreOverlay() in App.tsx
 handleMinimizeOverlay() in App.tsx
   → window.api.minimizeOverlay()
   → [IPC] overlayHandlers.ts: setMinimizedVariant('compact'), switchOverlayMode('minimized')
-  → [Window recreated as 320×88 compact]
+  → [Window resized in place to 380×64 compact]
   → setOverlayMode('minimized'), setMinimizedVariant('compact')
 ```
 
@@ -102,7 +108,7 @@ handleSetMinimizedVariant(variant) in App.tsx
   → setOverlayMode('minimized'), setMinimizedVariant(variant)
 ```
 
-> Here the mode stays `minimized` so `switchOverlayMode` only calls `setOverlayMode()` on the existing window (resize via `setBounds`) rather than destroying and recreating it.
+> Every transition above calls the same `setOverlayMode(window, mode, variant)` helper on the existing `BrowserWindow`. `switchOverlayMode` only falls back to creating a new window when the main window has been closed or destroyed.
 
 ---
 
@@ -120,7 +126,7 @@ if (sessionMode === 'active' && overlayMode === 'minimized' && variant !== 'comp
   nextVariant = (hasContent && !isComposing) ? 'prompt-response' : 'prompt-input'
 ```
 
-So when the model finishes streaming and there's a response, the pill automatically grows from `prompt-input` (120px tall) to `prompt-response` (420px tall) without any explicit user action.
+So when the model finishes streaming and there's a response, the pill automatically grows from `prompt-input` (115px tall) to `prompt-response` (360px tall) without any explicit user action.
 
 Voice turns add one extra rule in `App.tsx`: if the overlay is currently `compact` and a voice turn is actually submitted, the renderer immediately promotes the minimized window to `prompt-response` before the sidecar request is sent. That makes the loading state and streamed tokens visible during hands-free use instead of leaving the response hidden inside the compact pill.
 

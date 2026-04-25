@@ -24,11 +24,12 @@ The renderer is isolated for security — it has no direct access to the filesys
 
 ```
 handleSubmitPrompt(text)
-  → sessionStore.beginPromptSubmission(text)   // adds user message + empty assistant bubble
-  → window.api.submitSessionPrompt({ text, presetId })
+  → const messageId = crypto.randomUUID()              // renderer owns the id
+  → sessionStore.beginPromptSubmission({ messageId, prompt: text })
+  → window.api.submitSessionPrompt({ messageId, text, presetId })
 ```
 
-`beginPromptSubmission` immediately creates **two** messages in the store: the user's message (visible right away) and an empty assistant message with a freshly-generated UUID stored as `activeAssistantMessageId`. This placeholder fills in as tokens arrive.
+`beginPromptSubmission` immediately creates **two** messages in the store: the user's message (with the caller-supplied `messageId`) and an empty assistant message with a freshly-generated UUID stored as `activeAssistantMessageId`. The placeholder fills in as tokens arrive; the user message id is reused later to attach the saved screenshot path via `setUserMessageImagePath`.
 
 ### 2. Cross the context bridge (Preload — `src/preload/index.ts`)
 
@@ -38,21 +39,22 @@ handleSubmitPrompt(text)
 ipcRenderer.invoke('session:submit-prompt', request)
 ```
 
-`invoke` is async (unlike `send`). It returns a `Promise` that resolves when the main process handler returns.
+`invoke` is async (unlike `send`). It returns a `Promise<SessionPromptResponse>` that resolves when the main process handler returns.
 
 ### 3. Main process handles the IPC call (`src/main/ipc/sessionHandlers.ts`)
 
 ```
-ipcMain.handle('session:submit-prompt', async (_event, request) => {
-  1. captureForegroundWindow()           → takes a screenshot right now
-  2. mainWindow.webContents.send('frame:captured', frame)   → updates the preview
-  3. sessionPersistence.recordUserPrompt(...)               → writes to disk
-  4. sendToSidecar({ image, text, preset_id })              → fires over WebSocket
+ipcMain.handle('session:submit-prompt', async (_event, rawRequest) => {
+  1. sessionPromptRequestSchema.parse(rawRequest)                    → Zod validation
+  2. captureForegroundWindow()                                       → takes a screenshot right now
+  3. mainWindow.webContents.send('frame:captured', frame)            → updates the preview
+  4. imagePath = sessionPersistence.recordUserPrompt(...)            → persists the user turn + screenshot to disk
+  5. sendToSidecar({ image, text, preset_id, audio? })               → fires over WebSocket
+  6. return { imagePath, messageId }                                 → renderer stores the path on the user message
 })
-// handler returns → the Promise in the renderer resolves
 ```
 
-The screenshot is taken at the moment of submission, not when the user clicked "Capture". This guarantees the image is always current.
+The screenshot is taken at the moment of submission, not when the user clicked "Capture". This guarantees the image is always current. The `audio` blob is only attached on voice turns (where the renderer records a WAV from the VAD pipeline and passes it through alongside the fixed `VOICE_TURN_TEXT`).
 
 ### 4. WebSocket sends the message (`src/main/sidecar/wsClient.ts`)
 
@@ -81,11 +83,13 @@ await ws.send_json({"type": "token", "text": chunk})
 When the stream ends, the sidecar may optionally emit server-side TTS messages before the final `done`:
 
 ```python
-await ws.send_json({"type": "audio_start", "sample_rate": 24000, "sentence_count": 3})
+await ws.send_json({"type": "audio_start", "sample_rate": 24000})
 await ws.send_json({"type": "audio_chunk", "audio": "...", "index": 0})
 await ws.send_json({"type": "audio_end", "tts_time": 0.72})
 await ws.send_json({"type": "done"})
 ```
+
+The bridge defaults `sentence_count` to `0` on the renderer side when the sidecar doesn't include it.
 
 ---
 
@@ -104,20 +108,24 @@ switch (message.type) {
     mainWindow.webContents.send('sidecar:token', { text: message.text })
     break
   case 'audio_start':
-    mainWindow.webContents.send('sidecar:audio_start', { sampleRate: 24000, sentenceCount: 3 })
+    mainWindow.webContents.send('sidecar:audio_start', {
+      sampleRate: message.sample_rate ?? 24_000,
+      sentenceCount: message.sentence_count ?? 0,
+    })
     break
   case 'audio_chunk':
-    mainWindow.webContents.send('sidecar:audio_chunk', { audio: '...', index: 0 })
+    mainWindow.webContents.send('sidecar:audio_chunk', { audio: message.audio, index: message.index })
     break
   case 'audio_end':
-    mainWindow.webContents.send('sidecar:audio_end', { ttsTime: 0.72 })
+    mainWindow.webContents.send('sidecar:audio_end', { ttsTime: message.tts_time ?? 0 })
     break
   case 'done':
     sessionPersistence.finishAssistantResponse()
     mainWindow.webContents.send('sidecar:done')
     break
   case 'error':
-    mainWindow.webContents.send('sidecar:error', { message: ... })
+    sessionPersistence.failAssistantResponse(message.message)
+    mainWindow.webContents.send('sidecar:error', { message: message.message })
     break
 }
 ```
@@ -156,15 +164,17 @@ When `done` arrives, `finishAssistantResponse()` sets `isSubmitting: false` and 
 ```
 [Renderer]                  [Main process]              [Sidecar]
 handleSubmitPrompt()
-  beginPromptSubmission()   (adds placeholder bubble)
-  window.api                
+  messageId = randomUUID()
+  beginPromptSubmission({messageId,prompt})   (adds placeholder bubble)
+  window.api
   .submitSessionPrompt() ── ipcRenderer.invoke ────────→ ipcMain.handle
-                                                           captureForeground()
+                                                           captureForegroundWindow()
+                                                           recordUserPrompt() → disk
                                                            sendToSidecar() ────→ ws.send()
                                                                                   handle_turn()
                                                                                   ↓ tokens
                           ←─ webContents.send ──────────── sidecarBridge        ←─ ws.on('message')
-  onSidecarToken fires
+  onSidecarToken fires                                     appendAssistantToken() → disk
   appendAssistantText()
   [React re-renders]
                           ←─ webContents.send('audio_start') sidecarBridge      ←─ {"type":"audio_start",...}
@@ -172,9 +182,12 @@ handleSubmitPrompt()
                           ←─ webContents.send('audio_chunk') sidecarBridge      ←─ {"type":"audio_chunk",...}
                           ←─ webContents.send('audio_end') ─ sidecarBridge      ←─ {"type":"audio_end",...}
                           ←─ webContents.send('done') ────── sidecarBridge      ←─ {"type":"done"}
+                                                             finishAssistantResponse() → disk
   onSidecarDone fires
   finishAssistantResponse()
   [isSubmitting = false]
+← Promise resolves with {imagePath, messageId}
+  setUserMessageImagePath()  (attaches the saved screenshot to the user bubble)
 ```
 
 ---
@@ -188,4 +201,4 @@ Notice that submitting a prompt and receiving the response use **different IPC m
 | Renderer → Main (submit) | `ipcRenderer.invoke` / `ipcMain.handle` | Request/response — renderer awaits confirmation that the message was sent |
 | Main → Renderer (tokens) | `webContents.send` / `ipcRenderer.on` | Push events — main fires at any time without a pending request |
 
-The `invoke` returns as soon as `sendToSidecar()` is called — **not** when the model finishes. Tokens flow back independently over the push channel while the `invoke` Promise has already resolved.
+The `invoke` returns as soon as `sendToSidecar()` has been called and the user turn has been persisted — **not** when the model finishes. Tokens flow back independently over the push channel while the `invoke` Promise has already resolved with `{ imagePath, messageId }`.

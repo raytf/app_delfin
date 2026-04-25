@@ -6,28 +6,38 @@ The renderer has two kinds of state:
 
 | State | Held in | Persisted? |
 |---|---|---|
-| Conversation messages, submission status, session history, speech-listening preference | `sessionStore` (Zustand) | ✅ localStorage (survives hot reload) |
+| Conversation messages, submission status, session history, speech-listening preference, minimized-response anchor, session start time | `sessionStore` (Zustand) | ✅ localStorage (survives hot reload) |
+| User name | `settingsStore` (Zustand) | ✅ localStorage (`screen-copilot-settings`) |
 | Session mode, overlay mode, window variant | `useState` in `App.tsx` | ❌ initialised from main process on mount |
 | Sidecar connection status, capture source label | `useState` in `App.tsx` | ❌ ephemeral |
 
-> **Note**: `captureStore` and `settingsStore` are currently stubs (`{}`). All real state lives in either `sessionStore` or `App.tsx` local state.
+> **Note**: `captureStore` is still a stub (`{}`). All capture-related data flows through `frame:captured` IPC into `App.tsx` local state rather than a dedicated store.
 
 ---
 
-## sessionStore — The Only Real Store
+## sessionStore — The Main Store
 
 `sessionStore` (`src/renderer/stores/sessionStore.ts`) manages the conversation. Its key fields:
 
 ```
-messages[]                 — the full chat history (user + assistant bubbles)
-isSubmitting               — true while waiting for a response
-errorMessage               — set when something goes wrong
-activeAssistantMessageId   — ID of the assistant bubble currently being filled
-sessionHistory[]           — list of past sessions (shown on HomeScreen)
-vadListeningEnabled        — persisted manual on/off switch for VAD listening
+messages[]                      — the full chat history (user + assistant bubbles)
+isSubmitting                    — true while waiting for a response
+errorMessage                    — set when something goes wrong
+activeAssistantMessageId        — ID of the assistant bubble currently being filled
+sessionHistory[]                — list of past sessions (shown on HomeScreen)
+vadListeningEnabled             — persisted manual on/off switch for VAD listening
+minimizedResponseMessageId      — id of the assistant message the minimized overlay is
+                                  currently displaying (lets the response bubble persist
+                                  across minimize/restore transitions)
+sessionStartTime                — epoch ms when the current session started; drives the
+                                  "Session time: MM:SS" chip in the expanded view
 ```
 
 It uses `zustand/middleware persist` to write to `localStorage` under the key `'delfin-active-session'`. This means conversation state survives a hot-module-replacement reload during development.
+
+## settingsStore — The User Name Store
+
+`settingsStore` (`src/renderer/stores/settingsStore.ts`) persists a single field — `userName` — under the `localStorage` key `'screen-copilot-settings'`. The name is collected on first run by `HomeScreen` and used to personalise the greeting. There is no other user-facing setting today.
 
 `App.tsx` reads `vadListeningEnabled` and synchronises it to the live `useVAD()` instance with `toggleMute()`, so the MicVAD runtime stays mounted while speech detection is paused/resumed from the UI.
 
@@ -35,12 +45,12 @@ It uses `zustand/middleware persist` to write to `localStorage` under the key `'
 
 ## The Assistant Placeholder Pattern
 
-When a prompt is submitted, `beginPromptSubmission(text)` creates **both** messages at once before any response arrives:
+When a prompt is submitted, `beginPromptSubmission({ messageId, prompt })` creates **both** messages at once before any response arrives. The caller (`App.tsx`) generates the user-message id with `crypto.randomUUID()` and passes it in so it can reattach the saved screenshot path when the IPC promise resolves:
 
 ```
 messages before submit:   [user_msg_1, assistant_msg_1]
-                                              ↑
-                                    content: ""   ← empty placeholder
+                              ↑              ↑
+                    id: messageId   content: ""   ← empty placeholder
                                     id: "abc-123" ← stored as activeAssistantMessageId
 ```
 
@@ -70,9 +80,15 @@ useEffect(() => {
     setCaptureSourceLabel(frame.sourceLabel)     // local useState
   })
 
+  window.api.onOverlayError((data) => { /* log IPC errors from overlay handlers */ })
+
   window.api.onSidecarToken((data) => {
     appendAssistantText(data.text)               // sessionStore action
   })
+
+  window.api.onSidecarAudioStart((data) => { /* open AudioContext, buffer resume */ })
+  window.api.onSidecarAudioChunk((data) => { /* decode base64 PCM → queue buffer */ })
+  window.api.onSidecarAudioEnd((data) => { /* drain queue, schedule playback-complete */ })
 
   window.api.onSidecarDone(() => {
     finishAssistantResponse()                    // sessionStore action
@@ -87,17 +103,22 @@ useEffect(() => {
   })
 
   return () => {
-    // Cleanup on unmount — critical to prevent duplicate listeners on hot-reload
-    window.api.removeAllListeners('sidecar:token')
-    window.api.removeAllListeners('sidecar:done')
-    window.api.removeAllListeners('sidecar:error')
-    window.api.removeAllListeners('sidecar:status')
-    window.api.removeAllListeners('frame:captured')
+    // Cleanup on unmount — critical to prevent duplicate listeners on hot-reload.
+    // One removeAllListeners() per channel registered above.
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR)
+    window.api.removeAllListeners(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS)
   }
-}, [appendAssistantText, failAssistantResponse, finishAssistantResponse])
+}, [appendAssistantText, failAssistantResponse, finishAssistantResponse, /* ... */])
 ```
 
-The cleanup matters: without it, every hot-reload would add another set of listeners, causing tokens to be appended multiple times per event.
+The cleanup matters: without it, every hot-reload would add another set of listeners, causing tokens to be appended multiple times per event. Every channel passed to `window.api.on*` must have a matching `removeAllListeners` in the cleanup.
 
 ---
 

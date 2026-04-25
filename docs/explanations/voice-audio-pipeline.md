@@ -114,13 +114,17 @@ Silero running locally via WASM is the only option that is simultaneously **priv
 
 ### What happens on speech end
 
-When the VAD fires `onSpeechEnd`, the `useVAD` hook in `src/renderer/hooks/useVAD.ts` receives a raw `Float32Array` of all accumulated audio samples at 16 kHz. The hook:
+When the VAD fires `onSpeechEnd`, the `useVAD` hook in `src/renderer/hooks/useVAD.ts` receives a raw `Float32Array` of all accumulated audio samples at 16 kHz. The hook converts the float samples into a proper **WAV file** (RIFF header + 16-bit mono PCM) encoded as base64 using `float32ToWavBase64()` in `src/renderer/utils/audioUtils.ts`, then invokes the `onSpeechEnd(wavBase64)` callback passed in by `App.tsx`.
 
-1. Converts the float samples → a proper **WAV file** (RIFF header + 16-bit mono PCM) encoded as a base64 string using `float32ToWavBase64()` in `src/renderer/utils/audioUtils.ts`
-2. Takes a screenshot of the foreground window at the same moment
-3. Calls `window.api.submitSessionPrompt({ text: VOICE_TURN_TEXT, audio: wavBase64 })` — the text field is always the fixed string `"Please respond to what the user just asked."` so the model knows it has audio to process
+`App.tsx` is the caller that turns that WAV into a sidecar turn:
 
-> **Why a fixed text string?** The `sessionHandlers.ts` IPC handler has an empty-text guard that rejects blank prompts. The fixed string satisfies that guard and also gives the model a clear instruction about its role when it receives an audio blob.
+1. Generates a fresh user-message id with `crypto.randomUUID()` and calls `beginVoiceTurn({ messageId })` on `sessionStore` to add the placeholder user + assistant bubbles.
+2. Calls `window.api.submitSessionPrompt({ messageId, text: VOICE_TURN_TEXT, presetId: 'lecture-slide', audio: wavBase64 })`.
+3. The main-process IPC handler (`sessionHandlers.ts`) then calls `captureForegroundWindow()` to take the screenshot, persists the user turn to disk via `recordUserPrompt`, and forwards everything to the sidecar over the WebSocket.
+
+> **Why a fixed text string?** The `sessionHandlers.ts` IPC handler has an empty-text guard that rejects blank prompts when no `audio` blob is present. `VOICE_TURN_TEXT` (`"Please respond to what the user just asked."` — see `src/shared/constants.ts`) always sits in the `text` field for voice turns so the model knows its role even though the real utterance is in the audio blob.
+
+> **The screenshot is taken in the main process, not the renderer.** The renderer hook never touches `desktopCapturer`; it is the IPC handler in `src/main/ipc/sessionHandlers.ts` that calls `captureForegroundWindow()` at submission time.
 
 ---
 
@@ -157,11 +161,13 @@ full_text → split into sentences → for each sentence:
 The message sequence over WebSocket looks like:
 
 ```
-{"type": "audio_start"}
-{"type": "audio_chunk", "audio": "..."}   ← sentence 1
-{"type": "audio_chunk", "audio": "..."}   ← sentence 2
-{"type": "audio_end"}
+{"type": "audio_start", "sample_rate": 24000}
+{"type": "audio_chunk", "audio": "...", "index": 0}   ← sentence 1
+{"type": "audio_chunk", "audio": "...", "index": 1}   ← sentence 2
+{"type": "audio_end", "tts_time": 0.72}
 ```
+
+(`audio_start` carries only `sample_rate` — the sidecar does not send `sentence_count`; the renderer bridge defaults it to `0` when absent.)
 
 **Sentence-by-sentence streaming** means the first sentence starts playing before the last one is even synthesised — low perceived latency.
 
@@ -199,16 +205,17 @@ base64 string → Uint8Array → Int16Array → Float32Array (÷ 32768) → Audi
 
 "Barge-in" is when the user speaks while the AI is still talking. Without protection, the mic would pick up the AI's own voice and trigger a feedback loop.
 
-Two guards are in place inside the `useVAD` hook:
+Three guards are in place, split between `useVAD` and `App.tsx`:
 
-1. **Threshold raise** — While `isAudioPlaying` is `true`, Silero's positive-speech threshold is raised from `0.50` → `0.92`. The AI's voice played through speakers is quieter and less consistent than direct microphone speech, so it scores below 0.92 and gets ignored.
+1. **VAD muting (App.tsx)** — While the assistant is responding (`isSubmitting`, streaming tokens, playing server-side audio, or using the Web Speech fallback), `App.tsx` calls `toggleMute()` on the VAD. The Silero worklet stays mounted but stops emitting frames, so the mic is effectively off while the AI speaks.
 
-2. **Grace period** — For 800 ms after `audio_start`, any `onSpeechStart` events are silently dropped. This covers the brief moment before the threshold raise takes effect.
+2. **Threshold raise (useVAD)** — When `raiseThreshold()` is called, Silero's positive-speech threshold moves from `0.50` → `0.92` (and negative from `0.35` → `0.77`). If muting is ever bypassed, the AI's voice played through speakers is quieter and less consistent than direct microphone speech, so it scores below 0.92 and gets ignored.
 
-When the user genuinely interrupts:
-- `onSpeechStart` fires (threshold crossed)
-- The renderer immediately stops the `AudioContext` (cutting off playback)
-- `window.api.sidecarInterrupt()` is called → sends `{"type": "interrupt"}` over WebSocket → the sidecar's `interrupted` event is set → the inference loop and TTS loop both break on the next iteration
+3. **Grace period (useVAD)** — For 800 ms after `raiseThreshold()` fires, any `onSpeechStart` events are silently dropped. This covers the brief moment before the threshold raise takes effect on the audio worklet.
+
+Voice turns themselves do **not** send an `{"type":"interrupt"}` to the sidecar. The `onSpeechStart` handler in `App.tsx` simply returns early when the assistant is already responding, and `onSpeechEnd` only submits a new turn once the previous response has finished. `sidecarInterrupt()` is reserved for two explicit cases:
+- The user ends the session (stop button), and
+- The user submits a **text** prompt while audio playback is still running — the new prompt interrupts the old response before the fresh turn is sent.
 
 ---
 
@@ -217,20 +224,23 @@ When the user genuinely interrupts:
 ```
 [Renderer]                    [Electron Main]             [Sidecar]
 useVAD (Silero WASM)
-  onSpeechEnd →
-    float32ToWavBase64()
-    submitSessionPrompt() ──── SESSION_SUBMIT_PROMPT ────→ handle_turn()
-                                captureForegroundWindow()    ↓ token stream
-                          ←── sidecar:token ─────────────── {"type":"token"}
-    appendAssistantText()                                    ↓ TTS start
-                          ←── sidecar:audio_start ───────── {"type":"audio_start","sample_rate":24000,...}
-                          ←── sidecar:audio_chunk ───────── {"type":"audio_chunk","index":0,...}
+  onSpeechEnd(wavBase64) →
+    App.tsx beginVoiceTurn({messageId})
+    submitSessionPrompt({messageId, text:VOICE_TURN_TEXT, audio}) ── SESSION_SUBMIT_PROMPT ──→
+                                captureForegroundWindow()
+                                recordUserPrompt() → disk
+                                sendToSidecar() ────────────────────→ handle_turn()
+                                                                       ↓ token stream
+                          ←── sidecar:token ─────────────────────────── {"type":"token"}
+    appendAssistantText()                                              ↓ TTS start
+                          ←── sidecar:audio_start ───────────────────── {"type":"audio_start","sample_rate":24000}
+                          ←── sidecar:audio_chunk ───────────────────── {"type":"audio_chunk","index":0,...}
     decodeAudioChunk()
     AudioContext.play()
-                          ←── sidecar:audio_end ─────────── {"type":"audio_end","tts_time":0.72}
-                          ←── sidecar:done ──────────────── {"type":"done"}
+                          ←── sidecar:audio_end ─────────────────────── {"type":"audio_end","tts_time":0.72}
+                          ←── sidecar:done ──────────────────────────── {"type":"done"}
     finishAssistantResponse()
-    [user barges in]
+    [user submits a text prompt mid-playback]
     AudioContext.stop()
-    sidecarInterrupt() ─────── sidecar:interrupt ─────────→ interrupted.set()
+    sidecarInterrupt() ──── sidecar:interrupt ──────────────────────── interrupted.set()
 ```
