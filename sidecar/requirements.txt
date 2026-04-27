@@ -1,4 +1,5 @@
 fastapi[standard]
+pydantic
 uvicorn[standard]
 litert-lm-api-nightly
 pillow

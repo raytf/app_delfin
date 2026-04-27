@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sidecar.app.session.domain.services.session_message_impl import SessionMessageImpl
+from sidecar.app.session.repositories.file_session_repository import FileSessionRepository
 from sidecar.application.services.turn_service import TurnService
 from sidecar.config import SidecarConfig
 from sidecar.http.state import AppState, set_app_state
@@ -33,6 +36,9 @@ def create_app(config: SidecarConfig) -> FastAPI:
         if config.tts.enabled:
             state.tts_provider = TTSPipeline(config)
 
+        session_storage_root = Path(__file__).resolve().parents[1] / "data" / "sessions"
+        state.session_repository = FileSessionRepository(session_storage_root)
+        state.session_service = SessionMessageImpl(state.session_repository)
         state.turn_service = TurnService(tts_provider=state.tts_provider)
         set_app_state(state)
         yield
