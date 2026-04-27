@@ -2,12 +2,9 @@
 
 import base64
 import io
-import os
-
-from dotenv import load_dotenv
 from PIL import Image
 
-load_dotenv()
+from sidecar.config import load_config
 
 
 def resize_image_blob(b64_str: str) -> str:
@@ -26,7 +23,7 @@ def resize_image_blob(b64_str: str) -> str:
     Returns:
         Base64-encoded JPEG string.
     """
-    max_width = int(os.environ.get("MAX_IMAGE_WIDTH", "512"))
+    max_width = load_config().inference.max_image_width
 
     image_bytes = base64.b64decode(b64_str)
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
