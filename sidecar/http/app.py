@@ -9,14 +9,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from sidecar.app.session.domain.services.session_message_impl import SessionMessageImpl
+from sidecar.app.session.domain.services.session_service_impl import SessionServiceImpl
 from sidecar.app.session.repositories.file_session_repository import FileSessionRepository
 from sidecar.application.services.turn_service import TurnService
 from sidecar.config import SidecarConfig
+from sidecar.http.exception_handlers import register_exception_handlers
 from sidecar.http.state import AppState, set_app_state
 from sidecar.inference.litert_engine import LiteRTInferenceRuntime
 from sidecar.tts.pipeline import TTSPipeline
-
+from sidecar.http.routes import configure_routes
 
 def create_app(config: SidecarConfig) -> FastAPI:
     """Create the FastAPI application."""
@@ -38,7 +39,7 @@ def create_app(config: SidecarConfig) -> FastAPI:
 
         session_storage_root = Path(__file__).resolve().parents[1] / "data" / "sessions"
         state.session_repository = FileSessionRepository(session_storage_root)
-        state.session_service = SessionMessageImpl(state.session_repository)
+        state.session_service = SessionServiceImpl(state.session_repository)
         state.turn_service = TurnService(tts_provider=state.tts_provider)
         set_app_state(state)
         yield
@@ -51,7 +52,6 @@ def create_app(config: SidecarConfig) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    from sidecar.http.routes import configure_routes
-
+    register_exception_handlers(app)
     configure_routes(app)
     return app

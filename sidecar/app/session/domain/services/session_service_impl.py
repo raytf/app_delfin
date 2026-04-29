@@ -9,10 +9,10 @@ from sidecar.app.session.domain.abstractions.session_service import SessionServi
 from sidecar.app.session.domain.dtos.create_session_dto import CreateSessionDto
 from sidecar.app.session.domain.dtos.update_session_dto import UpdateSessionDto
 from sidecar.app.session.domain.entities.session_entity import SessionEntity
-from sidecar.app.session.domain.exceptions.session_not_found_error import SessionNotFoundError
+from sidecar.shared.exceptions import NotFoundException
 
 
-class SessionMessageImpl(SessionService):
+class SessionServiceImpl(SessionService):
     """Default session service backed by a session repository."""
 
     def __init__(self, session_repository: SessionRepository) -> None:
@@ -25,7 +25,7 @@ class SessionMessageImpl(SessionService):
     async def get_one_by_id(self, session_id: str) -> SessionEntity:
         session_entity = await self._session_repository.get_one_by_id(session_id)
         if session_entity is None:
-            raise SessionNotFoundError(f"Session not found: {session_id}")
+            raise NotFoundException(f"Session not found: {session_id}")
         return session_entity
 
     async def get(self) -> list[SessionEntity]:
@@ -38,7 +38,7 @@ class SessionMessageImpl(SessionService):
 
         updated_session = await self._session_repository.update_by_id(session_id, existing_session)
         if updated_session is None:
-            raise SessionNotFoundError(f"Session not found: {session_id}")
+            raise NotFoundException(f"Session not found: {session_id}")
         return updated_session
 
     async def end_by_id(self, session_id: str) -> SessionEntity:
@@ -50,7 +50,7 @@ class SessionMessageImpl(SessionService):
 
         updated_session = await self._session_repository.update_by_id(session_id, existing_session)
         if updated_session is None:
-            raise SessionNotFoundError(f"Session not found: {session_id}")
+            raise NotFoundException(f"Session not found: {session_id}")
         return updated_session
 
     async def delete_by_id(self, session_id: str) -> None:
