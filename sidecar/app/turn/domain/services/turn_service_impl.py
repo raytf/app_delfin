@@ -12,11 +12,11 @@ from sidecar.app.session.domain.abstractions.session_conversation_manager import
 from sidecar.app.turn.domain.abstractions.turn_service import TurnService
 from sidecar.app.turn.domain.abstractions.turn_streamer import TurnStreamer
 from sidecar.app.turn.domain.dtos.turn_dtos import TurnRequestDto
-from sidecar.application.services.tts_stream_service import (
+from sidecar.shared.utils.tts import (
     drain_complete_tts_sentences,
     normalize_tts_text,
 )
-from sidecar.inference.preprocess import resize_image_blob
+from sidecar.shared.utils.preprocess import resize_image_blob
 from sidecar.tts.interfaces import TTSProvider
 
 logger = logging.getLogger(__name__)

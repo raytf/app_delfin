@@ -6,9 +6,10 @@ from dataclasses import dataclass
 
 from sidecar.app.session.domain.abstractions.session_repository import SessionRepository
 from sidecar.app.session.domain.abstractions.session_service import SessionService
-from sidecar.application.services.turn_service import TurnService
+from sidecar.app.turn.domain.abstractions.inference_engine import InferenceEngine
+from sidecar.app.turn.domain.abstractions.inference_runtime import InferenceRuntime
+from sidecar.app.turn.domain.abstractions.turn_service import TurnService
 from sidecar.config import SidecarConfig
-from sidecar.inference.litert_engine import LiteRTInferenceRuntime
 from sidecar.tts.pipeline import TTSPipeline
 
 
@@ -17,11 +18,11 @@ class AppState:
     """Shared runtime state for the sidecar app."""
 
     config: SidecarConfig
-    engine: object | None = None
+    engine: InferenceEngine | None = None
     active_backend: str = "CPU"
     tts_provider: TTSPipeline | None = None
     turn_service: TurnService | None = None
-    inference_runtime: LiteRTInferenceRuntime | None = None
+    inference_runtime: InferenceRuntime | None = None
     session_repository: SessionRepository | None = None
     session_service: SessionService | None = None
 

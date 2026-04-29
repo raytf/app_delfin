@@ -9,15 +9,19 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from sidecar.app.session.domain.services.session_service_impl import SessionServiceImpl
+from sidecar.app.session.infrastructure.in_memory_session_conversation_manager import (
+    InMemorySessionConversationManager,
+)
 from sidecar.app.session.repositories.file_session_repository import FileSessionRepository
-from sidecar.application.services.turn_service import TurnService
+from sidecar.app.session.domain.services.session_service_impl import SessionServiceImpl
+from sidecar.app.turn.domain.services.turn_service_impl import TurnServiceImpl
+from sidecar.app.turn.infrastructure.litert_inference_runtime import LiteRTInferenceRuntime
 from sidecar.config import SidecarConfig
 from sidecar.http.exception_handlers import register_exception_handlers
 from sidecar.http.state import AppState, set_app_state
-from sidecar.inference.litert_engine import LiteRTInferenceRuntime
-from sidecar.tts.pipeline import TTSPipeline
 from sidecar.http.routes import configure_routes
+from sidecar.tts.pipeline import TTSPipeline
+
 
 def create_app(config: SidecarConfig) -> FastAPI:
     """Create the FastAPI application."""
@@ -39,8 +43,15 @@ def create_app(config: SidecarConfig) -> FastAPI:
 
         session_storage_root = Path(__file__).resolve().parents[1] / "data" / "sessions"
         state.session_repository = FileSessionRepository(session_storage_root)
-        state.session_service = SessionServiceImpl(state.session_repository)
-        state.turn_service = TurnService(tts_provider=state.tts_provider)
+        session_conversation_manager = InMemorySessionConversationManager(state.engine)
+        state.session_service = SessionServiceImpl(
+            session_repository=state.session_repository,
+            session_conversation_manager=session_conversation_manager,
+        )
+        state.turn_service = TurnServiceImpl(
+            session_conversation_manager=session_conversation_manager,
+            tts_provider=state.tts_provider,
+        )
         set_app_state(state)
         yield
         runtime.close()

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from sidecar.app.session.domain.abstractions.session_conversation_manager import SessionConversationManager
 from sidecar.app.turn.domain.abstractions.inference_engine import InferenceEngine
 from sidecar.app.turn.domain.abstractions.turn_conversation import TurnConversation
-from sidecar.inference.prompts.presets import PRESETS
+from sidecar.shared.prompts.presets import PRESETS
 from sidecar.shared.exceptions import NotFoundException
 
 

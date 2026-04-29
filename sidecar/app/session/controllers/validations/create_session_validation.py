@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from sidecar.inference.prompts.presets import PRESETS
+from sidecar.shared.prompts.presets import PRESETS
 
 
 class CreateSessionValidation(BaseModel):
