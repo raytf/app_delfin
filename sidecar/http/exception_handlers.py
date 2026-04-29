@@ -16,6 +16,7 @@ from sidecar.shared.exceptions import (
     NotFoundException,
     UnauthorizedException,
 )
+from sidecar.shared.http_responses import HttpErrorResponse, HttpResponseError
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -47,12 +48,14 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 def _build_error_body(status_code: int, display_message: str, log_message: object | None) -> dict[str, object]:
-    return {
-        "data": None,
-        "statusCode": status_code,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "error": {"logMessage": log_message, "displayMessage": display_message},
-    }
+    return HttpErrorResponse(
+        statusCode=status_code,
+        timestamp=datetime.now(timezone.utc),
+        error=HttpResponseError(
+            logMessage=log_message,
+            displayMessage=display_message,
+        ),
+    ).model_dump(mode="json")
 
 
 def _get_http_exception_message(exception: HTTPException) -> str:
