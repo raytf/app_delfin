@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from sidecar.app.turn.domain.abstractions.inference_engine import InferenceEngine
+
 
 class InferenceRuntime(ABC):
     """Lifecycle contract for inference runtime implementations."""
 
     @abstractmethod
-    def load(self) -> tuple[object, str]:
+    def load(self) -> tuple[InferenceEngine, str]:
         """Load the runtime and return the engine plus active backend."""
         raise NotImplementedError
 

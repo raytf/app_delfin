@@ -14,6 +14,7 @@ class SessionResponse(BaseModel):
 
     id: str
     name: str
+    preset_id: str
     started_at: datetime
     ended_at: datetime | None
     status: str

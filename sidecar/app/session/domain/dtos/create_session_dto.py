@@ -8,3 +8,4 @@ from dataclasses import dataclass
 @dataclass
 class CreateSessionDto:
     session_name: str
+    preset_id: str

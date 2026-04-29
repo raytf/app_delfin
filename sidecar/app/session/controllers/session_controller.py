@@ -20,7 +20,12 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 async def create_session(request_body: CreateSessionValidation) -> HttpSuccessResponse[SessionResponse]:
     """Create a new session."""
     session_service = _get_session_service()
-    session = await session_service.create(CreateSessionDto(session_name=request_body.session_name))
+    session = await session_service.create(
+        CreateSessionDto(
+            session_name=request_body.session_name,
+            preset_id=request_body.preset_id,
+        )
+    )
     return build_success_response(session)
 
 

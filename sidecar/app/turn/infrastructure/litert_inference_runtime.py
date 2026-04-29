@@ -7,6 +7,7 @@ import logging
 from huggingface_hub import hf_hub_download
 import litert_lm
 
+from sidecar.app.turn.domain.abstractions.inference_engine import InferenceEngine
 from sidecar.app.turn.domain.abstractions.inference_runtime import InferenceRuntime
 from sidecar.config import SidecarConfig
 
@@ -21,7 +22,7 @@ class LiteRTInferenceRuntime(InferenceRuntime):
         self.engine: litert_lm.Engine | None = None
         self.active_backend = "CPU"
 
-    def load(self) -> tuple[object, str]:
+    def load(self) -> tuple[InferenceEngine, str]:
         """Download and load the LiteRT-LM engine."""
         logger.info("Downloading model %s / %s ...", self._config.model.repo, self._config.model.file)
         model_path = hf_hub_download(

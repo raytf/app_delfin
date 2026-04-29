@@ -87,6 +87,7 @@ class FileSessionRepository(SessionRepository):
         return {
             "id": session.id,
             "name": session.name,
+            "preset_id": session.preset_id,
             "started_at": self._serialize_datetime(session.started_at),
             "ended_at": self._serialize_datetime(session.ended_at),
             "status": session.status,
@@ -96,7 +97,10 @@ class FileSessionRepository(SessionRepository):
         }
 
     def _map_record_to_entity(self, session_record: dict[str, Any]) -> SessionEntity:
-        session_entity = SessionEntity(name=str(session_record["name"]))
+        session_entity = SessionEntity(
+            name=str(session_record["name"]),
+            preset_id=str(session_record.get("preset_id", "lecture-slide")),
+        )
         session_entity.id = str(session_record["id"])
         session_entity.started_at = self._deserialize_datetime(session_record["started_at"])
         session_entity.ended_at = self._deserialize_datetime(session_record["ended_at"])
