@@ -3,12 +3,12 @@ import type {
   OverlayMode,
   OverlayState,
 } from '../../shared/types'
-import type { SessionPersistenceService } from '../session/sessionPersistenceService'
+import type { SidecarSessionClient } from '../sidecar/sessionClient'
 
 export interface RegisterIpcHandlersOptions {
   getOverlayState: () => OverlayState
   getMainWindow: () => BrowserWindow | null
-  sessionPersistence: SessionPersistenceService
+  sidecarSessionClient: SidecarSessionClient
   sidecarWsUrl: string
   switchOverlayMode: (mode: OverlayMode) => Promise<void>
 }

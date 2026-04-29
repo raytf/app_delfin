@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
+from sidecar.app.session.controllers.responses.session_detail_response import SessionDetailResponse
+from sidecar.app.session.controllers.responses.session_message_response import SessionMessageResponse
 from sidecar.app.session.controllers.responses.session_response import SessionResponse
 from sidecar.app.session.controllers.validations.create_session_validation import CreateSessionValidation
 from sidecar.app.session.controllers.validations.update_session_validation import UpdateSessionValidation
+from sidecar.app.session.domain.aggregates.session_aggregate import SessionAggregate
 from sidecar.app.session.domain.abstractions.session_service import SessionService
 from sidecar.app.session.domain.dtos.create_session_dto import CreateSessionDto
 from sidecar.app.session.domain.dtos.update_session_dto import UpdateSessionDto
@@ -37,12 +40,12 @@ async def get_sessions() -> HttpSuccessResponse[list[SessionResponse]]:
     return build_success_response(sessions)
 
 
-@router.get("/{session_id}", response_model=HttpSuccessResponse[SessionResponse])
-async def get_session_by_id(session_id: str) -> HttpSuccessResponse[SessionResponse]:
-    """Return a single session."""
+@router.get("/{session_id}", response_model=HttpSuccessResponse[SessionDetailResponse])
+async def get_session_by_id(session_id: str) -> HttpSuccessResponse[SessionDetailResponse]:
+    """Return a single session with its persisted messages."""
     session_service = _get_session_service()
-    session = await session_service.get_one_by_id(session_id)
-    return build_success_response(session)
+    session_aggregate = await session_service.get_one_by_id(session_id)
+    return build_success_response(_map_session_aggregate_to_response(session_aggregate))
 
 
 @router.patch("/{session_id}", response_model=HttpSuccessResponse[SessionResponse])
@@ -81,3 +84,31 @@ def _get_session_service() -> SessionService:
     if session_service is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Session service is not ready.")
     return session_service
+
+
+def _map_session_aggregate_to_response(session_aggregate: SessionAggregate) -> SessionDetailResponse:
+    session = SessionResponse.model_validate(session_aggregate)
+    return SessionDetailResponse(
+        id=session.id,
+        name=session.name,
+        preset_id=session.preset_id,
+        started_at=session.started_at,
+        ended_at=session.ended_at,
+        status=session.status,
+        message_count=session.message_count,
+        updated_at=session.updated_at,
+        messages=[
+            SessionMessageResponse(
+                id=message.id,
+                session_id=message.session_id,
+                author=message.author,
+                content=message.content,
+                timestamp=message.timestamp,
+                image_path=message.image_path,
+                audio_path=message.audio_path,
+                error_message=message.error_message,
+                interrupted=message.interrupted,
+            )
+            for message in session_aggregate.messages
+        ],
+    )

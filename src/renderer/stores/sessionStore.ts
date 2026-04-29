@@ -4,6 +4,7 @@ import { VOICE_TURN_TEXT } from '../../shared/constants'
 import type { ChatMessage, EndedSessionSnapshot, SessionListItem } from '../../shared/types'
 
 interface SessionStoreState {
+  activeSessionId: string | null
   activeSessionName: string | null
   endedSessionSnapshot: EndedSessionSnapshot | null
   errorMessage: string | null
@@ -19,7 +20,7 @@ interface SessionStoreState {
   clearLatestResponse: () => void
   setActiveSessionName: (sessionName: string | null) => void
   setEndedSessionSnapshot: (snapshot: EndedSessionSnapshot | null) => void
-  startSession: () => void
+  startSession: (input: { sessionId: string }) => void
   beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
   beginVoiceTurn: (input: { messageId: string }) => void
   appendAssistantText: (text: string) => void
@@ -28,7 +29,7 @@ interface SessionStoreState {
   removeSessionHistoryItem: (sessionId: string) => void
   setSessionHistory: (sessions: SessionListItem[]) => void
   toggleVadListening: () => void
-  setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
+  setUserMessageMedia: (input: { imageDataUrl: string; messageId: string }) => void
 }
 
 function createMessageId(): string {
@@ -38,6 +39,7 @@ function createMessageId(): string {
 export const useSessionStore = create<SessionStoreState>()(
   persist(
     (set) => ({
+      activeSessionId: null,
       activeSessionName: null,
       endedSessionSnapshot: null,
       errorMessage: null,
@@ -52,6 +54,7 @@ export const useSessionStore = create<SessionStoreState>()(
       clearConversation: () =>
         set((state) => ({
           activeSessionName: state.activeSessionName,
+          activeSessionId: null,
           endedSessionSnapshot: state.endedSessionSnapshot,
           errorMessage: null,
           isSubmitting: false,
@@ -83,9 +86,10 @@ export const useSessionStore = create<SessionStoreState>()(
           endedSessionSnapshot: snapshot,
         }),
 
-      startSession: () =>
+      startSession: (input: { sessionId: string }) =>
         set((state) => ({
           ...state,
+          activeSessionId: input.sessionId,
           sessionStartTime: state.sessionStartTime ?? Date.now(),
         })),
 
@@ -122,7 +126,7 @@ export const useSessionStore = create<SessionStoreState>()(
             role: 'user',
             content: VOICE_TURN_TEXT,
             timestamp: Date.now(),
-            isVoiceTurn: true,
+            audioPath: 'pending',
           }
 
           const assistantMessageId = createMessageId()
@@ -201,13 +205,13 @@ export const useSessionStore = create<SessionStoreState>()(
           vadListeningEnabled: !state.vadListeningEnabled,
         })),
 
-      setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
+      setUserMessageMedia: (input: { imageDataUrl: string; messageId: string }) =>
         set((state) => ({
           messages: state.messages.map((message) =>
             message.id === input.messageId
               ? {
                 ...message,
-                imagePath: input.imagePath,
+                imageDataUrl: input.imageDataUrl,
               }
               : message,
           ),
@@ -217,6 +221,7 @@ export const useSessionStore = create<SessionStoreState>()(
       name: 'delfin-active-session',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        activeSessionId: state.activeSessionId,
         errorMessage: state.errorMessage,
         isSubmitting: state.isSubmitting,
         messages: state.messages,

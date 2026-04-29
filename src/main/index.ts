@@ -14,10 +14,9 @@ import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
-import { SessionPersistenceService } from "./session/sessionPersistenceService";
+import { deriveSidecarHttpBaseUrl, SidecarSessionClient } from "./sidecar/sessionClient";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
 import { validateEnv } from "./envValidation";
-import { FileSessionStorage } from "./storage/fileSessionStorage";
 import {
   MAIN_TO_RENDERER_CHANNELS,
   type OverlayMode,
@@ -31,7 +30,6 @@ app.setName("Delfin");
 
 let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
-let sessionPersistence: SessionPersistenceService | null = null;
 
 function createWindow(mode: OverlayMode): BrowserWindow {
   const window = createOverlayWindow(mode);
@@ -126,14 +124,14 @@ app.whenReady().then(() => {
     },
   );
 
-  sessionPersistence = new SessionPersistenceService(
-    new FileSessionStorage(join(app.getPath("userData"), "storage")),
-  );
+  const sidecarWsUrl = process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws";
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
-    sessionPersistence,
-    sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
+    sidecarSessionClient: new SidecarSessionClient(
+      deriveSidecarHttpBaseUrl(sidecarWsUrl),
+    ),
+    sidecarWsUrl,
     switchOverlayMode,
   });
 

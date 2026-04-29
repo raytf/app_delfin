@@ -1,0 +1,34 @@
+{
+  "id": "70c6a398-829c-4b1d-a3c3-3a4c66531514",
+  "name": "test",
+  "preset_id": "lecture-slide",
+  "started_at": 1777464564.181809,
+  "ended_at": 1777464831.096222,
+  "status": "completed",
+  "message_count": 2,
+  "updated_at": 1777464831.096222,
+  "messages": [
+    {
+      "id": "eec9f6f4-9ee8-425a-957c-fc2290f84a26",
+      "session_id": "70c6a398-829c-4b1d-a3c3-3a4c66531514",
+      "author": "user",
+      "content": "What do you see?",
+      "timestamp": 1777464570935.2761,
+      "image_path": "/Users/pragyan/Desktop/Projects/qut-hackathon/sidecar/data/sessions/_media/70c6a398-829c-4b1d-a3c3-3a4c66531514/eec9f6f4-9ee8-425a-957c-fc2290f84a26.jpg",
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    },
+    {
+      "id": "15d7463e-8ec5-4062-849e-bb5b30f0b0c8",
+      "session_id": "70c6a398-829c-4b1d-a3c3-3a4c66531514",
+      "author": "assistant",
+      "content": "",
+      "timestamp": 1777464570935.2542,
+      "image_path": null,
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    }
+  ]
+}

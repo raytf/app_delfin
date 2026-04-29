@@ -7,8 +7,12 @@ import base64
 import logging
 import time
 from contextlib import suppress
+from dataclasses import replace
+from uuid import uuid4
 
+from sidecar.app.session.domain.abstractions.session_service import SessionService
 from sidecar.app.session.domain.abstractions.session_conversation_manager import SessionConversationManager
+from sidecar.app.session.domain.entities.session_message_entity import SessionMessageEntity
 from sidecar.app.turn.domain.abstractions.turn_service import TurnService
 from sidecar.app.turn.domain.abstractions.turn_streamer import TurnStreamer
 from sidecar.app.turn.domain.dtos.turn_dtos import TurnRequestDto
@@ -18,9 +22,10 @@ from sidecar.shared.utils.tts import (
 )
 from sidecar.shared.utils.preprocess import resize_image_blob
 from sidecar.tts.interfaces import TTSProvider
+from sidecar.shared.utils.date import now_ms
 
 logger = logging.getLogger(__name__)
-
+ASSISTANT_PERSIST_CHARS_THRESHOLD = 48
 
 class TurnServiceImpl(TurnService):
     """Coordinates multimodal inference turns and optional TTS streaming."""
@@ -28,9 +33,11 @@ class TurnServiceImpl(TurnService):
     def __init__(
         self,
         session_conversation_manager: SessionConversationManager,
+        session_service: SessionService,
         tts_provider: TTSProvider | None = None,
     ) -> None:
         self._session_conversation_manager = session_conversation_manager
+        self._session_service = session_service
         self._tts_provider = tts_provider
 
     async def handle_turn(
@@ -49,8 +56,21 @@ class TurnServiceImpl(TurnService):
         tts_sentence_queue: asyncio.Queue[str | None] | None = None
         tts_worker: asyncio.Task[None] | None = None
         turn_t0 = time.monotonic()
+        assistant_message = SessionMessageEntity(
+            id=str(uuid4()),
+            session_id=turn_request.session_id,
+            author="assistant",
+            content="",
+            timestamp=now_ms(),
+        )
+        assistant_persisted_content = ""
 
         try:
+            await self._persist_user_message(turn_request)
+            assistant_message = await self._session_service.create_session_message(
+                turn_request.session_id,
+                assistant_message,
+            )
             loop = asyncio.get_running_loop()
             chunk_queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
             tts_buffer = ""
@@ -98,6 +118,14 @@ class TurnServiceImpl(TurnService):
                     raise item
 
                 await streamer.send_token(item)
+                assistant_message.content += item
+                if len(assistant_message.content) - len(assistant_persisted_content) >= ASSISTANT_PERSIST_CHARS_THRESHOLD:
+                    assistant_message = await self._session_service.replace_message(
+                        turn_request.session_id,
+                        assistant_message.id,
+                        assistant_message,
+                    )
+                    assistant_persisted_content = assistant_message.content
 
                 if tts_sentence_queue is not None:
                     tts_buffer += item
@@ -113,6 +141,13 @@ class TurnServiceImpl(TurnService):
             logger.info("[handle_turn] +%.3fs token loop finished", time.monotonic() - turn_t0)
             await executor_fut
             logger.info("[handle_turn] +%.3fs executor done", time.monotonic() - turn_t0)
+            if assistant_message.content != assistant_persisted_content or interrupted.is_set():
+                assistant_message.interrupted = interrupted.is_set()
+                await self._session_service.replace_message(
+                    turn_request.session_id,
+                    assistant_message.id,
+                    assistant_message,
+                )
 
             if tts_sentence_queue is not None:
                 try:
@@ -140,6 +175,16 @@ class TurnServiceImpl(TurnService):
         except Exception as exc:
             logger.exception("Inference error: %s", exc)
             try:
+                assistant_message.error_message = str(exc)
+                assistant_message.interrupted = interrupted.is_set()
+                await self._session_service.replace_message(
+                    turn_request.session_id,
+                    assistant_message.id,
+                    assistant_message,
+                )
+            except Exception:
+                logger.exception("[handle_turn] failed to persist assistant error state")
+            try:
                 await streamer.send_error(str(exc))
             except Exception:
                 logger.exception("[handle_turn] failed to send error message to client")
@@ -165,6 +210,20 @@ class TurnServiceImpl(TurnService):
             content.append({"type": "text", "text": turn_request.text})
 
         return content
+
+    async def _persist_user_message(self, turn_request: TurnRequestDto) -> None:
+        await self._session_service.create_session_message(
+            turn_request.session_id,
+            SessionMessageEntity(
+                id=str(uuid4()),
+                session_id=turn_request.session_id,
+                author="user",
+                content=turn_request.text or "",
+                timestamp=now_ms(),
+            ),
+            image_base64=turn_request.image_base64,
+            audio_base64=turn_request.audio_base64,
+        )
 
     async def _stream_tts_sentence_queue(
         self,

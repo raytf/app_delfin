@@ -13,6 +13,8 @@ import type {
   SessionPromptRequest,
   SessionPromptResponse,
   SessionStartRequest,
+  SessionStartResponse,
+  SessionStopRequest,
   OverlayMode,
   SessionListItem,
 } from '../shared/types'
@@ -39,9 +41,10 @@ const api: ElectronAPI = {
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.OVERLAY_GET_STATE) as Promise<OverlayState>,
 
   startSession: (request: SessionStartRequest) =>
-    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START, request),
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_START, request) as Promise<SessionStartResponse>,
 
-  stopSession: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP),
+  stopSession: (request: SessionStopRequest) =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, request),
 
   submitSessionPrompt: (request: SessionPromptRequest) =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT, request) as Promise<SessionPromptResponse>,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from sidecar.app.session.domain.dtos.session_message_dto import SessionMessageDto
 from sidecar.app.session.domain.entities.session_entity import SessionEntity
+from sidecar.app.session.domain.entities.session_message_entity import SessionMessageEntity
 
 
 class SessionRepository(ABC):
@@ -37,6 +37,33 @@ class SessionRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def append_message(self, session_id: str, message: SessionMessageDto) -> None:
+    async def create_session_message(self, session_id: str, message: SessionMessageEntity) -> None:
         """Persist a session message."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def replace_session_message(
+        self,
+        session_id: str,
+        message_id: str,
+        message: SessionMessageEntity,
+    ) -> None:
+        """Replace an existing persisted session message."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_session_messages(self, session_id: str) -> list[SessionMessageEntity]:
+        """Return persisted messages for a session."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def persist_media(
+        self,
+        session_id: str,
+        message_id: str,
+        *,
+        image_base64: str | None = None,
+        audio_base64: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Persist optional image/audio blobs and return saved file paths."""
         raise NotImplementedError

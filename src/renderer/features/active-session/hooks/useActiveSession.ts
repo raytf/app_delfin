@@ -82,7 +82,8 @@ export function useActiveSession({
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
-  const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
+  const setUserMessageMedia = useSessionStore((state) => state.setUserMessageMedia)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
@@ -307,16 +308,22 @@ export function useActiveSession({
       clearFallbackSpeechTimer()
       beginVoiceTurn({ messageId })
 
+      if (activeSessionId === null) {
+        failAssistantResponse('Session is not active.')
+        return
+      }
+
       void window.api
         .submitSessionPrompt({
+          sessionId: activeSessionId,
           messageId,
           text: VOICE_TURN_TEXT,
           presetId: 'lecture-slide',
           audio: wavBase64,
         })
         .then((response) => {
-          setUserMessageImagePath({
-            imagePath: response.imagePath,
+          setUserMessageMedia({
+            imageDataUrl: response.imageDataUrl,
             messageId: response.messageId,
           })
         })
@@ -329,7 +336,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 
@@ -781,7 +789,11 @@ export function useActiveSession({
     }
 
     try {
-      await window.api.stopSession()
+      if (activeSessionId === null) {
+        throw new Error('No active session id.')
+      }
+
+      await window.api.stopSession({ sessionId: activeSessionId })
 
       clearConversation()
       onSessionEndCommitted(nextEndedSessionData)
@@ -804,6 +816,7 @@ export function useActiveSession({
     sessionStartTime,
     stopAssistantWaveformLoop,
     stopScheduledAudioSources,
+    activeSessionId,
   ])
 
   const handleSubmitPrompt = useCallback(
@@ -839,14 +852,19 @@ export function useActiveSession({
       })
 
       try {
+        if (activeSessionId === null) {
+          throw new Error('Session is not active.')
+        }
+
         const response = await window.api.submitSessionPrompt({
+          sessionId: activeSessionId,
           messageId,
           text: trimmedText,
           presetId: 'lecture-slide',
         })
 
-        setUserMessageImagePath({
-          imagePath: response.imagePath,
+        setUserMessageMedia({
+          imageDataUrl: response.imageDataUrl,
           messageId: response.messageId,
         })
       } catch (error) {
@@ -859,7 +877,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 

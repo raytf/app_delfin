@@ -50,6 +50,7 @@ def create_app(config: SidecarConfig) -> FastAPI:
         )
         state.turn_service = TurnServiceImpl(
             session_conversation_manager=session_conversation_manager,
+            session_service=state.session_service,
             tts_provider=state.tts_provider,
         )
         set_app_state(state)

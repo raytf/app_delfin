@@ -64,9 +64,6 @@ export function registerSidecarBridge(
     try {
       switch (message.type) {
         case "token":
-          await options.sessionPersistence.appendAssistantToken(
-            message.text ?? "",
-          );
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, {
             text: message.text ?? "",
           });
@@ -95,13 +92,9 @@ export function registerSidecarBridge(
           );
           return;
         case "done":
-          await options.sessionPersistence.finishAssistantResponse();
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE);
           return;
         case "error":
-          await options.sessionPersistence.failAssistantResponse(
-            message.message ?? "Unknown error",
-          );
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
             message: message.message ?? "Unknown error",
           });
@@ -109,7 +102,7 @@ export function registerSidecarBridge(
       }
     } catch (error) {
       console.error(
-        "[sidecarBridge] Failed to persist sidecar message:",
+        "[sidecarBridge] Failed to forward sidecar message:",
         error,
       );
     }

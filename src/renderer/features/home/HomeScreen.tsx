@@ -41,10 +41,10 @@ export default function HomeScreen() {
   }, [])
 
   const handleStartSession = useCallback(async (sessionName: string): Promise<void> => {
-    await window.api.startSession({ sessionName })
+    const response = await window.api.startSession({ sessionName })
     clearConversation()
     clearEndedSessionSnapshot()
-    startSession()
+    startSession({ sessionId: response.sessionId })
     setActiveSessionName(sessionName)
     await setOverlayMode('minimized-compact')
     navigate(ROUTES.active, { replace: true })

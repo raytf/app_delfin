@@ -121,7 +121,7 @@ export default function SessionConversation({
                   ) : null}
                   {isThinking ? (
                     <ThinkingDots size="sm" />
-                  ) : message.isVoiceTurn ? (
+                  ) : message.audioPath !== undefined ? (
                     <div className="inline-flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-medium">
                       <Mic size={14} />
                       Voice input
@@ -131,7 +131,7 @@ export default function SessionConversation({
                   )}
                 </div>
 
-                {isUser && message.imagePath !== undefined && (
+                {isUser && (message.imagePath !== undefined || message.imageDataUrl !== undefined) && (
                   <button
                     className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
                     disabled={loadingImageMessageId === message.id}
@@ -184,6 +184,11 @@ export default function SessionConversation({
   )
 
   async function handleViewCapture(message: ChatMessage): Promise<void> {
+    if (message.imageDataUrl !== undefined) {
+      setSelectedImage(message.imageDataUrl)
+      return
+    }
+
     if (message.imagePath === undefined) {
       return
     }

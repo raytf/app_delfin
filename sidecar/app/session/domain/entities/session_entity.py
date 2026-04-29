@@ -21,9 +21,13 @@ class SessionEntity:
         self.message_count = 0
         self.updated_at = now
 
-    def end(self) -> None:
+    def end(self, status: str = "completed") -> None:
         """Mark the session as ended."""
         now = datetime.now(timezone.utc)
         self.ended_at = now
         self.updated_at = now
-        self.status = "ended"
+        self.status = status
+
+    def touch(self) -> None:
+        """Refresh the session updated timestamp."""
+        self.updated_at = datetime.now(timezone.utc)

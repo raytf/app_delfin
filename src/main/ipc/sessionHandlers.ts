@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { ipcMain } from 'electron'
 import { captureForegroundWindow, capturePrimaryScreen } from '../capture/captureService'
 import { sendToSidecar } from '../sidecar/wsClient'
@@ -10,23 +11,29 @@ import {
   type SessionMessageImageRequest,
   type SessionPromptResponse,
   type SessionStartRequest,
+  type SessionStartResponse,
+  type SessionStopRequest,
 } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
 export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions): void {
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async (_event, request: SessionStartRequest) => {
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_START, async (_event, request: SessionStartRequest): Promise<SessionStartResponse> => {
     const sessionName = request.sessionName.trim()
 
     if (sessionName.length === 0) {
       throw new Error('Session name cannot be empty.')
     }
 
-    await options.sessionPersistence.startSession(sessionName)
+    const response = await options.sidecarSessionClient.createSession({
+      sessionName,
+      presetId: 'lecture-slide',
+    })
     await options.switchOverlayMode('minimized-compact')
+    return response
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async () => {
-    await options.sessionPersistence.stopSession('completed')
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_STOP, async (_event, request: SessionStopRequest) => {
+    await options.sidecarSessionClient.endSession(request.sessionId)
     await options.switchOverlayMode('expanded')
   })
 
@@ -54,45 +61,39 @@ export function registerSessionIpcHandlers(options: RegisterIpcHandlersOptions):
 
     mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, frame)
 
-    const imagePath = await options.sessionPersistence.recordUserPrompt({
-      imageBase64: frame.imageBase64,
-      isVoiceTurn,
-      messageId: request.messageId,
-      text,
-      presetId: request.presetId,
-      sourceLabel: frame.sourceLabel,
-    })
-
     try {
       sendToSidecar({
+        session_id: request.sessionId,
         image: frame.imageBase64,
         text,
         preset_id: request.presetId,
         ...(request.audio !== undefined ? { audio: request.audio } : {}),
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send prompt to sidecar.'
-      await options.sessionPersistence.failAssistantResponse(errorMessage)
       throw error
     }
 
     return {
-      imagePath,
       messageId: request.messageId,
+      imageDataUrl: `data:image/jpeg;base64,${frame.imageBase64}`,
     }
   })
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST, async () => options.sessionPersistence.listSessions())
+  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_LIST, async () => options.sidecarSessionClient.listSessions())
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_DETAIL, async (_event, request: SessionDetailRequest) =>
-    options.sessionPersistence.getSessionDetail(request.sessionId),
+    options.sidecarSessionClient.getSessionDetail(request.sessionId),
   )
 
   ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_DELETE, async (_event, request: SessionDeleteRequest) =>
-    options.sessionPersistence.deleteSession(request.sessionId),
+    options.sidecarSessionClient.deleteSession(request.sessionId),
   )
 
-  ipcMain.handle(RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE, async (_event, request: SessionMessageImageRequest) =>
-    options.sessionPersistence.getCaptureImageDataUrl(request.imagePath),
+  ipcMain.handle(
+    RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE,
+    async (_event, request: SessionMessageImageRequest) => {
+      const image = await readFile(request.imagePath)
+      return `data:image/jpeg;base64,${image.toString('base64')}`
+    },
   )
 }

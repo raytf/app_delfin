@@ -12,6 +12,7 @@ export const wsInboundMessageSchema = z.object({
 })
 
 export const wsOutboundMessageSchema = z.object({
+  session_id: z.string(),
   image: z.string().optional(),
   text: z.string(),
   preset_id: z.string(),
@@ -23,6 +24,7 @@ export const wsInterruptMessageSchema = z.object({
 })
 
 export const sessionPromptRequestSchema = z.object({
+  sessionId: z.string(),
   messageId: z.string(),
   text: z.string(),
   presetId: z.enum(['lecture-slide', 'generic-screen']),
