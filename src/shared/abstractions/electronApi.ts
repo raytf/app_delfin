@@ -3,6 +3,7 @@ import type {
   SessionDeleteRequest,
   SessionDetail,
   SessionDetailRequest,
+  SessionMessageAudioRequest,
   SessionMessageImageRequest,
   SessionPromptRequest,
   SessionPromptResponse,
@@ -30,6 +31,9 @@ export interface ElectronAPI {
   deleteSession: (request: SessionDeleteRequest) => Promise<void>;
   getSessionMessageImage: (
     request: SessionMessageImageRequest,
+  ) => Promise<string>;
+  getSessionMessageAudio: (
+    request: SessionMessageAudioRequest,
   ) => Promise<string>;
   setOverlayMode: (mode: OverlayMode) => Promise<void>;
   minimizeWindow: () => Promise<void>;

@@ -12,6 +12,7 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_GET_DETAIL: "session:get-detail",
   SESSION_DELETE: "session:delete",
   SESSION_GET_MESSAGE_IMAGE: "session:get-message-image",
+  SESSION_GET_MESSAGE_AUDIO: "session:get-message-audio",
 } as const;
 
 export const MAIN_TO_RENDERER_CHANNELS = {

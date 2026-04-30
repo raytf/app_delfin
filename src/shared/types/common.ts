@@ -9,15 +9,3 @@ export interface CapturedFrame {
   capturedAt: number; // unix ms
   sourceLabel: string;
 }
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-  latencyMs?: number;
-  imagePath?: string;
-  imageDataUrl?: string;
-  audioPath?: string;
-  interrupted?: boolean;
-}

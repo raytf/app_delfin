@@ -1,9 +1,10 @@
 import { ArrowLeft, Clock, Trash2 } from 'lucide-react'
-import type { ChatMessage, Session } from '../../shared/types'
-import SessionConversation from './SessionConversation'
+import type { Session } from '../../../../shared/types'
+import type { SessionMessage } from '../../../../shared/entities/session'
+import SessionConversation from '../../../components/conversation/SessionConversation'
 
 interface PastSessionViewProps {
-  messages: ChatMessage[]
+  messages: SessionMessage[]
   onBack: () => void
   onDelete: () => void
   session: Session

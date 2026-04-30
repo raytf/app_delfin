@@ -8,6 +8,7 @@ import type {
   OverlayState,
   SessionDetail,
   SessionDetailRequest,
+  SessionMessageAudioRequest,
   SessionDeleteRequest,
   SessionMessageImageRequest,
   SessionPromptRequest,
@@ -70,6 +71,12 @@ const api: ElectronAPI = {
   getSessionMessageImage: (request: SessionMessageImageRequest) =>
     ipcRenderer.invoke(
       RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_IMAGE,
+      request,
+    ) as Promise<string>,
+
+  getSessionMessageAudio: (request: SessionMessageAudioRequest) =>
+    ipcRenderer.invoke(
+      RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_AUDIO,
       request,
     ) as Promise<string>,
 

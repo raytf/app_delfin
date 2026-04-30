@@ -1,11 +1,11 @@
 import { createHashRouter } from 'react-router-dom'
-import ExpandedWindowShell from '../components/ExpandedWindowShell'
 import ActiveSessionScreen from '../features/active-session/ActiveSessionScreen'
 import HomeScreen from '../features/home/HomeScreen'
 import SessionEndedScreen from '../features/active-session/SessionEndedScreen'
 import SessionDetailScreen from '../features/sessions/SessionDetailScreen'
 import SessionsScreen from '../features/sessions/SessionsScreen'
 import { ROUTES } from './routes'
+import ExpandedWindowShell from '../components/window/ExpandedWindowShell'
 
 export const router = createHashRouter([
   {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Minus, Square, X } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
-import { useOverlayState } from '../hooks/useOverlayState'
+import { useOverlayState } from '../../hooks/useOverlayState'
 
 export default function ExpandedWindowShell() {
   const { overlayState } = useOverlayState()

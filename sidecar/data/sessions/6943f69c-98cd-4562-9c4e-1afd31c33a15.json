@@ -1,0 +1,34 @@
+{
+  "id": "6943f69c-98cd-4562-9c4e-1afd31c33a15",
+  "name": "test",
+  "preset_id": "lecture-slide",
+  "started_at": 1777553653.906812,
+  "ended_at": 1777553722.602771,
+  "status": "completed",
+  "message_count": 2,
+  "updated_at": 1777553722.602771,
+  "messages": [
+    {
+      "id": "b92d92e8-df8b-4b8d-8690-bffc9b615d2d",
+      "session_id": "6943f69c-98cd-4562-9c4e-1afd31c33a15",
+      "author": "user",
+      "content": "Please respond to what the user just asked.",
+      "timestamp": 1777553659891.384,
+      "image_path": "/Users/pragyan/Desktop/Projects/qut-hackathon/sidecar/data/sessions/_media/6943f69c-98cd-4562-9c4e-1afd31c33a15/b92d92e8-df8b-4b8d-8690-bffc9b615d2d.jpg",
+      "audio_path": "/Users/pragyan/Desktop/Projects/qut-hackathon/sidecar/data/sessions/_media/6943f69c-98cd-4562-9c4e-1afd31c33a15/b92d92e8-df8b-4b8d-8690-bffc9b615d2d.wav",
+      "error_message": null,
+      "interrupted": false
+    },
+    {
+      "id": "7ed39c8f-938f-4d53-a72a-a342f9e86766",
+      "session_id": "6943f69c-98cd-4562-9c4e-1afd31c33a15",
+      "author": "assistant",
+      "content": "I see you're looking at a code editor, which looks like you're working on some programming. There's a lot of text in the editor, and on the right side, there's a panel that seems to be showing some output or a dialog box. It looks like you might be trying to configure something or see the results of a program.",
+      "timestamp": 1777553659891.371,
+      "image_path": null,
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    }
+  ]
+}

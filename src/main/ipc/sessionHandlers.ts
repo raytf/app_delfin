@@ -10,6 +10,7 @@ import { RENDERER_TO_MAIN_CHANNELS } from "../../shared/constants";
 import type {
   SessionDetailRequest,
   SessionDeleteRequest,
+  SessionMessageAudioRequest,
   SessionMessageImageRequest,
   SessionPromptRequest,
   SessionPromptResponse,
@@ -117,6 +118,14 @@ export function registerSessionIpcHandlers(
     async (_event, request: SessionMessageImageRequest) => {
       const image = await readFile(request.imagePath);
       return `data:image/jpeg;base64,${image.toString("base64")}`;
+    },
+  );
+
+  ipcMain.handle(
+    RENDERER_TO_MAIN_CHANNELS.SESSION_GET_MESSAGE_AUDIO,
+    async (_event, request: SessionMessageAudioRequest) => {
+      const audio = await readFile(request.audioPath);
+      return `data:audio/wav;base64,${audio.toString("base64")}`;
     },
   );
 }

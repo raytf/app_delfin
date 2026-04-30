@@ -7,7 +7,7 @@ import type {
   SessionDetail,
   SessionMessage,
   Session,
-} from "./entities";
+} from "../../../shared/entities/session";
 import type { SessionStatus } from "../../../shared/enums/sessionStatus";
 
 function normalizeStatus(status: string): SessionStatus {

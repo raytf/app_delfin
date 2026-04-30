@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  type ChatMessage,
   type EndedSessionSnapshot,
   type OverlayMode,
 } from '../../../../shared/types'
+import type { SessionMessage } from '../../../../shared/entities/session'
 import { PresetId } from '../../../../shared/enums/presetId'
 import { MAIN_TO_RENDERER_CHANNELS } from '../../../../shared/constants'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
@@ -29,7 +29,9 @@ let lastAudioChunkPromise: Promise<void> = Promise.resolve()
 
 const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
 
-function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
+function getLatestAssistantMessage(
+  messages: SessionMessage[],
+): SessionMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'assistant') {
       return messages[index]
@@ -58,7 +60,7 @@ interface ActiveSession {
   isMuted: boolean
   isSubmitting: boolean
   latestResponseText: string | null
-  messages: ChatMessage[]
+  messages: SessionMessage[]
   toggleVadListening: () => void
   vadListeningEnabled: boolean
   waveformState: WaveformVisualState

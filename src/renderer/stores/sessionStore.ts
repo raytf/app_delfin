@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { VOICE_TURN_TEXT } from "../../shared/constants";
 import type {
-  ChatMessage,
   EndedSessionSnapshot,
   Session,
 } from "../../shared/types";
+import type { SessionMessage } from "../../shared/entities/session";
 
 interface SessionStoreState {
   activeSessionId: string | null;
@@ -13,7 +13,7 @@ interface SessionStoreState {
   endedSessionSnapshot: EndedSessionSnapshot | null;
   errorMessage: string | null;
   isSubmitting: boolean;
-  messages: ChatMessage[];
+  messages: SessionMessage[];
   sessionHistory: Session[];
   activeAssistantMessageId: string | null;
   vadListeningEnabled: boolean;
@@ -102,7 +102,7 @@ export const useSessionStore = create<SessionStoreState>()(
 
       beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {
-          const userMessage: ChatMessage = {
+          const userMessage: SessionMessage = {
             id: input.messageId,
             role: "user",
             content: input.prompt,
@@ -110,7 +110,7 @@ export const useSessionStore = create<SessionStoreState>()(
           };
 
           const assistantMessageId = createMessageId();
-          const assistantMessage: ChatMessage = {
+          const assistantMessage: SessionMessage = {
             id: assistantMessageId,
             role: "assistant",
             content: "",
@@ -128,7 +128,7 @@ export const useSessionStore = create<SessionStoreState>()(
 
       beginVoiceTurn: (input: { messageId: string }) =>
         set((state) => {
-          const userMessage: ChatMessage = {
+          const userMessage: SessionMessage = {
             id: input.messageId,
             role: "user",
             content: VOICE_TURN_TEXT,
@@ -137,7 +137,7 @@ export const useSessionStore = create<SessionStoreState>()(
           };
 
           const assistantMessageId = createMessageId();
-          const assistantMessage: ChatMessage = {
+          const assistantMessage: SessionMessage = {
             id: assistantMessageId,
             role: "assistant",
             content: "",

@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-30 (shared folder split; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed)
+> Last updated: 2026-04-30 (shared entity move; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -76,11 +76,12 @@
 | `src/shared/abstractions/httpRequestHelper.ts` | ✅ | Abstract HTTP helper for main-process API clients |
 | `src/main/http/fetchHttpRequestHelper.ts` | ✅ | Fetch-backed helper with query params, headers, JSON parsing, and error normalization |
 | `src/main/sidecar/session/api.ts` | ✅ | Session API client returns mapped `Session` / `SessionDetail` data |
-| `src/main/sidecar/session/entities.ts` | ✅ | Canonical `Session` / `SessionDetail` models and session status enum |
 | `src/main/sidecar/session/response.ts` | ✅ | Session response DTOs |
 | `src/main/sidecar/session/mappers.ts` | ✅ | DTO-to-model mapping layer for session list/detail/message payloads |
+| `src/shared/entities/session.ts` | ✅ | Canonical `SessionMessage`, `Session`, and `SessionDetail` models |
 | `src/shared/schemas/sidecar.ts` | ✅ | Sidecar inbound stream schema with inferred types |
 | `src/shared/types/session.ts` | ✅ | Shared session entities plus request/response DTOs for session IPC |
+| `src/main/ipc/sessionHandlers.ts` | ✅ | Session audio/image retrieval IPC for bubble playback and context modals |
 | `src/main/ipc/types.ts` | ✅ | `RegisterIpcHandlersOptions` now references the session API client path |
 
 ---
@@ -97,6 +98,7 @@
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button and recent-session deletion |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
+| `src/renderer/components/SessionConversation.tsx` | ✅ | Shared conversation renderer with role-specific text and playable voice bubbles |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |

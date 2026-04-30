@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { SessionDetail } from '../../../shared/types'
-import PastSessionView from '../../components/PastSessionView'
+import PastSessionView from './components/PastSessionView'
 import { ROUTES } from '../../navigation/routes'
 
 function SessionDetailLoadingState() {
