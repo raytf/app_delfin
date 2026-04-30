@@ -1,8 +1,8 @@
-import type { PresetId } from "../../../shared/types";
+import type { PresetId } from "../../../shared/enums/presetId";
 import { FetchHttpRequestHelper } from "../../http/fetchHttpRequestHelper";
-import type { HttpRequestHelper } from "../../http/httpRequestHelper";
+import type { HttpRequestHelper } from "../../../shared/abstractions/httpRequestHelper";
 import { mapSessionDetailResponse, mapSessionResponse } from "./mappers";
-import type { SessionDetail, Session } from "./entities";
+import type { Session, SessionDetail } from "./entities";
 import type {
   SessionCreateResponse,
   SessionDetailResponse,

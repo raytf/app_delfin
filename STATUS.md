@@ -11,9 +11,12 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Shared env contract for Electron and sidecar, including voice/TTS settings |
-| `src/shared/types.ts` | ✅ | IPC, session-scoped stream, overlay, audio-bearing turn types, `AnyObj`, and re-exported session models |
-| `src/shared/schemas.ts` | ✅ | Zod validation for session stream and session prompt contracts |
-| `src/shared/constants.ts` | ✅ | Presets, sidebar constants, `VOICE_TURN_TEXT` |
+| `src/shared/types/index.ts` | ✅ | IPC, session-scoped stream, overlay, audio-bearing turn types, `AnyObj`, and re-exported session models |
+| `src/shared/schemas/index.ts` | ✅ | Zod validation for session stream and session prompt contracts |
+| `src/shared/constants/index.ts` | ✅ | Presets, sidebar constants, `VOICE_TURN_TEXT` |
+| `src/shared/enums/*` | ✅ | Preset, session status, overlay mode, and stream-message enums |
+| `src/shared/abstractions/httpRequestHelper.ts` | ✅ | Main-process API client abstraction shared by the HTTP helper implementation |
+| `src/shared/index.ts` | ✅ | Shared barrel exports for constants, abstractions, schemas, and types |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar for Electron/UI work |
 | `scripts/run-sidecar.mjs` | ✅ | Helper script used by `npm run dev:sidecar` / `dev:full` |
 | `scripts/init-env.mjs`, `scripts/setup-sidecar.mjs`, `scripts/check-env.mjs` | ✅ | One-command setup and env validation |
@@ -68,10 +71,10 @@
 
 | File / Item | Status | Notes |
 |---|---|---|
-| `src/main/httpRequestHelper.ts` | ✅ | Abstract HTTP helper for main-process API clients |
-| `src/main/fetchHttpRequestHelper.ts` | ✅ | Fetch-backed helper with query params, headers, JSON parsing, and error normalization |
+| `src/shared/abstractions/httpRequestHelper.ts` | ✅ | Abstract HTTP helper for main-process API clients |
+| `src/main/http/fetchHttpRequestHelper.ts` | ✅ | Fetch-backed helper with query params, headers, JSON parsing, and error normalization |
 | `src/main/sidecar/session/api.ts` | ✅ | Session API client returns mapped `Session` / `SessionDetail` data |
-| `src/main/sidecar/session/entities.ts` | ✅ | Canonical session summary/detail models and session status enum |
+| `src/main/sidecar/session/entities.ts` | ✅ | Canonical `Session` / `SessionDetail` models and session status enum |
 | `src/main/sidecar/session/response.ts` | ✅ | Session response DTOs |
 | `src/main/sidecar/session/mappers.ts` | ✅ | DTO-to-model mapping layer for session list/detail/message payloads |
 | `src/main/ipc/types.ts` | ✅ | `RegisterIpcHandlersOptions` now references the session API client path |

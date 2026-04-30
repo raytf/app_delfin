@@ -1,4 +1,4 @@
-import type { AnyObj } from "../../shared/types";
+import type { AnyObj } from "../types/common";
 
 export interface HttpRequestOptions {
   headers?: AnyObj;

@@ -1,6 +1,5 @@
-export type SessionStatus = "active" | "completed" | "failed" | "aborted";
-
-export type PresetId = "lecture-slide" | "generic-screen";
+import type { PresetId } from "../../../shared/enums/presetId";
+import type { SessionStatus } from "../../../shared/enums/sessionStatus";
 
 export interface SessionMessage {
   id: string;

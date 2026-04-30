@@ -5,10 +5,10 @@ import type {
 } from "./response";
 import type {
   SessionDetail,
-  SessionStatus,
   SessionMessage,
   Session,
 } from "./entities";
+import type { SessionStatus } from "../../../shared/enums/sessionStatus";
 
 function normalizeStatus(status: string): SessionStatus {
   if (status === "completed" || status === "failed" || status === "aborted") {

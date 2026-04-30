@@ -2,7 +2,7 @@ import type { AnyObj } from "../../shared/types";
 import {
   HttpRequestHelper,
   type HttpRequestOptions,
-} from "./httpRequestHelper";
+} from "../../shared/abstractions/httpRequestHelper";
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;

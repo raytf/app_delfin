@@ -1,11 +1,4 @@
-import type { PresetId } from "../../../shared/types";
-
-export type {
-  SidecarSessionInboundMessage,
-  SidecarSessionInboundType,
-  SidecarSessionInterruptMessage,
-  SidecarSessionOutboundMessage,
-} from "../../../shared/types";
+import type { PresetId } from "../../../shared/enums/presetId";
 
 export interface SidecarEnvelope<T> {
   data: T;

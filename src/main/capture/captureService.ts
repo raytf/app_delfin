@@ -1,6 +1,6 @@
-import type { NativeImage } from 'electron'
-import type { CaptureFrame } from '../../shared/types'
-import { getActiveWindowSource, getPrimaryScreenSource } from './focusDetector'
+import type { NativeImage } from "electron";
+import type { CapturedFrame } from "../../shared/types";
+import { getActiveWindowSource, getPrimaryScreenSource } from "./focusDetector";
 
 /**
  * Sample a 4×4 grid of pixels across the image and return true if every
@@ -15,61 +15,66 @@ import { getActiveWindowSource, getPrimaryScreenSource } from './focusDetector'
  * toBitmap() returns raw BGRA data (4 bytes per pixel).
  */
 function isThumbnailBlank(image: NativeImage): boolean {
-  const { width, height } = image.getSize()
-  if (width === 0 || height === 0) return true
+  const { width, height } = image.getSize();
+  if (width === 0 || height === 0) return true;
 
-  const bitmap = image.toBitmap() // BGRA, 4 bytes per pixel
+  const bitmap = image.toBitmap(); // BGRA, 4 bytes per pixel
 
   for (const yFrac of [0.2, 0.4, 0.6, 0.8]) {
     for (const xFrac of [0.2, 0.4, 0.6, 0.8]) {
-      const x = Math.floor(width * xFrac)
-      const y = Math.floor(height * yFrac)
-      const offset = (y * width + x) * 4
-      const b = bitmap[offset] ?? 0
-      const g = bitmap[offset + 1] ?? 0
-      const r = bitmap[offset + 2] ?? 0
+      const x = Math.floor(width * xFrac);
+      const y = Math.floor(height * yFrac);
+      const offset = (y * width + x) * 4;
+      const b = bitmap[offset] ?? 0;
+      const g = bitmap[offset + 1] ?? 0;
+      const r = bitmap[offset + 2] ?? 0;
       // Any pixel brighter than near-black means the image has real content
-      if (r > 10 || g > 10 || b > 10) return false
+      if (r > 10 || g > 10 || b > 10) return false;
     }
   }
 
-  return true // all 16 samples were near-black
+  return true; // all 16 samples were near-black
 }
 
-export async function captureForegroundWindow(): Promise<CaptureFrame> {
-  const source = await getActiveWindowSource()
-  return captureSource(source, true)
+export async function captureForegroundWindow(): Promise<CapturedFrame> {
+  const source = await getActiveWindowSource();
+  return captureSource(source, true);
 }
 
-export async function capturePrimaryScreen(): Promise<CaptureFrame> {
-  const source = await getPrimaryScreenSource()
-  return captureSource(source, false)
+export async function capturePrimaryScreen(): Promise<CapturedFrame> {
+  const source = await getPrimaryScreenSource();
+  return captureSource(source, false);
 }
 
-function captureSource(source: { name: string; thumbnail: NativeImage }, isWindowCapture: boolean): CaptureFrame {
-  const { width, height } = source.thumbnail.getSize()
+function captureSource(
+  source: { name: string; thumbnail: NativeImage },
+  isWindowCapture: boolean,
+): CapturedFrame {
+  const { width, height } = source.thumbnail.getSize();
 
   if (width === 0 || height === 0) {
-    throw new Error(`Capture source "${source.name}" did not provide a usable thumbnail.`)
+    throw new Error(
+      `Capture source "${source.name}" did not provide a usable thumbnail.`,
+    );
   }
 
   if (isThumbnailBlank(source.thumbnail)) {
     throw new Error(
       `Screenshot from "${source.name}" is blank (all black). ` +
-      'This is a known WSL2 limitation: the display compositor does not support ' +
-      'pixel readback via desktopCapturer. ' +
-      (isWindowCapture
-        ? 'Try running the app on native Linux or Windows, or open a Linux GUI app ' +
-          '(e.g. a browser) in the same WSLg session so it appears as a capturable window.'
-        : 'Try running the app on native Linux or Windows, or capture from a display/compositor that supports screen thumbnails.'),
-    )
+        "This is a known WSL2 limitation: the display compositor does not support " +
+        "pixel readback via desktopCapturer. " +
+        (isWindowCapture
+          ? "Try running the app on native Linux or Windows, or open a Linux GUI app " +
+            "(e.g. a browser) in the same WSLg session so it appears as a capturable window."
+          : "Try running the app on native Linux or Windows, or capture from a display/compositor that supports screen thumbnails."),
+    );
   }
 
   return {
-    imageBase64: source.thumbnail.toJPEG(80).toString('base64'),
+    imageBase64: source.thumbnail.toJPEG(80).toString("base64"),
     width,
     height,
     capturedAt: Date.now(),
     sourceLabel: source.name,
-  }
+  };
 }

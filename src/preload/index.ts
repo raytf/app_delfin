@@ -4,7 +4,7 @@ import {
   RENDERER_TO_MAIN_CHANNELS,
 } from "../shared/types";
 import type {
-  CaptureFrame,
+  CapturedFrame,
   SidecarStatus,
   ElectronAPI,
   OverlayState,
@@ -95,7 +95,7 @@ const api: ElectronAPI = {
 
   closeWindow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE),
 
-  onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
+  onFrameCaptured: (cb: (frame: CapturedFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) =>
       cb(frame),
     ),
