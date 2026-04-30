@@ -200,17 +200,11 @@ export default function VoiceMessageBubble({
           )}
         </button>
 
-        <div className="min-w-0 text-white">
-          <p className="text-xs font-medium leading-none">
+        <div className="min-w-0 w-[4.75rem] shrink-0 text-white">
+          <p className="tabular-nums text-xs font-medium leading-none">
             {formatTime(currentTime)} / {formatTime(duration)}
           </p>
         </div>
-
-        {!isPlayable ? (
-          <span className="ml-auto text-[11px] uppercase tracking-[0.16em] text-white/70">
-            Pending
-          </span>
-        ) : null}
       </div>
     </TextMessageBubble>
   )
