@@ -1,10 +1,10 @@
 import { Clock3, MessageSquare, Trash2 } from 'lucide-react'
-import type { SessionListItem } from '../../shared/types'
+import type { Session } from '../../shared/types'
 
 interface SessionHistoryCardProps {
   onClick?: () => void
   onDelete?: () => void
-  session: SessionListItem
+  session: Session
   variant?: 'compact' | 'detailed'
 }
 
@@ -49,7 +49,7 @@ function formatRelativeTime(timestamp: number): string {
   })
 }
 
-function formatStatus(status: SessionListItem['status']): string {
+function formatStatus(status: Session['status']): string {
   if (status === 'completed') return 'Completed'
   if (status === 'failed') return 'Ended with issue'
   if (status === 'aborted') return 'Stopped early'
@@ -74,7 +74,7 @@ export default function SessionHistoryCard({
       {/* Delete button - appears on hover in top right */}
       {onDelete !== undefined ? (
         <button
-          aria-label={`Delete ${session.sessionName || session.sourceLabel || 'session'}`}
+          aria-label={`Delete ${session.name || session.sourceLabel || 'session'}`}
           className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-[var(--bg-surface)] text-[var(--text-muted)] opacity-0 shadow-sm transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
           onClick={(event) => {
             event.stopPropagation()
@@ -92,7 +92,7 @@ export default function SessionHistoryCard({
             isDetailed ? '' : 'line-clamp-2'
           }`}
         >
-          {session.sessionName || session.sourceLabel || 'Untitled Session'}
+          {session.name || session.sourceLabel || 'Untitled Session'}
         </h3>
         {isDetailed ? (
           <p className="mt-2 text-sm text-[var(--text-secondary)]">

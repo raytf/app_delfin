@@ -1,0 +1,56 @@
+{
+  "id": "125d2540-06b2-4a46-80c9-681f8827116a",
+  "name": "Testsdfsdfds",
+  "preset_id": "lecture-slide",
+  "started_at": 1777548629.533241,
+  "ended_at": 1777548664.243655,
+  "status": "completed",
+  "message_count": 4,
+  "updated_at": 1777548664.243655,
+  "messages": [
+    {
+      "id": "501f8387-2bfc-4c93-8515-d3c0ce9e62e1",
+      "session_id": "125d2540-06b2-4a46-80c9-681f8827116a",
+      "author": "user",
+      "content": "what do you see?",
+      "timestamp": 1777548636167.5588,
+      "image_path": "/Users/pragyan/Desktop/Projects/qut-hackathon/sidecar/data/sessions/_media/125d2540-06b2-4a46-80c9-681f8827116a/501f8387-2bfc-4c93-8515-d3c0ce9e62e1.jpg",
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    },
+    {
+      "id": "bf78bf44-a009-46d9-bb1a-8d0f12b38df8",
+      "session_id": "125d2540-06b2-4a46-80c9-681f8827116a",
+      "author": "assistant",
+      "content": "I see a code editor open, which looks like a programming environment. It has a lot of lines of text, which is code. There are some lines that look like they are in a language like JavaScript or something similar, and there are some comments in the code. On the right side, there's a panel that seems to be showing some output or status, and there's a window open that looks like a dialog box or a settings window. It seems like we are looking at some kind of development or debugging work.",
+      "timestamp": 1777548636167.541,
+      "image_path": null,
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    },
+    {
+      "id": "44b103d8-94d8-4c8b-830e-1664a37f7313",
+      "session_id": "125d2540-06b2-4a46-80c9-681f8827116a",
+      "author": "user",
+      "content": "sss",
+      "timestamp": 1777548654423.25,
+      "image_path": "/Users/pragyan/Desktop/Projects/qut-hackathon/sidecar/data/sessions/_media/125d2540-06b2-4a46-80c9-681f8827116a/44b103d8-94d8-4c8b-830e-1664a37f7313.jpg",
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": false
+    },
+    {
+      "id": "879ef890-66a7-47b9-a150-e17bc25e8b3e",
+      "session_id": "125d2540-06b2-4a46-80c9-681f8827116a",
+      "author": "assistant",
+      "content": "It looks like you've just typed \"sss\" in the input area of that window. Based on what I can see, that window is likely some kind of input field or a status area within the code editor. It's",
+      "timestamp": 1777548654423.2378,
+      "image_path": null,
+      "audio_path": null,
+      "error_message": null,
+      "interrupted": true
+    }
+  ]
+}

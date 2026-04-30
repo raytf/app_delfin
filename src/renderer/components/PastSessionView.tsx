@@ -1,12 +1,12 @@
 import { ArrowLeft, Clock, Trash2 } from 'lucide-react'
-import type { ChatMessage, SessionListItem } from '../../shared/types'
+import type { ChatMessage, Session } from '../../shared/types'
 import SessionConversation from './SessionConversation'
 
 interface PastSessionViewProps {
   messages: ChatMessage[]
   onBack: () => void
   onDelete: () => void
-  session: SessionListItem
+  session: Session
 }
 
 function formatDuration(startedAt: number, endedAt: number | null): string {
@@ -40,7 +40,7 @@ export default function PastSessionView({
   onDelete,
   session,
 }: PastSessionViewProps) {
-  const sessionName = session.sessionName || session.sourceLabel || 'Untitled Session'
+  const sessionName = session.name || session.sourceLabel || 'Untitled Session'
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">

@@ -1,3 +1,11 @@
+import type {
+  PresetId as SessionPresetId,
+  SessionDetail,
+  Session,
+} from "../main/sidecar/session/entities";
+
+export type AnyObj = Record<string, unknown>;
+
 // CaptureFrame
 export interface CaptureFrame {
   imageBase64: string; // JPEG base64
@@ -20,8 +28,8 @@ export interface ChatMessage {
   interrupted?: boolean;
 }
 
-// WebSocket outbound (Electron → Sidecar)
-export interface WsOutboundMessage {
+// Session stream outbound (Electron → Sidecar)
+export interface SidecarSessionOutboundMessage {
   session_id: string;
   image?: string;
   text: string;
@@ -33,7 +41,7 @@ export interface SessionPromptRequest {
   sessionId: string;
   messageId: string;
   text: string;
-  presetId: PresetId;
+  presetId: SessionPresetId;
   audio?: string; // base64 WAV — present on voice turns; text will be VOICE_TURN_TEXT
 }
 
@@ -72,12 +80,12 @@ export interface EndedSessionSnapshot {
   messageCount: number;
 }
 
-export interface WsInterruptMessage {
+export interface SidecarSessionInterruptMessage {
   type: "interrupt";
 }
 
-// WebSocket inbound (Sidecar → Electron)
-export type WsInboundType =
+// Session stream inbound (Sidecar → Electron)
+export type SidecarSessionInboundType =
   | "token"
   | "audio_start"
   | "audio_chunk"
@@ -85,8 +93,8 @@ export type WsInboundType =
   | "done"
   | "error";
 
-export interface WsInboundMessage {
-  type: WsInboundType;
+export interface SidecarSessionInboundMessage {
+  type: SidecarSessionInboundType;
   text?: string;
   audio?: string;
   message?: string;
@@ -132,11 +140,8 @@ export const MAIN_TO_RENDERER_CHANNELS = {
   SIDECAR_STATUS: "sidecar:status",
 } as const;
 
-// Presets
-export type PresetId = "lecture-slide" | "generic-screen";
-
 export interface Preset {
-  id: PresetId;
+  id: SessionPresetId;
   label: string;
   starterQuestions: string[];
 }
@@ -149,27 +154,13 @@ export interface SidecarStatus {
   visionTokens?: string;
 }
 
-export type PersistedSessionStatus =
-  | "active"
-  | "completed"
-  | "failed"
-  | "aborted";
-
-export interface SessionListItem {
-  id: string;
-  startedAt: number;
-  endedAt: number | null;
-  status: PersistedSessionStatus;
-  presetId: PresetId | null;
-  sessionName: string;
-  sourceLabel: string | null;
-  messageCount: number;
-  lastUpdatedAt: number;
-}
-
-export interface SessionDetail extends SessionListItem {
-  messages: ChatMessage[];
-}
+export type {
+  PresetId,
+  SessionMessage,
+  SessionDetail,
+  SessionStatus,
+  Session as Session,
+} from "../main/sidecar/session/entities";
 
 export type OverlayMode =
   | "expanded"
@@ -192,7 +183,7 @@ export interface ElectronAPI {
     enabled: boolean;
     intervalMs: number;
   }) => void;
-  sidecarSend: (msg: WsOutboundMessage) => void;
+  sidecarSend: (msg: SidecarSessionOutboundMessage) => void;
   sidecarInterrupt: () => void;
   getOverlayState: () => Promise<OverlayState>;
   startSession: (request: SessionStartRequest) => Promise<SessionStartResponse>;
@@ -200,7 +191,7 @@ export interface ElectronAPI {
   submitSessionPrompt: (
     request: SessionPromptRequest,
   ) => Promise<SessionPromptResponse>;
-  listSessions: () => Promise<SessionListItem[]>;
+  listSessions: () => Promise<Session[]>;
   getSessionDetail: (request: SessionDetailRequest) => Promise<SessionDetail>;
   deleteSession: (request: SessionDeleteRequest) => Promise<void>;
   getSessionMessageImage: (

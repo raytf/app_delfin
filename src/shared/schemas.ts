@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const wsInboundMessageSchema = z.object({
+export const sidecarSessionInboundMessageSchema = z.object({
   type: z.enum(['token', 'audio_start', 'audio_chunk', 'audio_end', 'done', 'error']),
   text: z.string().optional(),
   audio: z.string().optional(),
@@ -11,7 +11,7 @@ export const wsInboundMessageSchema = z.object({
   tts_time: z.number().optional(),
 })
 
-export const wsOutboundMessageSchema = z.object({
+export const sidecarSessionOutboundMessageSchema = z.object({
   session_id: z.string(),
   image: z.string().optional(),
   text: z.string(),
@@ -19,7 +19,7 @@ export const wsOutboundMessageSchema = z.object({
   audio: z.string().optional(), // base64 WAV — present on voice turns
 })
 
-export const wsInterruptMessageSchema = z.object({
+export const sidecarSessionInterruptMessageSchema = z.object({
   type: z.literal('interrupt'),
 })
 

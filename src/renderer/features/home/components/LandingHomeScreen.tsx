@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { SessionListItem } from '../../../../shared/types'
+import type { Session } from '../../../../shared/types'
 import delfinLogo from '../../../assets/logo.png'
 import SessionHistoryCard from '../../../components/SessionHistoryCard'
 
@@ -8,7 +8,7 @@ interface HomeScreenProps {
   onStartSession: (sessionName: string) => void
   onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
-  sessions: SessionListItem[]
+  sessions: Session[]
   userName: string | null
 }
 

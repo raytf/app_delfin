@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import {
-  wsInterruptMessageSchema,
-  wsOutboundMessageSchema,
+  sidecarSessionInterruptMessageSchema,
+  sidecarSessionOutboundMessageSchema,
 } from "../../shared/schemas";
 import {
   MAIN_TO_RENDERER_CHANNELS,
@@ -12,7 +12,8 @@ import {
   onSidecarMessage,
   onSidecarStatus,
   sendToSidecar,
-} from "../sidecar/wsClient";
+} from "../sidecar/session/ws";
+import type { SidecarSessionInboundMessage } from "../../shared/types";
 import type { RegisterIpcHandlersOptions } from "./types";
 
 export function registerSidecarBridge(
@@ -22,7 +23,7 @@ export function registerSidecarBridge(
 
   ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, (_event, message) => {
     try {
-      const parsed = wsOutboundMessageSchema.parse(message);
+      const parsed = sidecarSessionOutboundMessageSchema.parse(message);
       sendToSidecar(parsed);
     } catch (error) {
       const mainWindow = options.getMainWindow();
@@ -39,7 +40,9 @@ export function registerSidecarBridge(
 
   ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, () => {
     try {
-      const parsed = wsInterruptMessageSchema.parse({ type: "interrupt" });
+      const parsed = sidecarSessionInterruptMessageSchema.parse({
+        type: "interrupt",
+      });
       sendToSidecar(parsed);
     } catch (error) {
       const mainWindow = options.getMainWindow();
@@ -54,7 +57,7 @@ export function registerSidecarBridge(
     }
   });
 
-  onSidecarMessage(async (message) => {
+  onSidecarMessage(async (message: SidecarSessionInboundMessage) => {
     const mainWindow = options.getMainWindow();
 
     if (mainWindow === null || mainWindow.isDestroyed()) {

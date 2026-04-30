@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { SessionListItem } from '../../../shared/types'
+import type { Session } from '../../../shared/types'
 import { useOverlayState } from '../../hooks/useOverlayState'
 import { buildSessionDetailPath, ROUTES } from '../../navigation/routes'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -9,7 +9,7 @@ import LandingHomeScreen from './components/LandingHomeScreen'
 import UserNameModal from './components/UserNameModal'
 
 export default function HomeScreen() {
-  const [sessions, setSessions] = useState<SessionListItem[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
   const navigate = useNavigate()
   const { setOverlayMode } = useOverlayState()
   const clearConversation = useSessionStore((state) => state.clearConversation)

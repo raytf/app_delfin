@@ -1,16 +1,17 @@
 import WebSocket from "ws";
-import { wsInboundMessageSchema } from "../../shared/schemas";
+import { sidecarSessionInboundMessageSchema } from "../../../shared/schemas";
+import type { SidecarStatus } from "../../../shared/types";
 import type {
-  SidecarStatus,
-  WsInboundMessage,
-  WsInterruptMessage,
-  WsOutboundMessage,
-} from "../../shared/types";
+  SidecarSessionInboundMessage,
+  SidecarSessionInterruptMessage,
+  SidecarSessionOutboundMessage,
+} from "../../../shared/types";
 
 let socket: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let currentUrl: string = "";
-let messageHandler: ((message: WsInboundMessage) => void) | null = null;
+let messageHandler: ((message: SidecarSessionInboundMessage) => void) | null =
+  null;
 let statusHandler: ((status: SidecarStatus) => void) | null = null;
 let currentStatus: SidecarStatus = { connected: false };
 
@@ -47,11 +48,14 @@ export function connectToSidecar(wsUrl: string): void {
   socket.on("message", (data) => {
     const raw = data.toString();
     try {
-      const parsed = wsInboundMessageSchema.parse(JSON.parse(raw));
+      const parsed = sidecarSessionInboundMessageSchema.parse(JSON.parse(raw));
       messageHandler?.(parsed);
     } catch (error) {
       console.error("[wsClient] Failed to parse sidecar message:", error);
-      console.error("[wsClient] Raw payload that failed:", raw.substring(0, 500));
+      console.error(
+        "[wsClient] Raw payload that failed:",
+        raw.substring(0, 500),
+      );
     }
   });
 
@@ -68,7 +72,7 @@ export function connectToSidecar(wsUrl: string): void {
 }
 
 export function sendToSidecar(
-  message: WsOutboundMessage | WsInterruptMessage,
+  message: SidecarSessionOutboundMessage | SidecarSessionInterruptMessage,
 ): void {
   if (socket?.readyState !== WebSocket.OPEN) {
     throw new Error("Sidecar WebSocket is not connected.");
@@ -78,7 +82,7 @@ export function sendToSidecar(
 }
 
 export function onSidecarMessage(
-  handler: (message: WsInboundMessage) => void,
+  handler: (message: SidecarSessionInboundMessage) => void,
 ): void {
   messageHandler = handler;
 }

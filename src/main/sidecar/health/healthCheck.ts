@@ -8,3 +8,4 @@ export function startHealthPolling(): void {
 export function stopHealthPolling(): void {
   // Placeholder — implemented in Phase 2
 }
+

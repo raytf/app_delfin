@@ -14,8 +14,11 @@ import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
-import { deriveSidecarHttpBaseUrl, SidecarSessionClient } from "./sidecar/sessionClient";
-import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
+import {
+  deriveSidecarHttpBaseUrl,
+  SidecarSessionClient,
+} from "./sidecar/session/api";
+import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/session/ws";
 import { validateEnv } from "./envValidation";
 import {
   MAIN_TO_RENDERER_CHANNELS,
@@ -36,7 +39,10 @@ function createWindow(mode: OverlayMode): BrowserWindow {
   overlayMode = mode;
   mainWindow = window;
   window.webContents.once("did-finish-load", () => {
-    window.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, getSidecarStatus());
+    window.webContents.send(
+      MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS,
+      getSidecarStatus(),
+    );
   });
   window.on("closed", () => {
     if (mainWindow === window) {

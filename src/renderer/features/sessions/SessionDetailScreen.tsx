@@ -58,7 +58,7 @@ export default function SessionDetailScreen() {
       onDelete={() => {
         void handleDelete()
       }}
-      session={detail.session}
+      session={detail}
     />
   )
 }

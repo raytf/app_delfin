@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { SessionListItem } from '../../../shared/types'
+import type { Session } from '../../../shared/types'
 import { buildSessionDetailPath } from '../../navigation/routes'
 import AllSessionsPage from './components/AllSessionsPage'
 
 export default function SessionsScreen() {
-  const [sessions, setSessions] = useState<SessionListItem[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {

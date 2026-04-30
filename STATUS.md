@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-22 (overlay defaults expanded; overlay load screens removed; shared goBack helper added)
+> Last updated: 2026-04-30 (sidecar session module split; main-process HTTP helper added; session-scoped stream types renamed)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,8 +11,8 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Shared env contract for Electron and sidecar, including voice/TTS settings |
-| `src/shared/types.ts` | ✅ | IPC, WebSocket, session history, overlay, and audio-bearing turn types |
-| `src/shared/schemas.ts` | ✅ | Zod validation for WS and session prompt contracts |
+| `src/shared/types.ts` | ✅ | IPC, session-scoped stream, overlay, audio-bearing turn types, `AnyObj`, and re-exported session models |
+| `src/shared/schemas.ts` | ✅ | Zod validation for session stream and session prompt contracts |
 | `src/shared/constants.ts` | ✅ | Presets, sidebar constants, `VOICE_TURN_TEXT` |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar for Electron/UI work |
 | `scripts/run-sidecar.mjs` | ✅ | Helper script used by `npm run dev:sidecar` / `dev:full` |
@@ -55,14 +55,26 @@
 | `src/main/overlay/overlayWindow.ts` | ✅ | Expanded window plus compact / prompt-input / prompt-response minimized variants |
 | `src/main/capture/captureService.ts` — `captureForegroundWindow()` | ✅ | Captures the active window as base64 JPEG |
 | `src/main/capture/focusDetector.ts` — `getActiveWindowSource()` | ✅ | Excludes the Delfin window from capture candidates |
-| `src/main/sidecar/wsClient.ts` | ✅ | Persistent WebSocket client with reconnect and Zod-validated inbound messages |
-| `src/main/ipc/sidecarBridge.ts` | ✅ | Bridges WebSocket messages into renderer IPC and persistence updates |
+| `src/main/sidecar/session/ws.ts` | ✅ | Persistent WebSocket client with reconnect and Zod-validated session stream messages |
+| `src/main/ipc/sidecarBridge.ts` | ✅ | Bridges session stream messages into renderer IPC and persistence updates |
 | `src/main/ipc/overlayHandlers.ts` | ✅ | Overlay mode, minimized variant, and ended-session IPC flows |
 | `src/main/ipc/sessionHandlers.ts` | ✅ | Session start/stop, prompt submit, history lookup, image lookup, and deletion |
 | `src/preload/index.ts` | ✅ | Full `contextBridge` API for capture, sidecar, overlay, and session actions |
-| `src/main/index.ts` | ✅ | App startup, env validation, COOP/COEP, microphone permissions, and window lifecycle |
+| `src/main/index.ts` | ✅ | App startup, env validation, COOP/COEP, microphone permissions, window lifecycle, and sidecar session client wiring |
 | `src/main/capture/autoRefresh.ts` | ⚠️ | Placeholder — auto-refresh diffing not implemented yet |
-| `src/main/sidecar/healthCheck.ts` | ⚠️ | Placeholder — dedicated `/health` polling not implemented |
+| `src/main/sidecar/health/healthCheck.ts` | ⚠️ | Placeholder — dedicated `/health` polling not implemented |
+
+### Main-Process Sidecar Refactor
+
+| File / Item | Status | Notes |
+|---|---|---|
+| `src/main/httpRequestHelper.ts` | ✅ | Abstract HTTP helper for main-process API clients |
+| `src/main/fetchHttpRequestHelper.ts` | ✅ | Fetch-backed helper with query params, headers, JSON parsing, and error normalization |
+| `src/main/sidecar/session/api.ts` | ✅ | Session API client returns mapped `Session` / `SessionDetail` data |
+| `src/main/sidecar/session/entities.ts` | ✅ | Canonical session summary/detail models and session status enum |
+| `src/main/sidecar/session/response.ts` | ✅ | Session response DTOs |
+| `src/main/sidecar/session/mappers.ts` | ✅ | DTO-to-model mapping layer for session list/detail/message payloads |
+| `src/main/ipc/types.ts` | ✅ | `RegisterIpcHandlersOptions` now references the session API client path |
 
 ---
 
