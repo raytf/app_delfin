@@ -12,17 +12,12 @@ import type {
   Session,
 } from "../types/session";
 import type { OverlayState } from "../types/overlay";
-import type {
-  SidecarConnectionStatus,
-  SidecarSessionSubmitTurnMessage,
-} from "../schemas/sidecar";
 
 export interface ElectronAPI {
   /** True when VOICE_ENABLED=true in .env. Read synchronously by renderer. */
   voiceEnabled: boolean;
   /** True when TTS_ENABLED=true in .env. Used by renderer fallback logic. */
   ttsEnabled: boolean;
-  sidecarSend: (msg: SidecarSessionSubmitTurnMessage) => void;
   sidecarInterrupt: () => void;
   getOverlayState: () => Promise<OverlayState>;
   startSession: (request: SessionStartRequest) => Promise<SessionStartResponse>;
@@ -51,6 +46,5 @@ export interface ElectronAPI {
   onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) => void;
   onSidecarDone: (cb: () => void) => void;
   onSidecarError: (cb: (data: { message: string }) => void) => void;
-  onSidecarStatus: (cb: (data: SidecarConnectionStatus) => void) => void;
   removeAllListeners: (channel: string) => void;
 }

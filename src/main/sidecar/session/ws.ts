@@ -1,24 +1,24 @@
 import WebSocket from "ws";
 import { sidecarSessionInboundMessageSchema } from "../../../shared/schemas";
-import type {
-  SidecarConnectionStatus,
-  SidecarSessionInterruptTurnMessage,
-  SidecarSessionStreamMessage,
-  SidecarSessionSubmitTurnMessage,
-} from "../../../shared/schemas/sidecar";
+import type { SidecarSessionStreamMessage } from "../../../shared/schemas/sidecar";
+
+type SidecarSessionPromptMessage = {
+  session_id: string;
+  image?: string;
+  text: string;
+  preset_id: string;
+  audio?: string;
+};
+
+type SidecarSessionInterruptMessage = {
+  type: "interrupt";
+};
 
 let socket: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let currentUrl: string = "";
 let messageHandler: ((message: SidecarSessionStreamMessage) => void) | null =
   null;
-let statusHandler: ((status: SidecarConnectionStatus) => void) | null = null;
-let currentStatus: SidecarConnectionStatus = { connected: false };
-
-function emitStatus(status: SidecarConnectionStatus): void {
-  currentStatus = status;
-  statusHandler?.(status);
-}
 
 function scheduleReconnect(): void {
   if (!currentUrl || reconnectTimer !== null) {
@@ -42,7 +42,6 @@ export function connectToSidecar(wsUrl: string): void {
 
   socket.on("open", () => {
     console.log(`Connected to FastAPI sidecar WebSocket at ${wsUrl}`);
-    emitStatus({ connected: true });
   });
 
   socket.on("message", (data) => {
@@ -60,21 +59,17 @@ export function connectToSidecar(wsUrl: string): void {
   });
 
   socket.on("close", () => {
-    emitStatus({ connected: false });
     socket = null;
     scheduleReconnect();
   });
 
   socket.on("error", (error) => {
     console.error("Sidecar WebSocket error:", error.message);
-    emitStatus({ connected: false });
   });
 }
 
 export function sendToSidecar(
-  message:
-    | SidecarSessionSubmitTurnMessage
-    | SidecarSessionInterruptTurnMessage,
+  message: SidecarSessionPromptMessage | SidecarSessionInterruptMessage,
 ): void {
   if (socket?.readyState !== WebSocket.OPEN) {
     throw new Error("Sidecar WebSocket is not connected.");
@@ -89,16 +84,6 @@ export function onSidecarMessage(
   messageHandler = handler;
 }
 
-export function onSidecarStatus(
-  handler: (status: SidecarConnectionStatus) => void,
-): void {
-  statusHandler = handler;
-}
-
-export function getSidecarStatus(): SidecarConnectionStatus {
-  return currentStatus;
-}
-
 export function disconnectFromSidecar(): void {
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
@@ -108,5 +93,4 @@ export function disconnectFromSidecar(): void {
   currentUrl = "";
   socket?.close();
   socket = null;
-  currentStatus = { connected: false };
 }

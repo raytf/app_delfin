@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-30 (shared folder split; ElectronAPI abstraction and channel constants added; preset list removed; sidecar session types normalized)
+> Last updated: 2026-04-30 (shared folder split; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -79,7 +79,7 @@
 | `src/main/sidecar/session/entities.ts` | ✅ | Canonical `Session` / `SessionDetail` models and session status enum |
 | `src/main/sidecar/session/response.ts` | ✅ | Session response DTOs |
 | `src/main/sidecar/session/mappers.ts` | ✅ | DTO-to-model mapping layer for session list/detail/message payloads |
-| `src/shared/schemas/sidecar.ts` | ✅ | Sidecar stream, submit-turn, interrupt, and connection-status schemas with inferred types |
+| `src/shared/schemas/sidecar.ts` | ✅ | Sidecar inbound stream schema with inferred types |
 | `src/shared/types/session.ts` | ✅ | Shared session entities plus request/response DTOs for session IPC |
 | `src/main/ipc/types.ts` | ✅ | `RegisterIpcHandlersOptions` now references the session API client path |
 

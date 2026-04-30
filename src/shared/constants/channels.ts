@@ -1,5 +1,4 @@
 export const RENDERER_TO_MAIN_CHANNELS = {
-  SIDECAR_SEND: "sidecar:send",
   SIDECAR_INTERRUPT: "sidecar:interrupt",
   OVERLAY_GET_STATE: "overlay:get-state",
   OVERLAY_SET_MODE: "overlay:set-mode",
@@ -23,5 +22,4 @@ export const MAIN_TO_RENDERER_CHANNELS = {
   SIDECAR_AUDIO_END: "sidecar:audio_end",
   SIDECAR_DONE: "sidecar:done",
   SIDECAR_ERROR: "sidecar:error",
-  SIDECAR_STATUS: "sidecar:status",
 } as const;

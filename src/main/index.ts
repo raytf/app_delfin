@@ -18,11 +18,8 @@ import {
   deriveSidecarHttpBaseUrl,
   SidecarSessionClient,
 } from "./sidecar/session/api";
-import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/session/ws";
+import { disconnectFromSidecar } from "./sidecar/session/ws";
 import { validateEnv } from "./envValidation";
-import {
-  MAIN_TO_RENDERER_CHANNELS,
-} from "../shared/constants";
 import type { OverlayMode, OverlayState } from "../shared/types";
 
 config(); // load .env from repo root
@@ -37,12 +34,6 @@ function createWindow(mode: OverlayMode): BrowserWindow {
   const window = createOverlayWindow(mode);
   overlayMode = mode;
   mainWindow = window;
-  window.webContents.once("did-finish-load", () => {
-    window.webContents.send(
-      MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS,
-      getSidecarStatus(),
-    );
-  });
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;

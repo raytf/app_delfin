@@ -27,9 +27,6 @@ const api: ElectronAPI = {
   // Evaluated once at preload time. Defaults to false so speech output is opt-in.
   ttsEnabled: process.env.TTS_ENABLED === "true",
 
-  sidecarSend: (msg) =>
-    ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, msg),
-
   sidecarInterrupt: () =>
     ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT),
 
@@ -124,11 +121,6 @@ const api: ElectronAPI = {
 
   onSidecarError: (cb: (data: { message: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, (_event, data) =>
-      cb(data),
-    ),
-
-  onSidecarStatus: (cb) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, (_event, data) =>
       cb(data),
     ),
 

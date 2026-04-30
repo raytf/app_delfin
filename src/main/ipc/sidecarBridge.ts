@@ -1,16 +1,11 @@
 import { ipcMain } from "electron";
 import {
-  sidecarSessionInterruptTurnMessageSchema,
-  sidecarSessionSubmitTurnMessageSchema,
-} from "../../shared/schemas";
-import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
 } from "../../shared/constants";
 import {
   connectToSidecar,
   onSidecarMessage,
-  onSidecarStatus,
   sendToSidecar,
 } from "../sidecar/session/ws";
 import type { SidecarSessionStreamMessage } from "../../shared/schemas/sidecar";
@@ -21,32 +16,9 @@ export function registerSidecarBridge(
 ): void {
   connectToSidecar(options.sidecarWsUrl);
 
-  ipcMain.on(
-    RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND,
-    (_event, message: unknown) => {
-      try {
-        const parsed = sidecarSessionSubmitTurnMessageSchema.parse(message);
-        sendToSidecar(parsed);
-      } catch (error) {
-        const mainWindow = options.getMainWindow();
-        if (mainWindow !== null && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Failed to send message to sidecar.",
-          });
-        }
-      }
-    },
-  );
-
   ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, () => {
     try {
-      const parsed = sidecarSessionInterruptTurnMessageSchema.parse({
-        type: "interrupt",
-      });
-      sendToSidecar(parsed);
+      sendToSidecar({ type: "interrupt" });
     } catch (error) {
       const mainWindow = options.getMainWindow();
       if (mainWindow !== null && !mainWindow.isDestroyed()) {
@@ -112,18 +84,5 @@ export function registerSidecarBridge(
         error,
       );
     }
-  });
-
-  onSidecarStatus((status) => {
-    const mainWindow = options.getMainWindow();
-
-    if (mainWindow === null || mainWindow.isDestroyed()) {
-      return;
-    }
-
-    mainWindow.webContents.send(
-      MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS,
-      status,
-    );
   });
 }
