@@ -30,11 +30,13 @@ export default function VoiceMessageBubble({
   const isPlayable = audioPath !== undefined && audioPath !== 'pending'
 
   useEffect(() => {
-    const audio = audioRef.current
+    let cancelled = false
 
+    const audio = audioRef.current
     if (audio !== null) {
       audio.pause()
-      audio.src = ''
+      audio.removeAttribute('src')
+      audio.load()
     }
 
     setAudioSrc(null)
@@ -42,7 +44,92 @@ export default function VoiceMessageBubble({
     setIsPlaying(false)
     setCurrentTime(0)
     setDuration(0)
-  }, [audioPath])
+
+    if (!isPlayable || audioPath === undefined) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setIsLoadingAudio(true)
+
+    void window.api
+      .getSessionMessageAudio({
+        audioPath,
+      })
+      .then((nextSrc) => {
+        if (!cancelled) {
+          setAudioSrc(nextSrc)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('[VoiceMessageBubble] Failed to load voice message:', error)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAudio(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [audioPath, isPlayable])
+
+  useEffect(() => {
+    const audioSrcValue = audioSrc
+
+    if (audioSrcValue === null) {
+      return
+    }
+
+    const audio = audioRef.current ?? new Audio()
+    audio.preload = 'metadata'
+    audioRef.current = audio
+
+    const handleLoadedMetadata = (): void => {
+      setDuration(audio.duration || 0)
+    }
+
+    const handleTimeUpdate = (): void => {
+      setCurrentTime(audio.currentTime)
+    }
+
+    const handleEnded = (): void => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    }
+
+    const handlePause = (): void => {
+      setIsPlaying(false)
+    }
+
+    const handlePlay = (): void => {
+      setIsPlaying(true)
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('pause', handlePause)
+    audio.addEventListener('play', handlePlay)
+    audio.src = audioSrcValue
+    audio.load()
+
+    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      setDuration(audio.duration || 0)
+    }
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('pause', handlePause)
+      audio.removeEventListener('play', handlePlay)
+    }
+  }, [audioSrc])
 
   useEffect(() => {
     return () => {
@@ -59,17 +146,11 @@ export default function VoiceMessageBubble({
       return audioSrc
     }
 
-    setIsLoadingAudio(true)
-
-    try {
-      const nextSrc = await window.api.getSessionMessageAudio({
-        audioPath,
-      })
-      setAudioSrc(nextSrc)
-      return nextSrc
-    } finally {
-      setIsLoadingAudio(false)
-    }
+    const nextSrc = await window.api.getSessionMessageAudio({
+      audioPath,
+    })
+    setAudioSrc(nextSrc)
+    return nextSrc
   }
 
   async function handleTogglePlayback(): Promise<void> {
@@ -81,24 +162,10 @@ export default function VoiceMessageBubble({
     const audio = audioRef.current ?? new Audio()
     audioRef.current = audio
 
-    audio.onloadedmetadata = () => {
-      setDuration(audio.duration || 0)
+    if (audio.src !== nextSrc) {
+      audio.src = nextSrc
+      audio.load()
     }
-    audio.ontimeupdate = () => {
-      setCurrentTime(audio.currentTime)
-    }
-    audio.onended = () => {
-      setIsPlaying(false)
-      setCurrentTime(0)
-    }
-    audio.onpause = () => {
-      setIsPlaying(false)
-    }
-    audio.onplay = () => {
-      setIsPlaying(true)
-    }
-
-    audio.src = nextSrc
 
     if (audio.paused) {
       try {
@@ -117,7 +184,7 @@ export default function VoiceMessageBubble({
       <div className="flex items-center gap-3">
         <button
           aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!isPlayable || isLoadingAudio}
           onClick={() => {
             void handleTogglePlayback()
@@ -125,23 +192,22 @@ export default function VoiceMessageBubble({
           type="button"
         >
           {isLoadingAudio ? (
-            <Loader2 className="animate-spin" size={14} />
+            <Loader2 className="animate-spin text-white" size={14} />
           ) : isPlaying ? (
-            <Pause size={14} />
+            <Pause fill="currentColor" strokeWidth={0} className="text-white" size={15} />
           ) : (
-            <Play size={14} />
+            <Play fill="currentColor" strokeWidth={0} className="text-white" size={15} />
           )}
         </button>
 
-        <div className="min-w-0">
-          <p className="text-xs font-medium">Voice input</p>
-          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+        <div className="min-w-0 text-white">
+          <p className="text-xs font-medium leading-none">
             {formatTime(currentTime)} / {formatTime(duration)}
           </p>
         </div>
 
         {!isPlayable ? (
-          <span className="ml-auto text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          <span className="ml-auto text-[11px] uppercase tracking-[0.16em] text-white/70">
             Pending
           </span>
         ) : null}

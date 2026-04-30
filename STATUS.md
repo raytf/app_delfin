@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-30 (shared entity move; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed; sessions screen inlined; conversation bubbles split)
+> Last updated: 2026-04-30 (shared entity move; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed; sessions screen inlined; conversation bubbles split; voice bubble now preloads metadata)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -103,7 +103,7 @@
 | `src/renderer/components/conversation/SessionConversation.tsx` | ✅ | Shared conversation renderer with role-specific text and playable voice bubbles |
 | `src/renderer/components/conversation/Avatar.tsx` | ✅ | Role-aware avatar bubble for user and Delfin turns |
 | `src/renderer/components/conversation/TextMessageBubble.tsx` | ✅ | Text bubble wrapper used for assistant text and non-audio user messages |
-| `src/renderer/components/conversation/VoiceMessageBubble.tsx` | ✅ | Playable voice bubble with inline audio playback controls |
+| `src/renderer/components/conversation/VoiceMessageBubble.tsx` | ✅ | Playable voice bubble with inline audio playback controls and preloaded duration |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
