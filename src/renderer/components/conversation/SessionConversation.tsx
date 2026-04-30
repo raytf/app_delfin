@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Layers3, Loader2, Pause, Play, User } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Layers3 } from 'lucide-react'
 import type { SessionMessage } from '../../../shared/entities/session'
+import Avatar from './Avatar'
+import TextMessageBubble from './TextMessageBubble'
+import VoiceMessageBubble from './VoiceMessageBubble'
 import delfinLogo from '../../assets/logo-alt.png'
 import ThinkingDots from './ThinkingDots'
 
@@ -10,199 +13,6 @@ interface SessionConversationProps {
   isAudioPlaying: boolean
   isSubmitting: boolean
   messages: SessionMessage[]
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return '0:00'
-  }
-
-  const wholeSeconds = Math.floor(seconds)
-  const minutes = Math.floor(wholeSeconds / 60)
-  const remainder = wholeSeconds % 60
-  return `${minutes}:${String(remainder).padStart(2, '0')}`
-}
-
-function DelfinAvatar() {
-  return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)]">
-      <img
-        alt="Delfin"
-        className="h-6 w-6 object-contain"
-        src={delfinLogo}
-      />
-    </div>
-  )
-}
-
-function UserAvatar() {
-  return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-2)] text-[var(--text-muted)]">
-      <User size={16} />
-    </div>
-  )
-}
-
-function TextMessageBubble({
-  children,
-  isUser,
-  showSpeakingLabel,
-}: {
-  children: ReactNode
-  isUser: boolean
-  showSpeakingLabel: boolean
-}) {
-  return (
-    <div
-      className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-        isUser
-          ? 'bg-[var(--primary)] text-white'
-          : 'border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
-      }`}
-    >
-      {showSpeakingLabel ? (
-        <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--primary)]">
-          Speaking
-        </p>
-      ) : null}
-      {children}
-    </div>
-  )
-}
-
-function VoiceMessageBubble({
-  audioPath,
-}: {
-  audioPath?: string
-}) {
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [audioSrc, setAudioSrc] = useState<string | null>(null)
-  const [isLoadingAudio, setIsLoadingAudio] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-
-  const isPlayable = audioPath !== undefined && audioPath !== 'pending'
-
-  useEffect(() => {
-    const audio = audioRef.current
-
-    if (audio !== null) {
-      audio.pause()
-      audio.src = ''
-    }
-
-    setAudioSrc(null)
-    setIsLoadingAudio(false)
-    setIsPlaying(false)
-    setCurrentTime(0)
-    setDuration(0)
-  }, [audioPath])
-
-  useEffect(() => {
-    return () => {
-      audioRef.current?.pause()
-    }
-  }, [])
-
-  async function loadAudioSource(): Promise<string | null> {
-    if (audioPath === undefined || audioPath === 'pending') {
-      return null
-    }
-
-    if (audioSrc !== null) {
-      return audioSrc
-    }
-
-    setIsLoadingAudio(true)
-
-    try {
-      const nextSrc = await window.api.getSessionMessageAudio({
-        audioPath,
-      })
-      setAudioSrc(nextSrc)
-      return nextSrc
-    } finally {
-      setIsLoadingAudio(false)
-    }
-  }
-
-  async function handleTogglePlayback(): Promise<void> {
-    const nextSrc = await loadAudioSource()
-    if (nextSrc === null) {
-      return
-    }
-
-    const audio = audioRef.current ?? new Audio()
-    audioRef.current = audio
-
-    audio.onloadedmetadata = () => {
-      setDuration(audio.duration || 0)
-    }
-    audio.ontimeupdate = () => {
-      setCurrentTime(audio.currentTime)
-    }
-    audio.onended = () => {
-      setIsPlaying(false)
-      setCurrentTime(0)
-    }
-    audio.onpause = () => {
-      setIsPlaying(false)
-    }
-    audio.onplay = () => {
-      setIsPlaying(true)
-    }
-
-    audio.src = nextSrc
-
-    if (audio.paused) {
-      try {
-        await audio.play()
-      } catch (error) {
-        console.error('[SessionConversation] Failed to play voice message:', error)
-      }
-      return
-    }
-
-    audio.pause()
-  }
-
-  return (
-    <TextMessageBubble isUser showSpeakingLabel={false}>
-      <div className="flex items-center gap-3">
-        <button
-          aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!isPlayable || isLoadingAudio}
-          onClick={() => {
-            void handleTogglePlayback()
-          }}
-          type="button"
-        >
-          {isLoadingAudio ? (
-            <Loader2 className="animate-spin" size={14} />
-          ) : isPlaying ? (
-            <Pause size={14} />
-          ) : (
-            <Play size={14} />
-          )}
-        </button>
-
-        <div className="min-w-0">
-          <p className="text-xs font-medium">Voice input</p>
-          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </p>
-        </div>
-
-        {!isPlayable ? (
-          <span className="ml-auto text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            Pending
-          </span>
-        ) : null}
-      </div>
-    </TextMessageBubble>
-  )
 }
 
 export default function SessionConversation({
@@ -278,7 +88,7 @@ export default function SessionConversation({
               className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
               key={message.id}
             >
-              {isUser ? <UserAvatar /> : <DelfinAvatar />}
+              <Avatar variant={isUser ? 'user' : 'delfin'} />
 
               <div
                 className={`flex max-w-[75%] flex-col ${

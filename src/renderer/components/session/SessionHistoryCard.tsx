@@ -1,5 +1,5 @@
 import { Clock3, MessageSquare, Trash2 } from 'lucide-react'
-import type { Session } from '../../shared/types'
+import type { Session } from '../../../shared/entities/session'
 
 interface SessionHistoryCardProps {
   onClick?: () => void

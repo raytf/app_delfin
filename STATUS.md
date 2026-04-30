@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-30 (shared entity move; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed)
+> Last updated: 2026-04-30 (shared entity move; ElectronAPI abstraction and channel constants added; preset list removed; dead sidecar send/status plumbing removed; sessions screen inlined; conversation bubbles split)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -96,9 +96,14 @@
 | `src/renderer/features/active-session/ActiveSessionScreen.tsx` | ✅ | Renders directly from overlay store mode; local active-session reducer removed |
 | `src/renderer/features/active-session/hooks/useActiveSession.ts` | ✅ | Active-session state/actions hook; replaces `useActiveSessionController`, uses shared overlay hook, and ignores stale cancelled-turn audio/fallback output |
 | `src/renderer/components/HomeScreen.tsx` | ✅ | Landing screen with Start Session button and recent-session deletion |
+| `src/renderer/components/session/SessionHistoryCard.tsx` | ✅ | Reusable session card used across home and sessions screens |
 | `src/renderer/components/ExpandedSessionView.tsx` | ✅ | Prompt form, status display, auto-scrolling chat box with animated typing indicator |
 | `src/renderer/components/MinimizedSessionBar.tsx` | ✅ | Compact overlay bar with prompt input, expand, and end-session buttons |
-| `src/renderer/components/SessionConversation.tsx` | ✅ | Shared conversation renderer with role-specific text and playable voice bubbles |
+| `src/renderer/features/sessions/SessionsScreen.tsx` | ✅ | Inline all-sessions page with back navigation and session cards |
+| `src/renderer/components/conversation/SessionConversation.tsx` | ✅ | Shared conversation renderer with role-specific text and playable voice bubbles |
+| `src/renderer/components/conversation/Avatar.tsx` | ✅ | Role-aware avatar bubble for user and Delfin turns |
+| `src/renderer/components/conversation/TextMessageBubble.tsx` | ✅ | Text bubble wrapper used for assistant text and non-audio user messages |
+| `src/renderer/components/conversation/VoiceMessageBubble.tsx` | ✅ | Playable voice bubble with inline audio playback controls |
 | `src/renderer/components/ChatPanel.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/ChatInput.tsx` | ⚠️ | Placeholder |
 | `src/renderer/components/CapturePreview.tsx` | ⚠️ | Placeholder |
