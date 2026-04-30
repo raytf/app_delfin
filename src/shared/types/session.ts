@@ -1,5 +1,35 @@
 import type { PresetId } from "../enums/presetId";
-export type { SessionStatus } from "../enums/sessionStatus";
+import type { SessionStatus } from "../enums/sessionStatus";
+
+export interface SessionMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+  latencyMs?: number;
+  imagePath?: string;
+  imageDataUrl?: string;
+  audioPath?: string;
+  interrupted?: boolean;
+}
+
+export interface Session {
+  id: string;
+  startedAt: number;
+  endedAt: number | null;
+  status: SessionStatus;
+  presetId: PresetId | null;
+  name: string;
+  sourceLabel: string | null;
+  messageCount: number;
+  lastUpdatedAt: number;
+}
+
+export interface SessionDetail extends Session {
+  messages: SessionMessage[];
+}
+
+export type { SessionStatus };
 
 export interface SessionPromptRequest {
   sessionId: string;
@@ -43,9 +73,3 @@ export interface EndedSessionSnapshot {
   duration: number;
   messageCount: number;
 }
-
-export type {
-  SessionDetail,
-  SessionMessage,
-  Session,
-} from "../../main/sidecar/session/entities";

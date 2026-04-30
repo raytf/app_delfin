@@ -22,9 +22,8 @@ import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/session/ws";
 import { validateEnv } from "./envValidation";
 import {
   MAIN_TO_RENDERER_CHANNELS,
-  type OverlayMode,
-  type OverlayState,
-} from "../shared/types";
+} from "../shared/constants";
+import type { OverlayMode, OverlayState } from "../shared/types";
 
 config(); // load .env from repo root
 validateEnv(); // warn on missing / invalid env vars — never throws

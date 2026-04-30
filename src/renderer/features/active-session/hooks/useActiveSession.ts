@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   type ChatMessage,
   type EndedSessionSnapshot,
-  MAIN_TO_RENDERER_CHANNELS,
   type OverlayMode,
 } from '../../../../shared/types'
+import { PresetId } from '../../../../shared/enums/presetId'
+import { MAIN_TO_RENDERER_CHANNELS } from '../../../../shared/constants'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
 import { useOverlayState } from '../../../hooks/useOverlayState'
 import { useSessionStore } from '../../../stores/sessionStore'
@@ -318,7 +319,7 @@ export function useActiveSession({
           sessionId: activeSessionId,
           messageId,
           text: VOICE_TURN_TEXT,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
           audio: wavBase64,
         })
         .then((response) => {
@@ -860,7 +861,7 @@ export function useActiveSession({
           sessionId: activeSessionId,
           messageId,
           text: trimmedText,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
         })
 
         setUserMessageMedia({

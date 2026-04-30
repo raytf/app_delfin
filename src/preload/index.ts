@@ -2,11 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
-} from "../shared/types";
+} from "../shared/constants";
+import type { ElectronAPI } from "../shared/abstractions";
 import type {
-  CapturedFrame,
-  SidecarStatus,
-  ElectronAPI,
   OverlayState,
   SessionDetail,
   SessionDetailRequest,
@@ -19,7 +17,6 @@ import type {
   SessionStopRequest,
   OverlayMode,
   Session,
-  SidecarSessionOutboundMessage,
 } from "../shared/types";
 
 const api: ElectronAPI = {
@@ -30,12 +27,7 @@ const api: ElectronAPI = {
   // Evaluated once at preload time. Defaults to false so speech output is opt-in.
   ttsEnabled: process.env.TTS_ENABLED === "true",
 
-  captureNow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.CAPTURE_NOW),
-
-  captureAutoRefresh: (config: { enabled: boolean; intervalMs: number }) =>
-    ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.CAPTURE_AUTO_REFRESH, config),
-
-  sidecarSend: (msg: SidecarSessionOutboundMessage) =>
+  sidecarSend: (msg) =>
     ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, msg),
 
   sidecarInterrupt: () =>
@@ -95,11 +87,6 @@ const api: ElectronAPI = {
 
   closeWindow: () => ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE),
 
-  onFrameCaptured: (cb: (frame: CapturedFrame) => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) =>
-      cb(frame),
-    ),
-
   onOverlayError: (cb: (data: { message: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.OVERLAY_ERROR, (_event, data) =>
       cb(data),
@@ -140,7 +127,7 @@ const api: ElectronAPI = {
       cb(data),
     ),
 
-  onSidecarStatus: (cb: (data: SidecarStatus) => void) =>
+  onSidecarStatus: (cb) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, (_event, data) =>
       cb(data),
     ),

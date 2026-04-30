@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '../shared/types'
+import type { ElectronAPI } from '../shared/abstractions'
 
 declare global {
   interface Window {

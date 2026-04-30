@@ -4,18 +4,18 @@ import {
   captureForegroundWindow,
   capturePrimaryScreen,
 } from "../capture/captureService";
+import { PresetId } from "../../shared/enums/presetId";
 import { sendToSidecar } from "../sidecar/session/ws";
-import { sessionPromptRequestSchema } from "../../shared/schemas";
-import {
-  MAIN_TO_RENDERER_CHANNELS,
-  RENDERER_TO_MAIN_CHANNELS,
-  type SessionDetailRequest,
-  type SessionDeleteRequest,
-  type SessionMessageImageRequest,
-  type SessionPromptResponse,
-  type SessionStartRequest,
-  type SessionStartResponse,
-  type SessionStopRequest,
+import { RENDERER_TO_MAIN_CHANNELS } from "../../shared/constants";
+import type {
+  SessionDetailRequest,
+  SessionDeleteRequest,
+  SessionMessageImageRequest,
+  SessionPromptRequest,
+  SessionPromptResponse,
+  SessionStartRequest,
+  SessionStartResponse,
+  SessionStopRequest,
 } from "../../shared/types";
 import type { RegisterIpcHandlersOptions } from "./types";
 
@@ -36,7 +36,7 @@ export function registerSessionIpcHandlers(
 
       const response = await options.sidecarSessionClient.createSession({
         sessionName,
-        presetId: "lecture-slide",
+        presetId: PresetId.LectureSlide,
       });
       await options.switchOverlayMode("minimized-compact");
       return response;
@@ -53,8 +53,10 @@ export function registerSessionIpcHandlers(
 
   ipcMain.handle(
     RENDERER_TO_MAIN_CHANNELS.SESSION_SUBMIT_PROMPT,
-    async (_event, rawRequest): Promise<SessionPromptResponse> => {
-      const request = sessionPromptRequestSchema.parse(rawRequest);
+    async (
+      _event,
+      request: SessionPromptRequest,
+    ): Promise<SessionPromptResponse> => {
       const mainWindow = options.getMainWindow();
 
       if (mainWindow === null || mainWindow.isDestroyed()) {
@@ -74,11 +76,6 @@ export function registerSessionIpcHandlers(
         options.getOverlayState().mode === "expanded"
           ? await captureForegroundWindow()
           : await capturePrimaryScreen();
-
-      mainWindow.webContents.send(
-        MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED,
-        frame,
-      );
 
       try {
         sendToSidecar({

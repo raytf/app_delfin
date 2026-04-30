@@ -1,21 +1,21 @@
 import WebSocket from "ws";
 import { sidecarSessionInboundMessageSchema } from "../../../shared/schemas";
-import type { SidecarStatus } from "../../../shared/types";
 import type {
-  SidecarSessionInboundMessage,
-  SidecarSessionInterruptMessage,
-  SidecarSessionOutboundMessage,
-} from "../../../shared/types";
+  SidecarConnectionStatus,
+  SidecarSessionInterruptTurnMessage,
+  SidecarSessionStreamMessage,
+  SidecarSessionSubmitTurnMessage,
+} from "../../../shared/schemas/sidecar";
 
 let socket: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let currentUrl: string = "";
-let messageHandler: ((message: SidecarSessionInboundMessage) => void) | null =
+let messageHandler: ((message: SidecarSessionStreamMessage) => void) | null =
   null;
-let statusHandler: ((status: SidecarStatus) => void) | null = null;
-let currentStatus: SidecarStatus = { connected: false };
+let statusHandler: ((status: SidecarConnectionStatus) => void) | null = null;
+let currentStatus: SidecarConnectionStatus = { connected: false };
 
-function emitStatus(status: SidecarStatus): void {
+function emitStatus(status: SidecarConnectionStatus): void {
   currentStatus = status;
   statusHandler?.(status);
 }
@@ -72,7 +72,9 @@ export function connectToSidecar(wsUrl: string): void {
 }
 
 export function sendToSidecar(
-  message: SidecarSessionOutboundMessage | SidecarSessionInterruptMessage,
+  message:
+    | SidecarSessionSubmitTurnMessage
+    | SidecarSessionInterruptTurnMessage,
 ): void {
   if (socket?.readyState !== WebSocket.OPEN) {
     throw new Error("Sidecar WebSocket is not connected.");
@@ -82,18 +84,18 @@ export function sendToSidecar(
 }
 
 export function onSidecarMessage(
-  handler: (message: SidecarSessionInboundMessage) => void,
+  handler: (message: SidecarSessionStreamMessage) => void,
 ): void {
   messageHandler = handler;
 }
 
 export function onSidecarStatus(
-  handler: (status: SidecarStatus) => void,
+  handler: (status: SidecarConnectionStatus) => void,
 ): void {
   statusHandler = handler;
 }
 
-export function getSidecarStatus(): SidecarStatus {
+export function getSidecarStatus(): SidecarConnectionStatus {
   return currentStatus;
 }
 

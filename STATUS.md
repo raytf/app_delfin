@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-30 (sidecar session module split; main-process HTTP helper added; session-scoped stream types renamed)
+> Last updated: 2026-04-30 (shared folder split; ElectronAPI abstraction and channel constants added; preset list removed; sidecar session types normalized)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -11,10 +11,12 @@
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
 | `.env.example` + dotenv loading | ✅ | Shared env contract for Electron and sidecar, including voice/TTS settings |
-| `src/shared/types/index.ts` | ✅ | IPC, session-scoped stream, overlay, audio-bearing turn types, `AnyObj`, and re-exported session models |
-| `src/shared/schemas/index.ts` | ✅ | Zod validation for session stream and session prompt contracts |
-| `src/shared/constants/index.ts` | ✅ | Presets, sidebar constants, `VOICE_TURN_TEXT` |
-| `src/shared/enums/*` | ✅ | Preset, session status, overlay mode, and stream-message enums |
+| `src/shared/types/index.ts` | ✅ | Common, overlay, and session contracts used by renderer and main |
+| `src/shared/schemas/index.ts` | ✅ | Zod validation for sidecar stream and connection contracts |
+| `src/shared/constants/index.ts` | ✅ | Channel maps, UI constants, `VOICE_TURN_TEXT` |
+| `src/shared/abstractions/electronApi.ts` | ✅ | Preload bridge contract exposed on `window.api` |
+| `src/shared/constants/channels.ts` | ✅ | Renderer-to-main and main-to-renderer IPC channel names |
+| `src/shared/enums/*` | ✅ | Preset ID enum, session status, overlay mode, and sidecar stream type enum |
 | `src/shared/abstractions/httpRequestHelper.ts` | ✅ | Main-process API client abstraction shared by the HTTP helper implementation |
 | `src/shared/index.ts` | ✅ | Shared barrel exports for constants, abstractions, schemas, and types |
 | `scripts/mock-sidecar.js` | ✅ | Mock sidecar for Electron/UI work |
@@ -77,6 +79,8 @@
 | `src/main/sidecar/session/entities.ts` | ✅ | Canonical `Session` / `SessionDetail` models and session status enum |
 | `src/main/sidecar/session/response.ts` | ✅ | Session response DTOs |
 | `src/main/sidecar/session/mappers.ts` | ✅ | DTO-to-model mapping layer for session list/detail/message payloads |
+| `src/shared/schemas/sidecar.ts` | ✅ | Sidecar stream, submit-turn, interrupt, and connection-status schemas with inferred types |
+| `src/shared/types/session.ts` | ✅ | Shared session entities plus request/response DTOs for session IPC |
 | `src/main/ipc/types.ts` | ✅ | `RegisterIpcHandlersOptions` now references the session API client path |
 
 ---

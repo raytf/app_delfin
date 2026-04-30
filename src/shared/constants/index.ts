@@ -1,2 +1,2 @@
-export * from "./presets";
+export * from "./channels";
 export * from "./ui";

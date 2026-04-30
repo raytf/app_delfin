@@ -1,11 +1,8 @@
-export const SIDECAR_SESSION_INBOUND_TYPES = [
-  "token",
-  "audio_start",
-  "audio_chunk",
-  "audio_end",
-  "done",
-  "error",
-] as const;
-
-export type SidecarSessionInboundType =
-  (typeof SIDECAR_SESSION_INBOUND_TYPES)[number];
+export enum SidecarSessionInboundType {
+  Token = "token",
+  AudioStart = "audio_start",
+  AudioChunk = "audio_chunk",
+  AudioEnd = "audio_end",
+  Done = "done",
+  Error = "error",
+}
