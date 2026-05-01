@@ -38,7 +38,11 @@ Independent features that do not fit the numbered phase sequence. Each has a Gat
 
 | File | Status | Description |
 |---|---|---|
-| [`features/desktop-distribution-mvp-spec.md`](features/desktop-distribution-mvp-spec.md) | 🚧 In Progress | Native per-platform installers with a bundled Python sidecar and first-run model download. Gate 1 approved. |
+| [`features/desktop-distribution-mvp-spec.md`](features/desktop-distribution-mvp-spec.md) | 🚧 In Progress | Cross-platform distribution decision record. Revised 2026-05-01: llama-server binary replaces LiteRT-LM. Gate 1 approved. |
+| [`features/inference-benchmarking-spec.md`](features/inference-benchmarking-spec.md) | 🚧 In Progress | Standalone benchmark script comparing LiteRT-LM vs llama-server (TTFT, throughput, memory). Gate 1 — awaiting approval. |
+| [`features/distribution-backend-migration-spec.md`](features/distribution-backend-migration-spec.md) | 🚧 In Progress | Replace LiteRT-LM with llama-server in the Electron bridge; TTS backend investigation (Piper vs frozen kokoro). Gate 1 — awaiting approval. |
+| [`features/distribution-packaging-spec.md`](features/distribution-packaging-spec.md) | 🚧 In Progress | electron-builder config, first-run download orchestration, NSIS/DMG/AppImage installers, GPU stretch goal. Gate 1 — awaiting approval. |
+| [`features/distribution-cicd-spec.md`](features/distribution-cicd-spec.md) | 🚧 In Progress | GitHub Actions matrix builds, distribution channel recommendations, code signing guide. Gate 1 — awaiting approval. |
 | [`features/waveform-ui-spec.md`](features/waveform-ui-spec.md) | ✅ Complete | Reusable `VoiceWaveform` component — state-based colour, per-bar amplitude, user/AI/idle modes |
 | [`features/overlay-waveform-polish-spec.md`](features/overlay-waveform-polish-spec.md) | ✅ Complete | Compact overlay resize and shift to analyser-driven per-bar waveform rendering |
 | [`features/minimized-overlay-waveform-continuity-spec.md`](features/minimized-overlay-waveform-continuity-spec.md) | ✅ Complete | Persistent waveform/status chrome across all minimized overlay variants |

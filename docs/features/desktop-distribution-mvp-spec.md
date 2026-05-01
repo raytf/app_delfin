@@ -8,13 +8,46 @@
 |---|---|
 | **Status** | Gate 1 approved — ready for implementation |
 | **Approval date** | 2026-04-22 |
+| **Revised on** | 2026-05-01 (see revision section below) |
 | **Approver** | Human reviewer |
 | **Bundle identifier** | `com.delfin.desktop` |
 | **Target platforms** | Windows x64, macOS x64, macOS arm64, Linux x64 |
-| **Packaging decision** | Native Electron installers with a bundled frozen Python sidecar |
-| **Model delivery** | First-run Hugging Face download |
-| **Inference scope** | CPU-only for MVP |
-| **Deferred by approval** | Docker, GPU packaged builds, full CI/CD publishing, auto-update implementation |
+| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → llama-server pre-built binary (first-run download) + separate TTS sidecar; see revision |
+| **Model delivery** | First-run download (llama-server binary + GGUF model + TTS assets) |
+| **Inference scope** | CPU-only for MVP; CUDA/Metal as stretch goal |
+| **Deferred by approval** | Docker, full CI/CD publishing, auto-update implementation |
+
+## Revision — 2026-05-01
+
+### What changed and why
+
+The original approved approach (freeze the Python sidecar with PyInstaller) was revised after discovering that `litert-lm-api-nightly` — the core inference engine — publishes no `win_amd64` wheel and is explicitly Windows-WSL-only by Google. PyInstaller freezing a Linux-only C extension cannot produce a native Windows executable; the WSL2 split would persist even in a "packaged" build.
+
+**Research finding:** `llama.cpp` landed Gemma 4 GGUF support in April 2026 and publishes pre-built `llama-server` binaries for Windows x64, macOS arm64/x64, and Linux x64. Replacing LiteRT-LM with `llama-server` eliminates the WSL2 requirement at the source.
+
+### Decision: Option A — llama-server binary sidecar
+
+| Axis | Old decision | New decision |
+|---|---|---|
+| Inference engine | LiteRT-LM (Python, Linux/Mac only) | llama-server binary (C++, all platforms) |
+| Sidecar delivery | PyInstaller-frozen Python bundle | Pre-built binary downloaded at first run |
+| TTS | Unified Python sidecar (kokoro-onnx) | Investigate Piper TTS binary or frozen kokoro-onnx separately |
+| Installer size | ~500 MB (frozen Python stack) | ~50 MB (binary only; model downloaded separately) |
+| GPU | Deferred | CPU-first; CUDA/Metal detection as stretch goal |
+
+### Benchmark prerequisite
+
+Before finalising the backend switch, an empirical benchmark comparing LiteRT-LM vs llama-server on the Gemma 4 E2B model is required. LiteRT-LM is reportedly more optimised for Gemma 4; the benchmark spec is at `docs/features/inference-benchmarking-spec.md`.
+
+### Implementation sub-specs
+
+The original monolithic execution track is now split into three focused specs:
+
+| Spec | Scope |
+|---|---|
+| [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Replace LiteRT-LM with llama-server; TTS sidecar investigation |
+| [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers, GPU stretch |
+| [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds, artifact publishing, distribution recommendations |
 
 ## Goal
 
@@ -67,34 +100,41 @@ Allow students on the supported desktop platforms to download, install, and run 
 
 ## Proposed solution
 
-### Packaging strategy
-- Freeze the Python sidecar with PyInstaller into a platform-specific executable or app folder
-- Bundle that frozen sidecar inside the Electron app using `electron-builder` resources
-- In packaged builds, Electron launches the bundled sidecar instead of a Python venv
-- In development, the current `sidecar/.venv` path remains the default
+> **Note:** The solution below reflects the 2026-05-01 revision. See the Revision section above for context.
+
+### Inference strategy
+- Replace LiteRT-LM with the pre-built `llama-server` binary from llama.cpp releases (Gemma 4 GGUF support landed April 2026)
+- Download the platform-appropriate `llama-server` binary at first run alongside the GGUF model file
+- Do not bundle the binary inside the installer; download it to `app.getPath('userData')` on first launch
+- The Electron main process spawns `llama-server` as a child process and communicates with it via its OpenAI-compatible REST API
+
+### TTS strategy
+- Investigate whether Piper TTS (pre-built cross-platform binary) can replace the Python `kokoro-onnx` pipeline
+- If Piper TTS voice quality is acceptable, ship it as a second downloaded binary alongside llama-server
+- If not, freeze `kokoro-onnx` + `fastapi` as a minimal Python TTS sidecar using PyInstaller (Linux/Mac/Windows separately in CI)
+- Decision deferred until the TTS investigation track in `distribution-backend-migration-spec.md`
 
 ### Model strategy
-- Do not ship Gemma or Kokoro model files inside installers
-- On first launch, detect missing assets and guide the user through an in-app setup flow
-- Store model/cache assets in OS-writable user directories, not inside the installed app bundle
+- Do not ship Gemma or TTS model files inside installers
+- On first launch, detect missing assets and show an in-app setup/download screen
+- Store all downloaded assets in OS-writable user directories under `app.getPath('userData')`
+- Use a manifest file to track which versions of each asset are present
 
 ### Runtime strategy
-- Keep the existing WebSocket protocol between renderer and sidecar
-- Add a packaged-runtime path resolver in Electron main
-- Keep CPU as the only packaged inference target for MVP
-- Treat auto-update as a follow-up track after packaging is stable
+- Keep the existing WebSocket-based renderer ↔ main IPC protocol
+- The Electron main process acts as a bridge: renderer sends prompts via IPC; main calls llama-server REST API and relays streaming tokens back
+- In development mode, `npm run dev:full` continues to use the Python sidecar via `.venv` (no change for contributors)
+- CPU-only for MVP; CUDA (Windows/Linux) and Metal (macOS) are stretch goals once CPU path is stable
 
 ## Execution track map
 
-| Track | Goal | Primary output |
+The implementation is split across three sub-specs. This file remains the overarching decision record.
+
+| Track | Spec | Goal |
 |---|---|---|
-| **D0** — feasibility spike | Prove LiteRT-LM + current Python deps can be frozen successfully | Working frozen sidecar with `/health` |
-| **D1** — bundled sidecar runtime | Launch bundled sidecar from packaged Electron builds | Packaged app starts sidecar without Python |
-| **D2** — first-run bootstrap UX | Replace manual setup scripts for end users with in-app setup | Download/setup screen with retries |
-| **D3** — cross-platform installers | Produce installable artifacts for supported OS targets | NSIS, DMG, AppImage / optional `.deb` |
-| **D4** — platform hardening | Reduce student friction on real machines | Permissions/signing/notarization checklist |
-| **D5** — release operations | Make shipping repeatable | Release checklist and future CI notes |
-| **D6** — auto-update assessment | Decide whether and how to adopt `electron-updater` | Written recommendation or follow-up spec |
+| **DM0–DM2** — backend migration | [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Replace LiteRT-LM with llama-server; resolve TTS backend |
+| **DP0–DP3** — packaging | [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers |
+| **DC0–DC2** — CI/CD | [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds and distribution channel |
 
 ## Interface contract
 
@@ -171,20 +211,23 @@ MVP distribution artifacts must target:
 
 ## Risks and open questions
 
-1. **Freezing LiteRT-LM:** the main technical risk is whether PyInstaller can package `litert-lm-api-nightly` and all native dependencies cleanly on every target OS.
-2. **espeak-ng packaging:** the current WSL2/Linux fix may need to become a proper packaged-data path for frozen sidecar builds.
-3. **Hugging Face access friction:** if Gemma download requires license acceptance or login on some machines, the setup UX will need a clear fallback/error path.
-4. **Download progress fidelity:** Gemma progress may be coarse if download remains fully inside `huggingface_hub`; Electron-managed progress may be needed later.
-5. **Code signing and notarization:** MVP may be testable without full signing, but public-friendly releases will eventually need macOS notarization and Windows code signing.
+1. **Gemma 4 GGUF quality vs LiteRT-LM**: GGUF Q4_K_M quantisation may produce lower quality outputs or slower throughput than LiteRT-LM's native format. The inference benchmarking spec (`inference-benchmarking-spec.md`) must be run and reviewed before the backend migration is finalised.
+2. **TTS backend decision**: Piper TTS may not match Kokoro voice quality; the TTS investigation in `distribution-backend-migration-spec.md` resolves this. The migration may need a fallback path.
+3. **llama-server API stability**: llama.cpp uses build numbers (not semantic versions); downstream API changes are possible. Pin to a tested build number and test on upgrade.
+4. **Hugging Face access friction**: GGUF model downloads from `ggml-org` do not require login or license acceptance (unlike the gated LiteRT model). This is an improvement over the original plan, but network failures still need graceful UX.
+5. **Code signing and notarization**: MVP is testable without signing. macOS Gatekeeper will block unsigned apps on clean machines unless the user explicitly allows them. Windows Defender SmartScreen shows a warning for unsigned `.exe` installers. Both are deferred to the hardening track in `distribution-packaging-spec.md`.
+6. **espeak-ng path**: the current WSL2 espeak-ng binary patch in `sidecar/tts.py` becomes irrelevant if TTS moves to Piper. If kokoro-onnx is retained, a proper data-path solution is needed in the frozen bundle.
 
 ## Verification checklist for implementation
 
-- [ ] D0 spike produces a frozen sidecar that responds successfully at `/health`
-- [ ] Packaged Electron app can launch the bundled sidecar on at least one platform before broad rollout
-- [ ] First-run bootstrap works on a clean machine with no existing HF/Kokoro cache
-- [ ] One real prompt succeeds in a packaged build after bootstrap completes
-- [ ] `npm run dev:full` still works for local development
-- [ ] Windows installer installs and launches successfully
-- [ ] macOS x64 and arm64 builds install and launch successfully
+Sub-spec checklists are definitive. This high-level checklist covers the end-to-end milestone:
+
+- [ ] Inference benchmark shows llama-server is acceptable vs LiteRT-LM (see `inference-benchmarking-spec.md`)
+- [ ] TTS backend decision is made (Piper or frozen kokoro-onnx)
+- [ ] Packaged Electron app can launch llama-server and complete one real prompt on all three target platforms
+- [ ] First-run download flow works on a clean machine with no existing model cache
+- [ ] `npm run dev:full` still works for contributors using the original Python sidecar
+- [ ] Windows x64 NSIS installer installs and launches successfully
+- [ ] macOS x64 and arm64 DMG installs and launches successfully
 - [ ] Linux x64 AppImage launches successfully
-- [ ] Release checklist and future CI notes are documented before calling the feature ready
+- [ ] CI/CD produces platform artifacts automatically on push to a release branch

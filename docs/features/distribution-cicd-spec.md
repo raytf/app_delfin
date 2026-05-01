@@ -1,0 +1,237 @@
+# Distribution — CI/CD Spec
+
+> Gate 1 spec — awaiting approval before implementation.
+> Part of the Desktop Distribution MVP track. Read `desktop-distribution-mvp-spec.md` first.
+> Depends on `distribution-packaging-spec.md` tracks DP0–DP2 being complete.
+
+## Gate Resolution
+
+| Field | Value |
+|---|---|
+| **Status** | Gate 1 — awaiting approval |
+| **Created** | 2026-05-01 |
+| **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally) |
+
+## Goal
+
+Set up GitHub Actions workflows that automatically build platform-specific Delfin installers on Windows, macOS, and Linux runners whenever a release is cut. Provide clear guidance on distribution channel options and a repeatable release process that works from a local machine today and migrates to CI-produced artifacts later.
+
+## Background
+
+Currently, all builds are done locally on a single developer machine. Cross-platform distribution requires building on each target OS (electron-builder cannot cross-compile for all targets). GitHub Actions provides free hosted runners for all three platforms, making it the natural fit.
+
+The CI/CD work is the last track in the distribution milestone. Completing it makes the release process repeatable and removes the need for a developer to have access to all three OS environments.
+
+## Scope
+
+### Track DC0 — local release workflow (immediate)
+
+Before CI is set up, document and script a repeatable manual release process so builds can be produced today.
+
+| File | Change |
+|---|---|
+| `scripts/release-local.mjs` | New: interactive checklist script that builds for the current platform, names the output file correctly, and prints next steps |
+| `docs/features/distribution-cicd-spec.md` | This spec — includes the manual release checklist below |
+
+**Manual release checklist (current platform):**
+
+```
+1. Ensure npm run dev:full works and one real prompt succeeds
+2. Run npm run dist
+3. Verify the output in dist/:
+   - Windows: Delfin Setup x.y.z.exe
+   - macOS:   Delfin-x.y.z-arm64.dmg / Delfin-x.y.z.dmg
+   - Linux:   Delfin-x.y.z.AppImage
+4. Smoke test the installer on a clean user account (no existing userData)
+5. Upload the artifact to GitHub Releases as a draft
+6. Repeat steps 2–5 on each other target OS
+7. Publish the draft release once all three platform artifacts are attached
+```
+
+### Track DC1 — GitHub Actions matrix build
+
+Create a workflow that builds all platform artifacts on push to `release/*` branches or on manual trigger.
+
+#### File: `.github/workflows/dist.yml`
+
+```yaml
+name: Build distribution artifacts
+
+on:
+  push:
+    branches: ['release/*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.1.0)'
+        required: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: 'dist/*.exe'
+          - os: macos-latest       # arm64 runner
+            platform: mac
+            artifact: 'dist/*.dmg'
+          - os: ubuntu-latest
+            platform: linux
+            artifact: 'dist/*.AppImage'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app
+        run: npm run build
+
+      - name: Package (${{ matrix.platform }})
+        run: npm run dist
+        env:
+          # Provide signing credentials via secrets (see DC2)
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: delfin-${{ matrix.platform }}
+          path: ${{ matrix.artifact }}
+          retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/**
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+#### Notes on the matrix
+
+- **`macos-latest`** as of 2026 defaults to an arm64 (Apple Silicon) runner on GitHub. If you need x64 macOS builds, add a second matrix entry with `runs-on: macos-13` (Intel). electron-builder can produce universal binaries (`arch: universal`) on arm64 runners but this doubles build time.
+- **Windows**: `windows-latest` is x64. arm64 is not a target for MVP.
+- **Linux**: `ubuntu-latest` is x64. The AppImage produced here runs on any reasonably modern Linux distribution.
+
+### Track DC2 — code signing setup (when ready)
+
+Code signing is not required for student tester builds but is required before broader public distribution. The workflow above already has signing credential placeholders.
+
+#### macOS notarization
+
+Requirements:
+- Apple Developer account ($99/yr)
+- Developer ID Application certificate exported as `.p12`
+- App-specific password for your Apple ID
+
+GitHub Actions secrets to set:
+| Secret | Value |
+|---|---|
+| `CSC_LINK` | Base64-encoded `.p12` file: `base64 -i cert.p12` |
+| `CSC_KEY_PASSWORD` | `.p12` export password |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | Generated at appleid.apple.com |
+| `APPLE_TEAM_ID` | 10-character Team ID from developer.apple.com |
+
+electron-builder handles notarization automatically when these are set. The `dist.yml` workflow already passes them through.
+
+#### Windows code signing
+
+Requirements:
+- EV code signing certificate from a CA (DigiCert, Sectigo, etc.) — $300–700/yr
+- Certificate exported as `.pfx`
+
+GitHub Actions secrets to set:
+| Secret | Value |
+|---|---|
+| `CSC_LINK` | Base64-encoded `.pfx` |
+| `CSC_KEY_PASSWORD` | `.pfx` password |
+
+Without signing, Windows Defender SmartScreen shows "Windows protected your PC". Users can click "More info → Run anyway". Acceptable for MVP tester builds; required before public distribution.
+
+## Distribution channel recommendations
+
+### Recommended for MVP: GitHub Releases (draft → publish)
+
+**Why**: Free, no infrastructure required, integrates directly with the CI workflow above. Testers get a direct download link. Versioning and changelog are built in.
+
+**How it works**:
+1. Push to `release/v0.1.0` branch → CI builds all three platform artifacts → creates a draft GitHub Release
+2. Developer smoke tests the artifacts and edits the release notes
+3. Developer publishes the release → download links are live
+
+**Limitations**: GitHub has a 2 GB per-file limit. Gemma GGUF is downloaded separately at first run (not in the installer), so installer artifacts will be well under 200 MB.
+
+### Alternative: Direct S3 / CDN hosting
+
+If GitHub Releases becomes limiting (e.g. high download traffic, need for analytics, or custom update server for `electron-updater`), host artifacts on:
+- **Cloudflare R2**: S3-compatible, no egress fees
+- **AWS S3 + CloudFront**: standard and well-documented with electron-updater
+
+This requires maintaining a bucket and a `latest.yml` / `latest-mac.yml` update manifest. Defer to the auto-update assessment track.
+
+### Not recommended: App stores (for now)
+
+Mac App Store and Microsoft Store require sandboxing and additional entitlements that would require architectural changes (child process spawning is restricted in sandbox mode). Snap and Flatpak have similar constraints. Defer post-MVP.
+
+## Out of scope
+
+- Auto-update implementation (separate assessment track)
+- App store submission
+- Build caching beyond npm's built-in `actions/setup-node` cache
+- Scheduled nightly builds
+- Test suite execution in CI (a separate CI workflow is recommended but not part of this spec)
+
+## Acceptance criteria
+
+- [ ] `scripts/release-local.mjs` runs without error and produces the correct output filename for the current platform
+- [ ] `.github/workflows/dist.yml` exists and is valid YAML (passes `actionlint` or similar)
+- [ ] Pushing to `release/*` triggers the matrix build on all three runners
+- [ ] All three platform artifacts are produced and uploaded to GitHub Actions as workflow artifacts
+- [ ] A draft GitHub Release is created automatically with all three artifacts attached
+- [ ] Workflow completes without error when signing secrets are absent (signing is skipped gracefully, not a hard failure)
+- [ ] Manual release checklist is followed at least once end-to-end before calling DC1 complete
+
+## Risks / open questions
+
+1. **macOS runner architecture**: `macos-latest` on GitHub Actions moved to arm64 (M1) in 2024. Verify this is the correct runner for arm64 builds. For x64 macOS support, `macos-13` is the last Intel runner available. Producing a universal binary (`arch: universal`) on the arm64 runner is possible but builds take longer.
+2. **Windows runner and `llama-server` build**: the CI downloads a pre-built `llama-server` binary from GitHub releases. Ensure the pinned build number is available for all three platforms and that the download URL pattern is stable.
+3. **GitHub Actions minutes**: the matrix build uses ~3 OS runners × ~10–15 min each per run. GitHub Free provides 2000 minutes/month (Linux) with macOS and Windows runners costing 5× and 2× respectively. Monitor usage and consider self-hosted runners if limits are hit.
+4. **Artifact size**: if the total installer + artifact size approaches GitHub Release's 2 GB per-file limit in future (e.g. bundled TTS model), move to R2/S3 early.
+
+## Future todos (post-MVP)
+
+- [ ] **Auto-update assessment**: evaluate `electron-updater` against a hosted `latest.yml` manifest on GitHub Releases or S3; write recommendation or follow-up spec
+- [ ] **Test suite in CI**: add a separate `test.yml` workflow running `npm test` and Python sidecar tests on every PR
+- [ ] **Release notes automation**: generate changelog from commit messages between tags using `conventional-changelog` or similar
+- [ ] **Self-hosted runner**: add a macOS arm64 self-hosted runner if GitHub Actions minutes become a bottleneck
+- [ ] **Build caching**: cache electron-builder's downloaded Electron binaries between runs using `actions/cache` to reduce CI time
