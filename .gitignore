@@ -15,3 +15,7 @@ default.profraw
 # Kokoro TTS model files — large binaries, downloaded via `npm run download:models`
 sidecar/*.onnx
 sidecar/*.bin
+
+# Benchmark results — written at runtime, not committed
+results/*
+!results/.gitkeep
