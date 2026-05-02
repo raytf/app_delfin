@@ -6,6 +6,16 @@ This folder contains the Delfin-specific native bridge source for Track A of
 The upstream `litert_lm_main` target is a demo CLI. Delfin needs a long-lived
 stdio process that speaks a tiny JSONL protocol to `scripts/litert-cpp-proxy.mjs`.
 
+## Current status — 2026-05-02
+
+- Native Windows build is validated with Visual Studio 2022 17.14 / MSVC 14.44.
+- App-facing runtime copy needs both `delfin_litert_bridge.exe` and
+  `libGemmaModelConstraintProvider.dll` next to it in `bin/`.
+- Text turns stream successfully through `npm run dev:litert-cpp`.
+- Vision is the next high-priority gap: the bridge currently accepts JSON
+  message arrays but does not yet convert `{ "type": "image", "blob": "..." }`
+  content parts into LiteRT-LM C++ image inputs.
+
 ## JSONL protocol
 
 Bridge startup output:
@@ -61,3 +71,9 @@ LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
 ```
 
 Then run `npm run dev:litert-cpp` and `npm run benchmark:litert-cpp`.
+
+Until vision support lands, benchmark text scenarios only:
+
+```powershell
+node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s3'
+```

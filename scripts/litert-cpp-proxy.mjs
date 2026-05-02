@@ -13,6 +13,7 @@ import { resolvePreset } from "./litert-cpp-presets.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 dotenvConfig({ path: resolve(rootDir, ".env") });
+const bridgeReadyTimeoutMs = 120_000;
 
 function isDirectExecution() {
   return (
@@ -107,7 +108,7 @@ function createStdioBridge() {
     readyError = error;
     rejectReady(error);
     child.kill();
-  }, 10_000);
+  }, bridgeReadyTimeoutMs);
 
   const flushPendingWithError = (message) => {
     for (const [requestId, handlers] of pending.entries()) {

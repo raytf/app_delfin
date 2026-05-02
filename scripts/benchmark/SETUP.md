@@ -157,6 +157,14 @@ In another terminal:
 npm run benchmark:litert-cpp
 ```
 
+Current native C++ bridge status: text-only scenarios are validated, but S2
+vision is blocked until `delfin_litert_bridge.exe` translates Delfin's base64
+image blobs into LiteRT-LM C++ image inputs. Until that lands, run only S1/S3:
+
+```powershell
+node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s3'
+```
+
 To pass extra flags:
 
 ```powershell
@@ -244,5 +252,6 @@ same CSV file for easy side-by-side comparison in Excel or Google Sheets.
 | Gemma 4 not supported                                    | The llamafile version is too old — bump `LLAMAFILE_VERSION` in `.env`                |
 | RSS shows N/A                                            | Pass `--sidecar-pid` with the correct PID                                            |
 | Very low tok/s on Windows                                | Expected for CPU inference; check no other heavy process is running                  |
-| S2 vision scenario fails                                 | Ensure the GGUF model includes the vision encoder (multimodal GGUF)                  |
+| S2 vision scenario fails with llamafile                  | Ensure the GGUF model includes the vision encoder (multimodal GGUF)                  |
+| S2 vision scenario fails with LiteRT C++                 | Expected until C++ bridge image/blob support lands; use `--scenarios 's1,s3'`        |
 | Port conflict on 8080                                    | Set `LLAMAFILE_PORT=<other>` in `.env` and pass `--llamafile-host localhost:<other>` |

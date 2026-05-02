@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-05-02 (LiteRT-LM C++ distribution path and bridge build helper scope documented)
+> Last updated: 2026-05-02 (LiteRT-LM C++ bridge builds/runs for text; vision support is the remaining native Windows blocker)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -34,9 +34,10 @@
 | `scripts/benchmark/sysinfo.py`                                               | ✅     | Platform/CPU/RAM/GPU detection                                                                                          |
 | `scripts/benchmark/SETUP.md`                                                 | ✅     | Setup and usage guide for LiteRT, LiteRT C++ proxy research, and llamafile examples                                     |
 | `scripts/litert-cpp-presets.mjs`                                             | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                 |
-| `scripts/litert-cpp-proxy.mjs`                                               | ⚠️     | Delfin WebSocket proxy and health endpoint for a JSONL/stdio LiteRT C++ bridge; real native bridge binary still pending |
+| `scripts/litert-cpp-proxy.mjs`                                               | ✅     | Delfin WebSocket proxy and health endpoint validated against native `delfin_litert_bridge.exe`; text turns stream successfully |
 | `scripts/litert-cpp-proxy.test.mjs`                                          | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                        |
-| `native/litert-cpp-bridge/`                                                  | ⚠️     | JSONL C++ bridge source/Bazel/test scaffold; native build validation pending                                            |
+| `native/litert-cpp-bridge/`                                                  | ⚠️     | Native Windows build/text runtime validated; high-priority vision/image blob support still pending for full app parity   |
+| `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll`   | ✅     | Gitignored local runtime artifacts copied from Bazel output; required for `npm run dev:litert-cpp` on Windows            |
 
 ---
 

@@ -4,13 +4,13 @@
 
 ## Gate Resolution
 
-| Field | Value |
-|---|---|
-| **Status** | Gate 1 approved — implemented |
-| **Created** | 2026-05-01 |
-| **Implemented** | 2026-05-02 |
-| **Type** | Standalone developer script (no app changes) |
-| **Output location** | `scripts/benchmark/` |
+| Field               | Value                                        |
+| ------------------- | -------------------------------------------- |
+| **Status**          | Gate 1 approved — implemented                |
+| **Created**         | 2026-05-01                                   |
+| **Implemented**     | 2026-05-02                                   |
+| **Type**            | Standalone developer script (no app changes) |
+| **Output location** | `scripts/benchmark/`                         |
 
 ## Goal
 
@@ -21,6 +21,7 @@ Produce a standalone benchmark script that measures and compares inference perfo
 LiteRT-LM is Google's inference engine purpose-built for Gemma 4 and reportedly more optimised than generic GGUF inference. Before committing to llama-server as the production backend, empirical data is needed to quantify the trade-off (if any) in throughput, latency, and memory usage on the same hardware.
 
 The benchmark is designed to run on two shells on the same physical machine:
+
 - **WSL2 Ubuntu** — LiteRT-LM sidecar via the existing `sidecar/.venv`
 - **Native Windows/macOS** — llama-server binary downloaded separately
 
@@ -55,25 +56,34 @@ Results from each run are written to `results/` and compared manually.
 
 ## Metrics
 
-| Metric | Unit | How measured |
-|---|---|---|
-| **Time to first token (TTFT)** | ms | Wall time from request sent → first token/chunk received |
-| **Generation throughput** | tokens / sec | Output tokens ÷ (total generation time − TTFT) |
-| **Total turn time** | ms | Wall time from request sent → final `done` / `[DONE]` signal |
-| **Peak sidecar RSS** | MB | `psutil.Process(pid).memory_info().rss` sampled every 100 ms during generation |
-| **Image encoding time** | ms | For llama-server: TTFT delta vs text-only baseline (S2 TTFT − S1 TTFT). For LiteRT: instrumented directly if sidecar exposes timing headers, otherwise same delta method. |
-| **TTS first-chunk latency** | ms | Time from `done` message → first audio chunk; LiteRT sidecar only in initial cut; skip for llama adapter until TTS is wired |
-| **GPU utilisation (optional)** | % average | `pynvml` on NVIDIA GPUs; field omitted on CPU-only or Apple Silicon runs |
+| Metric                         | Unit         | How measured                                                                                                                                                              |
+| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Time to first token (TTFT)** | ms           | Wall time from request sent → first token/chunk received                                                                                                                  |
+| **Generation throughput**      | tokens / sec | Output tokens ÷ (total generation time − TTFT)                                                                                                                            |
+| **Total turn time**            | ms           | Wall time from request sent → final `done` / `[DONE]` signal                                                                                                              |
+| **Peak sidecar RSS**           | MB           | `psutil.Process(pid).memory_info().rss` sampled every 100 ms during generation                                                                                            |
+| **Image encoding time**        | ms           | For llama-server: TTFT delta vs text-only baseline (S2 TTFT − S1 TTFT). For LiteRT: instrumented directly if sidecar exposes timing headers, otherwise same delta method. |
+| **TTS first-chunk latency**    | ms           | Time from `done` message → first audio chunk; LiteRT sidecar only in initial cut; skip for llama adapter until TTS is wired                                               |
+| **GPU utilisation (optional)** | % average    | `pynvml` on NVIDIA GPUs; field omitted on CPU-only or Apple Silicon runs                                                                                                  |
 
 ## Test scenarios
 
 Each scenario runs **5 repetitions** by default (configurable via `--runs N`). The **first run is treated as warmup** and excluded from statistics. Report shows mean ± std dev for all metrics.
 
-| ID | Name | Prompt | Image | Notes |
-|---|---|---|---|---|
-| **S1** | Text-only | `"Briefly explain the concept of gradient descent in 2 sentences."` | None | Baseline, isolates pure generation speed |
-| **S2** | Vision — static slide | `"Summarise this lecture slide in 3 bullet points."` | `assets/test-slide.png` | Measures vision overhead; same image every run |
-| **S3** | Multi-turn text | 3 sequential turns sharing a conversation context | None | Each turn measured independently; tests KV cache behaviour |
+| ID     | Name                  | Prompt                                                              | Image                   | Notes                                                      |
+| ------ | --------------------- | ------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------- |
+| **S1** | Text-only             | `"Briefly explain the concept of gradient descent in 2 sentences."` | None                    | Baseline, isolates pure generation speed                   |
+| **S2** | Vision — static slide | `"Summarise this lecture slide in 3 bullet points."`                | `assets/test-slide.png` | Measures vision overhead; same image every run             |
+| **S3** | Multi-turn text       | 3 sequential turns sharing a conversation context                   | None                    | Each turn measured independently; tests KV cache behaviour |
+
+### Native LiteRT C++ status note — 2026-05-02
+
+The `litert-cpp` backend adapter is operational for text scenarios through
+`scripts/litert-cpp-proxy.mjs` and the JSONL C++ bridge. On native Windows,
+S1/S3 completed successfully with `--scenarios 's1,s3'`. S2 is intentionally
+excluded until the C++ bridge implements image/blob parity with the Python
+LiteRT sidecar; the current failure is `Provided less images than expected in
+the prompt.`
 
 ## Interface contract
 
@@ -81,7 +91,7 @@ Each scenario runs **5 repetitions** by default (configurable via `--runs N`). T
 
 ```
 python scripts/benchmark/run.py \
-  --backend <litert|llamafile> \
+  --backend <litert|litert-cpp|llamafile> \
   --litert-host <host:port>         # default: localhost:8321 \
   --llamafile-host <host:port>      # default: localhost:8080 \
   --llamafile-bin <path>            # auto-launch binary (optional) \
@@ -97,6 +107,7 @@ npm convenience scripts (default 5 runs, all scenarios):
 
 ```bash
 npm run benchmark:litert
+npm run benchmark:litert-cpp
 npm run benchmark:llamafile
 ```
 
@@ -144,8 +155,8 @@ See `scripts/benchmark/SETUP.md` for full setup and usage instructions.
         "gpu_util_pct_avg": null
       }
     },
-    "s2": { "..." : "..." },
-    "s3": { "..." : "..." }
+    "s2": { "...": "..." },
+    "s3": { "...": "..." }
   }
 }
 ```
@@ -183,6 +194,8 @@ Connects to llama-server's OpenAI-compatible REST API (`POST /v1/chat/completion
 ## Acceptance criteria
 
 - [x] `python scripts/benchmark/run.py --backend litert --scenarios s1,s2,s3` completes without error on WSL2 Ubuntu with the LiteRT sidecar running
+- [x] `node scripts/run-benchmark.mjs --backend litert-cpp --scenarios 's1,s3'` completes without error on native Windows with the LiteRT C++ proxy running
+- [ ] `node scripts/run-benchmark.mjs --backend litert-cpp --scenarios s1,s2,s3` completes without error after C++ image support lands
 - [ ] `python scripts/benchmark/run.py --backend llamafile --scenarios s1,s2,s3` completes without error on native Windows with llamafile running
 - [ ] JSON output contains all defined metrics for every completed run
 - [ ] CSV summary is human-readable and opens correctly in Excel / Google Sheets

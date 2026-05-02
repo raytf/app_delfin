@@ -127,11 +127,14 @@ absl::Status Generate(Engine& engine, const ordered_json& request) {
   EraseActive(request_id);
   if (!status.ok()) return status;
 
+  ordered_json assistant_message = {
+      {"role", "model"},
+      {"content", ordered_json::array({{{"type", "text"}, {"text", full_text}}})},
+  };
   WriteEvent({{"type", "done"},
               {"requestId", request_id},
               {"text", full_text},
-              {"message", {{"role", "model"},
-                             {"content", {{{"type", "text"}, {"text", full_text}}}}}}}});
+              {"message", assistant_message}});
   return absl::OkStatus();
 }
 
