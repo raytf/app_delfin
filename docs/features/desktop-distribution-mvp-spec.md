@@ -103,10 +103,11 @@ Allow students on the supported desktop platforms to download, install, and run 
 > **Note:** The solution below reflects the 2026-05-01 revision. See the Revision section above for context.
 
 ### Inference strategy
-- Replace LiteRT-LM with the pre-built `llama-server` binary from llama.cpp releases (Gemma 4 GGUF support landed April 2026)
-- Download the platform-appropriate `llama-server` binary at first run alongside the GGUF model file
-- Do not bundle the binary inside the installer; download it to `app.getPath('userData')` on first launch
-- The Electron main process spawns `llama-server` as a child process and communicates with it via its OpenAI-compatible REST API
+- **Primary (macOS, Linux, Windows + WSL2):** LiteRT-LM via the existing Python sidecar — fastest option, Gemma-4-optimised, stateful KV cache
+- **Fallback (Windows without WSL2):** llamafile (Mozilla AI, llama.cpp-based) — single binary, works natively on Windows, no Python required; somewhat slower than LiteRT-LM
+- `INFERENCE_BACKEND=litert|llamafile` env var selects the path; `sidecarBridge.ts` delegates to the appropriate client
+- The llamafile binary and GGUF model are downloaded by `npm run setup:llamafile` (`scripts/setup-llamafile.mjs`) into `llamafile/bin/` and `llamafile/models/`
+- For packaged distribution: download assets to `app.getPath('userData')` on first launch; do not bundle inside the installer
 
 ### TTS strategy
 - Investigate whether Piper TTS (pre-built cross-platform binary) can replace the Python `kokoro-onnx` pipeline
@@ -132,7 +133,7 @@ The implementation is split across three sub-specs. This file remains the overar
 
 | Track | Spec | Goal |
 |---|---|---|
-| **DM0–DM2** — backend migration | [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Replace LiteRT-LM with llama-server; resolve TTS backend |
+| **DM0–DM3** — backend migration | [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Add llamafile as an additive fallback backend for Windows (no WSL2); LiteRT-LM remains primary on macOS/Linux/WSL2 |
 | **DP0–DP3** — packaging | [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers |
 | **DC0–DC2** — CI/CD | [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds and distribution channel |
 

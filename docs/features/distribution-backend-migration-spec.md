@@ -9,149 +9,208 @@
 |---|---|
 | **Status** | Gate 1 — awaiting approval |
 | **Created** | 2026-05-01 |
+| **Revised** | 2026-05-02 (see revision section below) |
 | **Depends on** | Inference benchmark results (`inference-benchmarking-spec.md`) reviewed and accepted |
 | **Blocks** | `distribution-packaging-spec.md` (packaging requires a working cross-platform backend) |
 
+## Revision — 2026-05-02
+
+The original spec assumed a **full replacement** of LiteRT-LM with llama-server across all platforms. This is incorrect for the approved architecture.
+
+**Approved architecture (Path 2 — hybrid):**
+
+- **LiteRT-LM** remains the primary backend on macOS, Linux, and Windows + WSL2. It is faster, Gemma-4-optimised, and maintains a KV cache that makes follow-up turns near-instant.
+- **llamafile** is the fallback backend for Windows users without WSL2, where LiteRT-LM has no native wheel.
+
+The implementation is therefore **additive**, not a replacement. The existing `wsClient.ts` and Python sidecar are unchanged. A new llamafile client sits alongside them; a backend selector in `sidecarBridge.ts` chooses which path to activate at startup.
+
+---
+
 ## Goal
 
-Replace the LiteRT-LM Python sidecar with a `llama-server` binary integration so that inference runs natively on Windows, macOS, and Linux without WSL2 or a Python virtual environment. Simultaneously investigate and decide on a cross-platform TTS backend to replace or complement the existing `kokoro-onnx` pipeline.
+Add a llamafile integration path to the Electron main process so that users on native Windows (no WSL2) can run the full app — inference, screen capture, and (eventually) TTS — without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users.
 
 ## Background
 
-The current architecture runs inference through `litert-lm-api-nightly`, which has no Windows wheel. The Electron renderer communicates with a Python FastAPI WebSocket server. The migration replaces the inference engine while preserving the renderer-facing IPC contract so that no renderer code changes are needed.
+The Electron renderer communicates with the inference backend via IPC channels (`sidecar:send`, `sidecar:chunk`, `sidecar:done`, etc.). These channels are implemented in `sidecarBridge.ts`, which currently delegates exclusively to `wsClient.ts` (the LiteRT WebSocket client). The bridge layer is the only place that needs to change — the renderer and IPC channel names are unaffected.
 
 ```
-Before:
-  Electron Main ──WebSocket──▶ Python FastAPI (LiteRT-LM, kokoro-onnx, FastAPI)
+Current (LiteRT only):
+  Renderer ──IPC──▶ sidecarBridge.ts ──WebSocket──▶ Python FastAPI (LiteRT-LM)
 
-After:
-  Electron Main ──REST/SSE──▶ llama-server binary (inference)
-  Electron Main ──WebSocket──▶ TTS sidecar binary (Piper or frozen kokoro-onnx)
-  (or Electron Main handles TTS directly if a JS-native option is chosen)
+After (hybrid):
+  Renderer ──IPC──▶ sidecarBridge.ts ─┬─ WebSocket ──▶ Python FastAPI (LiteRT-LM)  [macOS/Linux/WSL2]
+                                       └─ REST/SSE  ──▶ llamafile server             [Windows no WSL2]
 ```
 
-The renderer-facing IPC interface (`sidecar:send`, `sidecar:chunk`, `sidecar:done`, etc.) does not change — the bridge layer in Electron main absorbs the protocol difference.
+The llamafile server is already downloadable and startable via `npm run setup:llamafile` / `npm run dev:llamafile`. The missing piece is the Electron-side client that talks to it and feeds its output into the existing IPC pipeline.
+
+---
 
 ## Scope
 
-### Track DM0 — llama-server integration
+### Track DM0 — llamafile client
 
-| File | Change |
+New file: `src/main/sidecar/llamafileClient.ts`
+
+Exposes the same interface as `wsClient.ts` so `sidecarBridge.ts` can swap between them without knowing the difference:
+
+```ts
+// Same shape as wsClient.ts exports
+connectToLlamafile(host: string): void
+sendToLlamafile(message: WsOutboundMessage | WsInterruptMessage): void
+onLlamafileMessage(handler: (message: WsInboundMessage) => void): void
+onLlamafileStatus(handler: (status: SidecarStatus) => void): void
+getLlamafileStatus(): SidecarStatus
+disconnectFromLlamafile(): void
+```
+
+#### Protocol translation
+
+| LiteRT WebSocket message | llamafile REST equivalent |
 |---|---|
-| `src/main/sidecar/wsClient.ts` | Replace WebSocket sidecar client with llama-server REST/SSE client |
-| `src/main/sidecar/healthCheck.ts` | Update health check to hit `GET /health` on llama-server instead of sidecar WebSocket |
-| `src/main/ipc/sidecarBridge.ts` | Rewrite to translate IPC calls → llama-server `POST /v1/chat/completions` (streaming) |
-| `src/shared/types.ts` | Add `LlamaBackendConfig` type; retain existing IPC types unchanged |
-| `scripts/download-llama-server.mjs` | New: download platform-appropriate llama-server binary from GitHub releases to `~/.delfin/bin/` |
-| `scripts/run-llama-server.mjs` | New: spawn llama-server with correct flags; handle port conflict and crash recovery |
-| `.env.example` | Add `LLAMA_SERVER_PORT`, `LLAMA_MODEL_PATH`, `LLAMA_SERVER_BIN` env vars |
+| `sendToSidecar({text, image, preset_id})` | `POST /v1/chat/completions` — messages array with system prompt from preset, user text, optional vision content |
+| `{type: "token", text}` | SSE `data:` line → `choices[0].delta.content` |
+| `{type: "done"}` | SSE `data: [DONE]` |
+| `{type: "error", message}` | HTTP error status or SSE error chunk |
+| `{type: "interrupt"}` | Abort the in-flight `fetch()` via `AbortController` |
 
-### Track DM1 — sidecar bridge rewrite
+Vision content format for llamafile:
+```json
+{
+  "role": "user",
+  "content": [
+    { "type": "text", "text": "Summarise this slide." },
+    { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,..." } }
+  ]
+}
+```
 
-The `sidecarBridge.ts` translation layer must map the existing turn protocol to llama-server's API:
+#### Conversation history (stateless REST)
 
-| Existing (LiteRT WebSocket) | llama-server equivalent |
-|---|---|
-| `turn_start` + `image_data` + `prompt` | `POST /v1/chat/completions` with messages array (text + base64 image) |
-| `chunk` streaming events | SSE `data:` lines with `choices[0].delta.content` |
-| `done` event | SSE `data: [DONE]` |
-| `audio_start` / `audio_chunk` / `audio_end` | Handled by TTS sidecar after `done` is received |
-| `interrupt` | HTTP `POST /slots/{id}/cancel` (llama-server slot API) |
+LiteRT-LM is stateful: it maintains a KV cache per WebSocket connection, so only the new turn is sent each time. llamafile is stateless: the full conversation history must be sent in every request.
 
-### Track DM2 — TTS investigation and decision
+`llamafileClient.ts` maintains a `messages: {role, content}[]` array in memory, scoped to the current session:
+- On `SESSION_START` (or the first send after connect): reset history to `[]`
+- On each `sendToLlamafile()`: append the user turn, POST the full history, append the completed assistant response after `[DONE]`
+- On `SESSION_STOP`: clear history
 
-Evaluate two candidates. Pick one and implement it.
+The session lifecycle hooks are provided by `sidecarBridge.ts` calling into the client.
+
+#### System prompt injection
+
+The LiteRT sidecar selects system prompts by `preset_id` server-side. llamafile has no concept of presets. `llamafileClient.ts` reads `preset_id` from the outbound message and resolves it to a system prompt string using the same registry used by the Python sidecar (`sidecar/prompts/presets.py`). A TypeScript copy of the preset strings lives at `src/main/sidecar/presets.ts`.
+
+### Track DM1 — backend selector in sidecarBridge
+
+Modify `src/main/ipc/sidecarBridge.ts` to read `INFERENCE_BACKEND` from env at startup and wire up either `wsClient` or `llamafileClient`:
+
+```ts
+const backend = process.env.INFERENCE_BACKEND ?? 'litert'  // 'litert' | 'llamafile'
+```
+
+No other logic in `sidecarBridge.ts` changes — the two clients present identical interfaces.
+
+Pass `backend` config through `RegisterIpcHandlersOptions` from `src/main/index.ts`.
+
+### Track DM2 — health check
+
+`src/main/sidecar/healthCheck.ts` is currently a placeholder. Implement polling for both backends:
+
+| Backend | Health endpoint | Ready signal |
+|---|---|---|
+| LiteRT | `GET http://localhost:8321/health` → `{"status": "ok"}` | `model_loaded: true` |
+| llamafile | `GET http://localhost:8080/health` → `{"status": "ok"}` | HTTP 200 |
+
+### Track DM3 — TTS on the llamafile path
+
+TTS is currently handled by the Python sidecar (kokoro-onnx), which only exists on the LiteRT path. On the llamafile path, no server-side TTS is available yet. Two candidates:
 
 #### Candidate A: Piper TTS (pre-built binary)
-
-- **What**: Neural TTS by Rhasspy/Nabu Casa. Pre-built binaries for Windows x64, macOS arm64/x64, Linux x64. ONNX-based, real-time speed on CPU.
-- **Integration**: Electron main spawns `piper` CLI as a child process: `echo "text" | piper --model en_US-lessac-medium.onnx --output-raw | ...`; pipe raw PCM audio back.
-- **Voice quality**: Good for English; fewer voice options than Kokoro.
-- **Size**: ~20 MB binary + ~60 MB voice model.
-- **Pros**: No Python, no freezing, small, fast.
-- **Cons**: Voice quality may differ from Kokoro; limited language/voice options.
+- Pre-built binaries for Windows x64, macOS arm64/x64, Linux x64
+- Electron main spawns `piper` CLI: pipe text in, get raw PCM back
+- ~20 MB binary + ~60 MB voice model
+- Good quality for English; fewer voice options than Kokoro
 
 #### Candidate B: Frozen kokoro-onnx sidecar (PyInstaller)
+- Freeze the existing `sidecar/tts.py` pipeline into a standalone binary per platform
+- Electron main spawns it; it exposes `POST /tts` → streamed audio
+- ~250 MB frozen binary; same voice quality as current
+- Requires per-platform PyInstaller CI builds; espeak-ng path must be resolved
 
-- **What**: Keep the existing `kokoro-onnx` TTS pipeline but freeze it into a standalone binary per platform using PyInstaller, separate from the inference sidecar.
-- **Integration**: Electron main spawns the frozen `tts-sidecar` binary; it exposes a minimal HTTP endpoint (`POST /tts` → streamed audio chunks).
-- **Voice quality**: Identical to current (Kokoro voices already in use).
-- **Size**: ~200–300 MB frozen binary (onnxruntime + kokoro).
-- **Pros**: No regression in voice quality or streaming behaviour.
-- **Cons**: Requires PyInstaller build in CI per platform; Windows build must be done on Windows runner.
+**For MVP:** the llamafile path falls back to Web Speech (browser TTS) with no `audio_*` events emitted from the bridge. DM3 is deferred until after DM0–DM2 are stable.
 
-#### Decision criteria
-
-| Criterion | Piper | Frozen kokoro |
-|---|---|---|
-| Voice quality match vs current | Investigate | Same |
-| Cross-platform binary availability | Yes (pre-built) | Yes (PyInstaller build) |
-| CI complexity | Low (download binary) | Medium (3-platform PyInstaller builds) |
-| Installer size impact | Low (+80 MB downloaded) | Medium (+250 MB downloaded) |
-| espeak-ng path issue | Not applicable | Must be resolved for Linux/Windows |
-
-Run a manual A/B listen test on a representative TTS sample before deciding. Document the decision in a "DM2 Decision" section appended to this spec after review.
+---
 
 ## Out of scope
 
 - Changes to the renderer or Zustand stores
-- Changes to the existing Python sidecar code (it remains for `npm run dev:full` in dev mode)
+- Changes to the existing Python sidecar (it remains for `npm run dev:full` / `npm run dev:sidecar`)
 - VAD pipeline changes
 - Electron packaging (handled in `distribution-packaging-spec.md`)
 - GPU inference (handled in `distribution-packaging-spec.md` stretch goal)
 
+---
+
+## New files
+
+| File | Purpose |
+|---|---|
+| `src/main/sidecar/llamafileClient.ts` | REST/SSE client for llamafile; manages conversation history; same interface as `wsClient.ts` |
+| `src/main/sidecar/presets.ts` | TypeScript copy of the Python preset registry for system prompt injection |
+
+## Modified files
+
+| File | Change |
+|---|---|
+| `src/main/ipc/sidecarBridge.ts` | Read `INFERENCE_BACKEND` env var; delegate to `wsClient` or `llamafileClient` |
+| `src/main/sidecar/healthCheck.ts` | Implement polling for both backends |
+| `src/shared/types.ts` | Add `InferenceBackend = 'litert' \| 'llamafile'` and `LlamafileClientConfig` types |
+| `src/main/ipc/types.ts` | Add `backend` field to `RegisterIpcHandlersOptions` |
+| `src/main/index.ts` | Read `INFERENCE_BACKEND` from env; pass to `registerSidecarBridge` |
+| `.env.example` | Add `INFERENCE_BACKEND=litert` with comment explaining when to switch |
+
+---
+
 ## Interface contract
 
-### Environment variables added
+### New env var
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LLAMA_SERVER_BIN` | `~/.delfin/bin/llama-server[.exe]` | Path to the llama-server binary |
-| `LLAMA_SERVER_PORT` | `8321` | Port llama-server listens on |
-| `LLAMA_MODEL_PATH` | `~/.delfin/models/gemma-4-e2b-q4_k_m.gguf` | Path to the GGUF model file |
-| `LLAMA_SERVER_EXTRA_ARGS` | `` | Pass-through flags (e.g. `--n-gpu-layers 35`) |
-| `TTS_BIN` | `~/.delfin/bin/piper[.exe]` or `~/.delfin/bin/tts-sidecar[.exe]` | Path to TTS binary (set after DM2 decision) |
-| `TTS_MODEL_PATH` | `~/.delfin/models/tts/` | Directory containing TTS model files |
+| `INFERENCE_BACKEND` | `litert` | Which backend to use: `litert` or `llamafile` |
 
-### llama-server launch flags (baseline)
+The llamafile connection details reuse the existing `LLAMAFILE_PORT` / `LLAMAFILE_BIN` vars added for `scripts/run-llamafile.mjs`.
 
-```
-llama-server \
-  --model $LLAMA_MODEL_PATH \
-  --port $LLAMA_SERVER_PORT \
-  --host 127.0.0.1 \
-  --ctx-size 8192 \
-  --n-predict 1024 \
-  --threads <cpu_count> \
-  --no-mmap                  # avoid mmap on Windows for reliability
-```
-
-### New IPC types (`src/shared/types.ts`)
+### New shared types (`src/shared/types.ts`)
 
 ```ts
-export type LlamaBackendConfig = {
-  binPath: string;
-  modelPath: string;
-  port: number;
-  extraArgs: string[];
+export type InferenceBackend = 'litert' | 'llamafile';
+
+export type LlamafileClientConfig = {
+  host: string;   // e.g. 'localhost:8080'
 };
 ```
 
-No new renderer-facing IPC channels are introduced. The existing `sidecar:*` channels are preserved.
+No new renderer-facing IPC channels. The existing `sidecar:*` channels are preserved.
+
+---
 
 ## Acceptance criteria
 
-- [ ] `npm run dev:llama` (new script) starts llama-server and the Electron app; a prompt completes end-to-end on native Windows
-- [ ] `npm run dev:llama` works on macOS arm64 and Linux x64 as well
-- [ ] The existing `npm run dev:full` (Python sidecar) still works unchanged for contributors on Linux/Mac
-- [ ] Interrupt (`stop` button) cancels in-progress generation within 500 ms
-- [ ] Vision prompt (screenshot attached) produces a valid response from llama-server
-- [ ] TTS plays audio after a response (using whichever backend is chosen in DM2)
-- [ ] DM2 decision (Piper vs frozen kokoro) is documented with voice quality notes
+- [ ] `INFERENCE_BACKEND=llamafile npm run dev` starts the Electron app; a text prompt completes end-to-end on native Windows with `npm run dev:llamafile` running
+- [ ] Vision prompt (screenshot attached) produces a valid response via llamafile
+- [ ] Multi-turn conversation works: each follow-up turn receives context from prior turns
+- [ ] `interrupt` (stop button) cancels in-progress generation within 500 ms
+- [ ] `INFERENCE_BACKEND=litert npm run dev:full` (default) still works unchanged on macOS / Linux / WSL2
+- [ ] Status indicator in the renderer correctly reflects connected / disconnected for both backends
+- [ ] Web Speech TTS fallback fires on the llamafile path (no `audio_*` events emitted)
+
+---
 
 ## Risks / open questions
 
-1. **Gemma 4 vision via GGUF**: confirm that llama-server with `gemma-4-e2b-q4_k_m.gguf` processes inline base64 images correctly via the OpenAI vision API format (`image_url` with `data:image/...;base64,...`).
-2. **Slot cancellation**: llama-server's slot cancel API (`/slots/{id}/cancel`) requires knowing the slot ID assigned to the current request. Verify this is exposed in the streaming response headers or via a separate `/slots` endpoint.
-3. **espeak-ng for frozen kokoro on Windows**: if Candidate B is chosen, the `espeak-ng` binary must be bundled with the frozen sidecar. The current path patch in `sidecar/tts.py` must be replaced with a proper resource-relative path lookup.
-4. **Context window for multi-turn**: the current LiteRT sidecar maintains in-session state automatically. llama-server is stateless; the Electron bridge must maintain conversation history in memory and send it in each request.
+1. **Gemma 4 vision via llamafile**: confirm that `bartowski/google_gemma-4-E2B-it-IQ4_NL.gguf` supports multimodal input. The vision projector (`mmproj-*.gguf`) may need to be downloaded separately and passed via `--mmproj` flag. `scripts/setup-llamafile.mjs` will need to download it.
+2. **Slot cancellation**: llamafile inherits llama.cpp's slot API. Aborting the `fetch()` via `AbortController` should stop the response stream, but verify the server actually halts generation (not just stops sending tokens).
+3. **Context window overflow for multi-turn**: the llamafile path sends full history each request. Long sessions will exceed the 8192-token context window. The client must trim old turns when approaching the limit.
+4. **Preset strings staying in sync**: `src/main/sidecar/presets.ts` duplicates the Python preset strings. If prompts are updated in `sidecar/prompts/`, the TypeScript copy must be updated too. Consider a single JSON source of truth shared between both.
