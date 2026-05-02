@@ -80,7 +80,7 @@ The script is **idempotent** — running it again skips files already present.
 > **Configuring version or model:** Override via `.env` before running:
 >
 > ```
-> LLAMAFILE_VERSION=0.8.17
+> LLAMAFILE_VERSION=0.10.1
 > LLAMAFILE_MODEL_FILE=google_gemma-4-E2B-it-IQ4_NL.gguf
 > ```
 >
@@ -144,13 +144,13 @@ unnecessary — the benchmark tracks the spawned process's PID automatically.
 ```bash
 python scripts/benchmark/run.py \
   --backend llamafile \
-  --llamafile-bin llamafile/bin/llamafile-0.8.17 \
+  --llamafile-bin llamafile/bin/llamafile-0.10.1 \
   --llamafile-model llamafile/models/google_gemma-4-E2B-it-IQ4_NL.gguf \
   --runs 5 \
   --scenarios s1,s2,s3
 ```
 
-On Windows PowerShell, replace the binary name with `llamafile-0.8.17.exe`.
+On Windows PowerShell, replace the binary name with `llamafile-0.10.1.exe`.
 
 ---
 

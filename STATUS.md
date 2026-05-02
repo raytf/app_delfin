@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-04-22 (overlay defaults expanded; overlay load screens removed; shared goBack helper added)
+> Last updated: 2026-05-02 (llamafile default bumped to 0.10.1 for Gemma 4 GGUF support)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -10,7 +10,7 @@
 | File / Item | Status | Notes |
 |---|---|---|
 | Electron + Vite + React + TypeScript scaffold | ✅ | `electron.vite.config.ts`, `package.json` |
-| `.env.example` + dotenv loading | ✅ | Shared env contract for Electron and sidecar, including voice/TTS settings |
+| `.env.example` + dotenv loading | ✅ | Shared env contract for Electron, sidecar, voice/TTS settings, and llamafile 0.10.1 defaults |
 | `src/shared/types.ts` | ✅ | IPC, WebSocket, session history, overlay, and audio-bearing turn types |
 | `src/shared/schemas.ts` | ✅ | Zod validation for WS and session prompt contracts |
 | `src/shared/constants.ts` | ✅ | Presets, sidebar constants, `VOICE_TURN_TEXT` |
@@ -21,8 +21,8 @@
 | `scripts/download-models.test.mjs` | ✅ | Vitest coverage for safe model download behavior |
 | `scripts/check-vad-runtime.mjs` | ✅ | Verifies copied VAD/ORT runtime assets |
 | `scripts/setup-check.sh` / `scripts/setup-check.ps1` | ✅ | Environment validation helpers |
-| `scripts/setup-llamafile.mjs` | ✅ | Downloads llamafile binary + GGUF model to `llamafile/bin/` and `llamafile/models/` |
-| `scripts/run-llamafile.mjs` | ✅ | Starts llamafile server; pre-flight checks for binary and model |
+| `scripts/setup-llamafile.mjs` | ✅ | Downloads llamafile 0.10.1 binary + GGUF model to `llamafile/bin/` and `llamafile/models/` |
+| `scripts/run-llamafile.mjs` | ✅ | Starts llamafile 0.10.1 server by default; pre-flight checks for binary and model |
 | `scripts/run-benchmark.mjs` | ✅ | Node wrapper that runs benchmark/run.py using the sidecar venv Python |
 | `scripts/benchmark/run.py` | ✅ | CLI benchmark entry point — `--backend litert|llamafile`, all scenarios, JSON+CSV output |
 | `scripts/benchmark/backends/litert.py` | ✅ | LiteRT adapter over WebSocket |
@@ -31,7 +31,7 @@
 | `scripts/benchmark/scenarios.py` | ✅ | S1 (text), S2 (vision), S3 (multi-turn) scenario definitions |
 | `scripts/benchmark/reporter.py` | ✅ | JSON + CSV result writer with mean±std stats |
 | `scripts/benchmark/sysinfo.py` | ✅ | Platform/CPU/RAM/GPU detection |
-| `scripts/benchmark/SETUP.md` | ✅ | Setup and usage guide for both backends |
+| `scripts/benchmark/SETUP.md` | ✅ | Setup and usage guide for both backends, including Gemma 4-compatible llamafile 0.10.1 examples |
 
 ---
 
