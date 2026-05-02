@@ -18,7 +18,9 @@
 
 ## Goal
 
-Add a llamafile integration path so that users on native Windows (no WSL2) can run the full app without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users. **No changes to the Electron IPC layer or renderer are required.**
+Add a llamafile integration path so that **all packaged Windows users** — whether or not they have WSL2 — can run the full app without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users **running from source**. **No changes to the Electron IPC layer or renderer are required.**
+
+> **Packaging decision:** Packaged Windows builds always use llamafile regardless of WSL2 availability. Bootstrapping LiteRT-LM inside WSL2 from a packaged Electron app is impractical. WSL2 users who want LiteRT-LM speed run from source. See `desktop-distribution-mvp-spec.md` for the full rationale.
 
 ---
 

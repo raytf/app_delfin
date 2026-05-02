@@ -20,24 +20,38 @@ const venvPython = process.platform === 'win32'
   ? join(sidecarDir, '.venv', 'Scripts', 'python.exe')
   : join(sidecarDir, '.venv', 'bin', 'python')
 
-// Fall back to system Python on machines where the sidecar venv doesn't exist
-// (e.g. native Windows without WSL2, where LiteRT-LM has no wheel).
-// Use `py` (Windows Python Launcher) on Windows — more reliable than `python`
-// when multiple Python versions are installed.
-let pythonBin = venvPython
-if (!existsSync(venvPython)) {
-  pythonBin = process.platform === 'win32' ? 'py' : 'python3'
+const benchmarkScript = join(rootDir, 'scripts', 'benchmark', 'run.py')
+
+// On native Windows without the sidecar venv, Node's spawn uses cmd.exe which
+// may have a different PATH than PowerShell (user Python installs often only
+// appear in PowerShell's PATH). Spawn via powershell.exe to get the same
+// Python resolution the user sees in their terminal.
+const useVenv = existsSync(venvPython)
+
+if (!useVenv) {
   console.warn('[run-benchmark] Sidecar venv not found — falling back to system Python.')
   console.warn('[run-benchmark] If the benchmark fails, install deps with:')
   console.warn('[run-benchmark]   pip install httpx psutil pillow websockets')
   console.warn()
 }
 
-const benchmarkScript = join(rootDir, 'scripts', 'benchmark', 'run.py')
-const child = spawn(pythonBin, [benchmarkScript, ...process.argv.slice(2)], {
-  cwd: rootDir,
-  stdio: 'inherit',
-})
+const extraArgs = process.argv.slice(2)
+let child
+
+if (!useVenv && process.platform === 'win32') {
+  // Escape args for PowerShell and run via python directly
+  const psArgs = [extraArgs.map(a => `'${a}'`).join(' ')]
+  child = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-Command', `python "${benchmarkScript}" ${psArgs}`],
+    { cwd: rootDir, stdio: 'inherit' },
+  )
+} else {
+  child = spawn(venvPython, [benchmarkScript, ...extraArgs], {
+    cwd: rootDir,
+    stdio: 'inherit',
+  })
+}
 
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {

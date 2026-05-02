@@ -12,8 +12,8 @@
 | **Approver** | Human reviewer |
 | **Bundle identifier** | `com.delfin.desktop` |
 | **Target platforms** | Windows x64, macOS x64, macOS arm64, Linux x64 |
-| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → llama-server pre-built binary (first-run download) + separate TTS sidecar; see revision |
-| **Model delivery** | First-run download (llama-server binary + GGUF model + TTS assets) |
+| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → llamafile binary on Windows (first-run download); frozen Python sidecar on macOS/Linux; see revision |
+| **Model delivery** | First-run download (llamafile binary + GGUF model + mmproj + TTS assets) |
 | **Inference scope** | CPU-only for MVP; CUDA/Metal as stretch goal |
 | **Deferred by approval** | Docker, full CI/CD publishing, auto-update implementation |
 
@@ -23,21 +23,39 @@
 
 The original approved approach (freeze the Python sidecar with PyInstaller) was revised after discovering that `litert-lm-api-nightly` — the core inference engine — publishes no `win_amd64` wheel and is explicitly Windows-WSL-only by Google. PyInstaller freezing a Linux-only C extension cannot produce a native Windows executable; the WSL2 split would persist even in a "packaged" build.
 
-**Research finding:** `llama.cpp` landed Gemma 4 GGUF support in April 2026 and publishes pre-built `llama-server` binaries for Windows x64, macOS arm64/x64, and Linux x64. Replacing LiteRT-LM with `llama-server` eliminates the WSL2 requirement at the source.
+**Research finding:** llamafile (Mozilla AI, llama.cpp-based) publishes universal single-file binaries for Windows x64, macOS arm64/x64, and Linux x64 with Gemma 4 GGUF support. Using llamafile eliminates the WSL2 requirement for packaged Windows builds.
 
-### Decision: Option A — llama-server binary sidecar
+### Decision: hybrid backend — llamafile for packaged Windows, LiteRT-LM elsewhere
 
 | Axis | Old decision | New decision |
 |---|---|---|
-| Inference engine | LiteRT-LM (Python, Linux/Mac only) | llama-server binary (C++, all platforms) |
-| Sidecar delivery | PyInstaller-frozen Python bundle | Pre-built binary downloaded at first run |
+| Inference — packaged Windows | LiteRT-LM via frozen Python (impossible) | llamafile binary (downloaded at first run) |
+| Inference — packaged macOS/Linux | LiteRT-LM via frozen Python | LiteRT-LM via frozen Python sidecar |
+| Inference — dev mode (all platforms) | LiteRT-LM via `.venv` | LiteRT-LM via `.venv` (unchanged) |
 | TTS | Unified Python sidecar (kokoro-onnx) | Investigate Piper TTS binary or frozen kokoro-onnx separately |
-| Installer size | ~500 MB (frozen Python stack) | ~50 MB (binary only; model downloaded separately) |
+| Installer size | ~500 MB (frozen Python stack) | ~50 MB (Electron only; binaries + models downloaded at first run) |
 | GPU | Deferred | CPU-first; CUDA/Metal detection as stretch goal |
+
+### Windows packaging decision: llamafile for all packaged Windows builds
+
+**Both Windows + WSL2 and Windows without WSL2 users get the llamafile backend in the packaged app.**
+
+LiteRT-LM cannot run natively on Windows without WSL2. Even for WSL2 users, the packaged Electron app cannot reliably bootstrap and manage a Python environment inside the WSL2 Linux subsystem — it would require detecting WSL2, knowing whether the sidecar is set up, and spawning processes across the Windows/Linux boundary from within a packaged app. This adds significant complexity for a performance benefit that developers can already access by running from source.
+
+The llamafile backend at ~30 tok/s on a modern CPU is perfectly usable for students. WSL2 users who want the LiteRT-LM speed advantage can run from source using the existing dev workflow.
+
+| User type | Packaged app backend | Dev workflow backend |
+|---|---|---|
+| Windows (no WSL2) | llamafile | llamafile |
+| Windows + WSL2 | llamafile | LiteRT-LM (via `npm run dev:sidecar` in WSL2) |
+| macOS | LiteRT-LM (frozen Python) | LiteRT-LM (via `.venv`) |
+| Linux | LiteRT-LM (frozen Python) | LiteRT-LM (via `.venv`) |
+
+`INFERENCE_BACKEND` is set at build time by electron-builder, not exposed as a user-facing setting in the packaged app.
 
 ### Benchmark prerequisite
 
-Before finalising the backend switch, an empirical benchmark comparing LiteRT-LM vs llama-server on the Gemma 4 E2B model is required. LiteRT-LM is reportedly more optimised for Gemma 4; the benchmark spec is at `docs/features/inference-benchmarking-spec.md`.
+An empirical benchmark comparing LiteRT-LM vs llamafile on the Gemma 4 E2B model is required before finalising the backend. The benchmark spec is at `docs/features/inference-benchmarking-spec.md`.
 
 ### Implementation sub-specs
 
@@ -45,7 +63,7 @@ The original monolithic execution track is now split into three focused specs:
 
 | Spec | Scope |
 |---|---|
-| [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Replace LiteRT-LM with llama-server; TTS sidecar investigation |
+| [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | llamafile WebSocket proxy; zero changes to Electron IPC layer |
 | [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers, GPU stretch |
 | [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds, artifact publishing, distribution recommendations |
 
@@ -103,11 +121,17 @@ Allow students on the supported desktop platforms to download, install, and run 
 > **Note:** The solution below reflects the 2026-05-01 revision. See the Revision section above for context.
 
 ### Inference strategy
-- **Primary (macOS, Linux, Windows + WSL2):** LiteRT-LM via the existing Python sidecar — fastest option, Gemma-4-optimised, stateful KV cache
-- **Fallback (Windows without WSL2):** llamafile (Mozilla AI, llama.cpp-based) — single binary, works natively on Windows, no Python required; somewhat slower than LiteRT-LM
-- `INFERENCE_BACKEND=litert|llamafile` env var selects the path; `sidecarBridge.ts` delegates to the appropriate client
-- The llamafile binary and GGUF model are downloaded by `npm run setup:llamafile` (`scripts/setup-llamafile.mjs`) into `llamafile/bin/` and `llamafile/models/`
-- For packaged distribution: download assets to `app.getPath('userData')` on first launch; do not bundle inside the installer
+
+**Packaged app:**
+- **Windows (all users, WSL2 or not):** llamafile binary — downloaded to `app.getPath('userData')` at first launch. `INFERENCE_BACKEND=llamafile` is baked in at build time. A Node.js WebSocket proxy (`llamafile-proxy.mjs`) presents the identical sidecar protocol to Electron so no IPC layer changes are needed.
+- **macOS / Linux:** LiteRT-LM via a frozen Python sidecar (PyInstaller) — bundled with the installer as a platform binary. Faster, Gemma-4-optimised, stateful KV cache.
+
+**Dev mode (all platforms, running from source):**
+- `npm run dev:full` uses LiteRT-LM via `sidecar/.venv` on macOS/Linux/WSL2
+- `npm run dev:llamafile` uses llamafile on native Windows (no WSL2)
+- `INFERENCE_BACKEND` env var controls which path is active
+
+Assets for packaged distribution are downloaded to `app.getPath('userData')` on first launch; never bundled inside installers.
 
 ### TTS strategy
 - Investigate whether Piper TTS (pre-built cross-platform binary) can replace the Python `kokoro-onnx` pipeline
