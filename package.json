@@ -15,6 +15,7 @@
     "setup": "npm run init:env && npm run setup:sidecar && npm run download:models && npm run check:env",
     "setup:sidecar": "node scripts/setup-sidecar.mjs",
     "setup:llamafile": "node scripts/setup-llamafile.mjs",
+    "build:litert-cpp-bridge": "node scripts/build-litert-cpp-bridge.mjs",
     "init:env": "node scripts/init-env.mjs",
     "download:models": "node scripts/download-models.mjs",
     "check:env": "node scripts/check-env.mjs",

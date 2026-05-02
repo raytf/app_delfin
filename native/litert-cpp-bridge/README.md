@@ -43,15 +43,17 @@ cd LiteRT-LM
 bazelisk build //runtime/engine:litert_lm_main --config=windows
 ```
 
-2. Copy `delfin_litert_bridge.cc` into `runtime/engine/` and merge the
-   `BUILD.bazel` target into `runtime/engine/BUILD`, then build:
+2. From the Delfin repo, run the helper against that checkout. It copies
+   `delfin_litert_bridge.cc`, merges the `BUILD.bazel` target, builds, and
+   copies the resulting executable into Delfin's gitignored `bin/` directory:
 
 ```powershell
-bazelisk build //runtime/engine:delfin_litert_bridge --config=windows
+npm run build:litert-cpp-bridge -- -- --litert-lm-dir D:\path\to\LiteRT-LM
 ```
 
-3. Copy the resulting binary into Delfin's gitignored `bin/` directory and point
-   `.env` at it:
+Use `node scripts/build-litert-cpp-bridge.mjs --plan --litert-lm-dir <path>` for a dry-run plan without invoking Bazel.
+
+3. Point `.env` at the built bridge and model:
 
 ```powershell
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
