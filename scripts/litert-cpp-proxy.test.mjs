@@ -5,19 +5,27 @@ import { startLitertCppProxy } from './litert-cpp-proxy.mjs'
 
 function createMockBridge() {
   const inFlight = new Map()
+  const sessionTurns = new Map()
+  const resetSessions = []
+  const requests = []
 
   return {
+    requests,
+    resetSessions,
     async ready() {},
     getInfo() {
       return { ready: true, backend: 'litert-cpp', model: 'mock-gemma-4' }
     },
     async generate(request, handlers) {
-      const turnCount = request.messages.filter((message) => message.role === 'user').length
-      const lastUserMessage = request.messages.at(-1)
-      const prompt = (lastUserMessage?.content ?? [])
+      requests.push(request)
+      const turnCount = (sessionTurns.get(request.sessionId) ?? 0) + 1
+      sessionTurns.set(request.sessionId, turnCount)
+
+      const prompt = (request.message?.content ?? [])
         .filter((item) => item.type === 'text')
         .map((item) => item.text)
         .join(' ')
+      const includesImage = (request.message?.content ?? []).some((item) => item.type === 'image')
 
       if (prompt.includes('interrupt')) {
         handlers.onToken('partial ')
@@ -25,7 +33,7 @@ function createMockBridge() {
         return
       }
 
-      const response = `turn ${turnCount}: ${prompt}`
+      const response = `turn ${turnCount}: ${prompt}${includesImage ? ' [image]' : ''}`
       handlers.onToken(response.slice(0, 6))
       handlers.onToken(response.slice(6))
       handlers.onDone({
@@ -40,8 +48,13 @@ function createMockBridge() {
       inFlight.delete(requestId)
       handlers.onError('Generation interrupted.')
     },
+    resetSession(sessionId) {
+      resetSessions.push(sessionId)
+      sessionTurns.delete(sessionId)
+    },
     async close() {
       inFlight.clear()
+      sessionTurns.clear()
     },
   }
 }
@@ -88,14 +101,15 @@ describe('startLitertCppProxy', () => {
     expect(payload).toMatchObject({ status: 'ok', backend: 'litert-cpp', model: 'mock-gemma-4' })
   })
 
-  it('streams tokens and keeps per-connection conversation history', async () => {
-    proxy = await startLitertCppProxy({ host: '127.0.0.1', port: 0, createBridge: createMockBridge })
+  it('reuses a bridge session per connection and sends only the new user turn', async () => {
+    const bridge = createMockBridge()
+    proxy = await startLitertCppProxy({ host: '127.0.0.1', port: 0, createBridge: () => bridge })
     const socket = await openSocket(`ws://127.0.0.1:${proxy.port}/ws`)
 
-    socket.send(JSON.stringify({ text: 'explain this slide', preset_id: 'lecture-slide' }))
+    socket.send(JSON.stringify({ text: 'explain this slide', image: 'abc123', preset_id: 'lecture-slide' }))
     const firstTurn = await collectUntil(socket, 'done')
     expect(firstTurn.filter((message) => message.type === 'token').map((message) => message.text).join('')).toBe(
-      'turn 1: explain this slide',
+      'turn 1: explain this slide [image]',
     )
 
     socket.send(JSON.stringify({ text: 'simplify it', preset_id: 'lecture-slide' }))
@@ -104,7 +118,24 @@ describe('startLitertCppProxy', () => {
       'turn 2: simplify it',
     )
 
+    expect(bridge.requests).toHaveLength(2)
+    expect(bridge.requests[0]).toMatchObject({
+      systemPrompt: expect.stringContaining('You are Delfin'),
+      sessionId: expect.any(String),
+      message: {
+        role: 'user',
+        content: [
+          { type: 'image', blob: 'abc123' },
+          { type: 'text', text: 'explain this slide' },
+        ],
+      },
+    })
+    expect(bridge.requests[0]).not.toHaveProperty('messages')
+    expect(bridge.requests[1].sessionId).toBe(bridge.requests[0].sessionId)
+    const closed = new Promise((resolve) => socket.once('close', resolve))
     socket.close()
+    await closed
+    expect(bridge.resetSessions).toEqual([bridge.requests[0].sessionId])
   })
 
   it('forwards interrupt messages to the bridge', async () => {

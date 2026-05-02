@@ -22,33 +22,12 @@ function isDirectExecution() {
   );
 }
 
-function extractText(message) {
-  if (typeof message === "string") return message;
-  if (!message || typeof message !== "object") return "";
-  if (typeof message.content === "string") return message.content;
-  if (Array.isArray(message.content)) {
-    return message.content
-      .filter((item) => item?.type === "text" && typeof item.text === "string")
-      .map((item) => item.text)
-      .join("");
-  }
-  return "";
-}
-
 function buildUserMessage(request) {
   const content = [];
-  if (request.text) content.push({ type: "text", text: request.text });
   if (request.image) content.push({ type: "image", blob: request.image });
   if (request.audio) content.push({ type: "audio", blob: request.audio });
+  if (request.text) content.push({ type: "text", text: request.text });
   return { role: "user", content };
-}
-
-function buildConversation(history, request) {
-  return [
-    { role: "system", content: resolvePreset(request.preset_id) },
-    ...history,
-    buildUserMessage(request),
-  ];
 }
 
 function resolveBridgeCommand(binPath) {
@@ -186,6 +165,12 @@ function createStdioBridge() {
         `${JSON.stringify({ type: "interrupt", requestId })}\n`,
       );
     },
+    resetSession(sessionId) {
+      if (!ready || !sessionId) return;
+      child.stdin.write(
+        `${JSON.stringify({ type: "reset_session", sessionId })}\n`,
+      );
+    },
     async close() {
       clearTimeout(startupTimer);
       flushPendingWithError("LiteRT C++ bridge was closed.");
@@ -236,7 +221,7 @@ export async function startLitertCppProxy(options = {}) {
   });
 
   wss.on("connection", (ws) => {
-    const session = { history: [], activeRequestId: null };
+    const session = { sessionId: randomUUID(), activeRequestId: null };
     sessions.set(ws, session);
 
     ws.on("message", async (raw) => {
@@ -265,27 +250,22 @@ export async function startLitertCppProxy(options = {}) {
       }
 
       const requestId = randomUUID();
-      const userMessage = buildUserMessage(message);
       session.activeRequestId = requestId;
-      let assistantText = "";
 
       try {
         await bridge.generate(
-          { requestId, messages: buildConversation(session.history, message) },
+          {
+            requestId,
+            sessionId: session.sessionId,
+            systemPrompt: resolvePreset(message.preset_id),
+            message: buildUserMessage(message),
+          },
           {
             onToken(text) {
-              assistantText += text;
               ws.send(JSON.stringify({ type: "token", text }));
             },
-            onDone(event) {
+            onDone() {
               session.activeRequestId = null;
-              const finalText =
-                event.text ?? extractText(event.message) ?? assistantText;
-              const assistantMessage = event.message ?? {
-                role: "model",
-                content: [{ type: "text", text: finalText }],
-              };
-              session.history.push(userMessage, assistantMessage);
               ws.send(JSON.stringify({ type: "done" }));
             },
             onError(errorMessage) {
@@ -310,6 +290,7 @@ export async function startLitertCppProxy(options = {}) {
 
     ws.on("close", () => {
       bridge.interrupt(session.activeRequestId);
+      bridge.resetSession(session.sessionId);
       sessions.delete(ws);
     });
   });
