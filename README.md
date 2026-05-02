@@ -251,6 +251,8 @@ Electron Main (Node.js)  ←→  WebSocket  ←→  Inference sidecar
 ├── llamafile/
 │   ├── bin/           # downloaded llamafile binary (gitignored)
 │   └── models/        # downloaded GGUF model files (gitignored)
+├── native/
+│   └── litert-cpp-bridge/ # experimental LiteRT-LM C++ JSONL bridge source
 ├── scripts/           # setup, env checks, model downloads, benchmark runner
 ├── results/           # benchmark output JSON/CSV (gitignored except .gitkeep)
 ├── docs/              # spec, phase plans, and design notes

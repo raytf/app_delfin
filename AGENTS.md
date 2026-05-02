@@ -42,6 +42,8 @@ scripts/
     └── backends/                    ← LiteRT WebSocket, LiteRT C++ proxy, and llamafile/llama-server adapters.
 scripts/litert-cpp-proxy.mjs         ← Research proxy exposing Delfin's sidecar WebSocket protocol for a LiteRT C++ bridge.
 scripts/litert-cpp-presets.mjs       ← JS preset registry used by the LiteRT C++ proxy.
+native/
+└── litert-cpp-bridge/               ← Experimental LiteRT-LM C++ JSONL bridge source/build scaffold for Track A.
 results/
 └── .gitkeep                         ← Keep the output directory; benchmark JSON/CSV files are gitignored.
 docs/

@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-05-02 (LiteRT-LM C++ proxy groundwork and benchmark wiring added)
+> Last updated: 2026-05-02 (LiteRT-LM C++ proxy, benchmark wiring, and bridge source scaffold added)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -36,6 +36,7 @@
 | `scripts/litert-cpp-presets.mjs`                                             | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                 |
 | `scripts/litert-cpp-proxy.mjs`                                               | ⚠️     | Delfin WebSocket proxy and health endpoint for a JSONL/stdio LiteRT C++ bridge; real native bridge binary still pending |
 | `scripts/litert-cpp-proxy.test.mjs`                                          | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                        |
+| `native/litert-cpp-bridge/`                                                  | ⚠️     | JSONL C++ bridge source/Bazel/test scaffold; native build validation pending                                            |
 
 ---
 

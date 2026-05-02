@@ -20,6 +20,11 @@ sidecar/*.bin
 llamafile/bin/
 llamafile/models/
 
+# LiteRT C++ bridge binaries and local model files — built/downloaded outside git
+bin/
+models/
+native/litert-cpp-bridge/build/
+
 # Benchmark results — written at runtime, not committed
 results/*
 !results/.gitkeep

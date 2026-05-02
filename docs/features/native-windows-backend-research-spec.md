@@ -6,17 +6,17 @@
 
 ## Gate Resolution
 
-| Field                  | Value                                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**             | Gate 3 — proxy/benchmark groundwork landed; native bridge/build validation pending                                                           |
-| **Created**            | 2026-05-02                                                                                                                                   |
-| **Approved**           | 2026-05-02                                                                                                                                   |
-| **Implemented so far** | `scripts/litert-cpp-proxy.mjs`, `scripts/litert-cpp-presets.mjs`, `scripts/benchmark/backends/litert_cpp.py`, `npm run benchmark:litert-cpp` |
-| **Type**               | Sequential validation spec — LiteRT-LM C++ first, Foundry Local only as contingency                                                          |
-| **Preferred path**     | **Track A — LiteRT-LM C++** (features already validated via Python LiteRT-LM in WSL2)                                                        |
-| **Contingency path**   | Track B — Foundry Local only if Track A fails build, benchmark, or Delfin feature validation                                                 |
-| **Depends on**         | `inference-benchmarking-spec.md` (✅ Complete — provides baseline numbers)                                                                   |
-| **Blocks**             | Distribution backend decision: remove llamafile fallback if Track A passes validation                                                        |
+| Field                  | Value                                                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**             | Gate 3 — proxy/benchmark/bridge source scaffold landed; native validation pending                                                         |
+| **Created**            | 2026-05-02                                                                                                                                |
+| **Approved**           | 2026-05-02                                                                                                                                |
+| **Implemented so far** | `scripts/litert-cpp-proxy.mjs`, `scripts/litert-cpp-presets.mjs`, `scripts/benchmark/backends/litert_cpp.py`, `native/litert-cpp-bridge/` |
+| **Type**               | Sequential validation spec — LiteRT-LM C++ first, Foundry Local only as contingency                                                       |
+| **Preferred path**     | **Track A — LiteRT-LM C++** (features already validated via Python LiteRT-LM in WSL2)                                                     |
+| **Contingency path**   | Track B — Foundry Local only if Track A fails build, benchmark, or Delfin feature validation                                              |
+| **Depends on**         | `inference-benchmarking-spec.md` (✅ Complete — provides baseline numbers)                                                                |
+| **Blocks**             | Distribution backend decision: remove llamafile fallback if Track A passes validation                                                     |
 
 ---
 
@@ -77,7 +77,7 @@ In all cases, **the Electron main process, renderer, IPC contract, `wsClient.ts`
 | Phase  | Deliverable                                                                                                                                                                                                                                                                                               |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A0** | Native Windows build of `litert_lm_main.exe` from `https://github.com/google-ai-edge/LiteRT-LM` using Bazelisk + Visual Studio Build Tools. Document exact `bazel build` command and required toolchain versions.                                                                                         |
-| **A1** | Minimal C++ runtime smoke test: run a text-only prompt and a base64-image prompt directly against the C++ runner/API. Confirm streaming, multimodal input, and cancellation hooks exist before building any Delfin-specific proxy.                                                                        |
+| **A1** | ⚠️ Source scaffold landed: `native/litert-cpp-bridge/` defines the JSONL bridge, Bazel target, and static contract tests. Still pending native Windows build plus text, image, streaming, and cancellation runtime smoke tests.                                                                           |
 | **A2** | ✅ Groundwork landed: standalone benchmark adapter `scripts/benchmark/backends/litert_cpp.py` targets the WebSocket proxy and conforms to `BaseBackend`. `npm run benchmark:litert-cpp` added. Real benchmark numbers pending native bridge build.                                                        |
 | **A3** | ✅ Groundwork landed: sidecar proxy `scripts/litert-cpp-proxy.mjs` exposes the Delfin WebSocket sidecar protocol on port 8321 and forwards prompts/images/audio to a long-lived JSONL/stdio LiteRT C++ bridge. Streams tokens back as `{type:"token",text}` / `{type:"done"}` / `{type:"error",message}`. |
 | **A4** | Automated/manual Delfin feature validation round against `litert-cpp-proxy.mjs`: lecture slide explain, manual prompt, auto-refresh capture, interrupt/barge-in, error display, reconnect/health, and TTS fallback behavior.                                                                              |
@@ -160,7 +160,7 @@ cd LiteRT-LM
 bazelisk build //runtime/engine:litert_lm_main --config=windows
 ```
 
-The upstream demo binary validates the toolchain and model load path. The next implementation phase adds a Delfin-specific bridge binary that uses the same LiteRT-LM C++ Conversation API but speaks JSONL over stdio for the Node proxy. Models are downloaded separately to `models/*.litertlm` and gitignored.
+The upstream demo binary validates the toolchain and model load path. `native/litert-cpp-bridge/` now contains the Delfin-specific bridge source that uses the same LiteRT-LM C++ Conversation API but speaks JSONL over stdio for the Node proxy. It still needs to be copied into a LiteRT-LM checkout and built natively on Windows. Models are downloaded separately to `models/*.litertlm` and gitignored.
 
 ### Track B — installing Foundry Local (only if Track A fails)
 
