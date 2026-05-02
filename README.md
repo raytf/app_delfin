@@ -30,6 +30,8 @@ Delfin runs Gemma 4 locally using one of the following backends depending on you
 | **llamafile**     | Windows (no WSL2), macOS, Linux | Mozilla's single-file server based on llama.cpp. Works natively on all platforms with no Python environment required. Slower than LiteRT-LM on the same hardware, but the only practical option for Windows users who cannot or do not want to use WSL2.                               |
 | **LiteRT-LM C++** | Native Windows research track   | Experimental path to keep LiteRT performance without WSL2. `scripts/litert-cpp-proxy.mjs` and `npm run benchmark:litert-cpp` are wired, but the native JSONL bridge binary is still being validated.                                                                                   |
 
+For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by developers or CI to build `delfin_litert_bridge.exe`. End users should receive a prebuilt bridge executable in the packaged app and download only the `.litertlm` model/TTS assets at first run.
+
 ---
 
 ## Setup by platform

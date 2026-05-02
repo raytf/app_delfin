@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-05-02 (LiteRT-LM C++ proxy, benchmark wiring, and bridge source scaffold added)
+> Last updated: 2026-05-02 (LiteRT-LM C++ distribution path and bridge build helper scope documented)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---

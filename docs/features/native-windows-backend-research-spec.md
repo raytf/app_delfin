@@ -38,6 +38,12 @@ LiteRT-LM is the better experience but currently has no Windows Python wheel, wh
 
 Both paths preserve the renderer ↔ Electron main ↔ WebSocket sidecar architecture by introducing a thin proxy that speaks Delfin's existing sidecar WebSocket protocol on one side. If Track A passes, the Windows distribution strategy should become a LiteRT C++ bridge binary + `litert-cpp-proxy.mjs`, and the llamafile fallback should be removed from the active packaging plan.
 
+Track A has a strict build/runtime split:
+
+- **Developer/CI only:** LiteRT-LM C++ source tree, Bazelisk/Bazel, Visual Studio C++ toolchain, and `native/litert-cpp-bridge/` source are used to build `delfin_litert_bridge.exe`.
+- **End user only:** the packaged app receives a prebuilt `delfin_litert_bridge.exe` plus bundled Node proxy scripts. The user never needs the LiteRT-LM source tree, Bazel, or a compiler.
+- **First-run asset:** `gemma-4-E2B-it.litertlm` remains a model download/cache item, not a committed repo file or required compiler input.
+
 ---
 
 ## Architecture
@@ -82,6 +88,7 @@ In all cases, **the Electron main process, renderer, IPC contract, `wsClient.ts`
 | **A3** | ✅ Groundwork landed: sidecar proxy `scripts/litert-cpp-proxy.mjs` exposes the Delfin WebSocket sidecar protocol on port 8321 and forwards prompts/images/audio to a long-lived JSONL/stdio LiteRT C++ bridge. Streams tokens back as `{type:"token",text}` / `{type:"done"}` / `{type:"error",message}`. |
 | **A4** | Automated/manual Delfin feature validation round against `litert-cpp-proxy.mjs`: lecture slide explain, manual prompt, auto-refresh capture, interrupt/barge-in, error display, reconnect/health, and TTS fallback behavior.                                                                              |
 | **A5** | Distribution assessment: if A0–A4 pass, revise the distribution docs so Windows uses the LiteRT C++ bridge binary + `litert-cpp-proxy.mjs` and remove llamafile as an active fallback. Identify remaining installer/model-download work.                                                                  |
+| **A6** | CI/build handoff: automate the developer/CI-only bridge build with a helper script, then feed the prebuilt `delfin_litert_bridge.exe` into packaging. Users receive the binary; only models/TTS assets are first-run downloads.                                                                           |
 
 ### Track B — Foundry Local (contingency only)
 
@@ -162,6 +169,8 @@ bazelisk build //runtime/engine:litert_lm_main --config=windows
 
 The upstream demo binary validates the toolchain and model load path. `native/litert-cpp-bridge/` now contains the Delfin-specific bridge source that uses the same LiteRT-LM C++ Conversation API but speaks JSONL over stdio for the Node proxy. It still needs to be copied into a LiteRT-LM checkout and built natively on Windows. Models are downloaded separately to `models/*.litertlm` and gitignored.
 
+The local/CI build helper is `npm run build:litert-cpp-bridge -- --litert-lm-dir <LiteRT-LM checkout>`. It copies the bridge source into the upstream tree, builds `//runtime/engine:delfin_litert_bridge`, and writes the resulting executable to Delfin's gitignored `bin/` directory. The helper does not install toolchains or download models.
+
 ### Track B — installing Foundry Local (only if Track A fails)
 
 ```powershell
@@ -227,7 +236,8 @@ If Track A passes, the active distribution plan removes the llamafile fallback. 
 4. **A3 — Build the Delfin WebSocket proxy.** Only after A2 passes thresholds, implement `litert-cpp-proxy.mjs` behind the existing sidecar protocol.
 5. **A4 — Automated/manual Delfin feature validation.** Run the full app against the C++ proxy and validate the core lecture-slide workflow plus capture, interrupt, reconnect, error, and TTS fallback behavior.
 6. **A5 — Assess distribution next steps.** If A0–A4 pass, update the distribution plan to remove llamafile and identify remaining packaging work: bundling the binary, model download/cache, first-run setup, installer resources, and CI artifacts.
-7. **Track B decision gate.** Foundry Local work starts only if Track A fails and the human explicitly approves activating the contingency path.
+7. **A6 — Automate build handoff.** Add/validate the bridge build helper and CI artifact handoff so `delfin_litert_bridge.exe` is produced before Electron packaging.
+8. **Track B decision gate.** Foundry Local work starts only if Track A fails and the human explicitly approves activating the contingency path.
 
 ---
 

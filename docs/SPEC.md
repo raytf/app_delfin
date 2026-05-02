@@ -132,6 +132,10 @@ MAX_IMAGE_WIDTH=512
 LITERT_CPP_BIN=./bin/litert_lm_main.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
 
+# For packaged Windows builds, LITERT_CPP_BIN points at the bundled prebuilt
+# delfin_litert_bridge.exe resource and LITERT_CPP_MODEL points at the user's
+# first-run-downloaded .litertlm model under app.getPath('userData').
+
 # === TTS ===
 TTS_ENABLED=false
 TTS_BACKEND=web-speech

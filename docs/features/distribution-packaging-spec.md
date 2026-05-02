@@ -24,6 +24,14 @@ Package Delfin as a native installable desktop application for Windows x64, macO
 
 This is the key architectural decision for packaging. The inference backend differs by platform because LiteRT-LM has no Windows native wheel. A newer native-Windows research track (`native-windows-backend-research-spec.md`) is validating LiteRT-LM C++ as a replacement for the Windows llamafile path; until that passes A0–A5, this packaging spec still treats llamafile as the active Windows fallback.
 
+If Track A passes, the Windows row changes from llamafile to LiteRT-LM C++:
+
+| Platform        | Future packaged inference backend      | Sidecar delivery                                                                  |
+| --------------- | -------------------------------------- | --------------------------------------------------------------------------------- |
+| **Windows x64** | LiteRT-LM C++ + `litert-cpp-proxy.mjs` | `delfin_litert_bridge.exe` bundled as a prebuilt resource; `.litertlm` downloaded |
+
+In that future state the LiteRT-LM C++ source tree, Bazelisk/Bazel, and Visual Studio C++ toolchain are CI/developer-only build inputs. End users receive the prebuilt bridge executable and never need compiler tooling.
+
 | Platform              | Packaged inference backend        | Sidecar delivery                                                        |
 | --------------------- | --------------------------------- | ----------------------------------------------------------------------- |
 | **Windows x64**       | llamafile + `llamafile-proxy.mjs` | llamafile binary downloaded at first run; proxy bundled as app resource |
@@ -109,6 +117,8 @@ On first launch the app checks for required assets and downloads anything missin
 | macOS / Linux | GGUF model weights (sidecar binary is bundled in installer), TTS model      | ~3.5 GB     |
 
 Note: on macOS/Linux the frozen sidecar binary is bundled inside the installer itself (no first-run binary download), but the Gemma model is still downloaded at first run to keep installer size small.
+
+If the LiteRT C++ Windows path replaces llamafile, Windows first-run assets become `gemma-4-E2B-it.litertlm` plus TTS assets. `delfin_litert_bridge.exe`, `litert-cpp-proxy.mjs`, and `litert-cpp-presets.mjs` are bundled with the app, not downloaded by the user.
 
 #### Download manifest
 
@@ -196,6 +206,17 @@ When `app.isPackaged`, Electron spawns the appropriate backend from user data / 
 
 The proxy script (`scripts/llamafile-proxy.mjs`) is bundled as an `extraResource` so it is available at `process.resourcesPath/llamafile-proxy.mjs` in packaged builds. Node.js is already embedded in Electron, so the proxy can be spawned with Electron's own Node runtime via `process.execPath --` or as a forked process.
 
+#### Windows future path if Track A passes (LiteRT-LM C++)
+
+```ts
+// dev:   node scripts/litert-cpp-proxy.mjs
+// prod:  spawn litert-cpp-proxy.mjs from app resources
+//        pass LITERT_CPP_BIN=<resources/bin/delfin_litert_bridge.exe>
+//        pass LITERT_CPP_MODEL=<userData/models/gemma-4-E2B-it.litertlm>
+```
+
+The bridge executable is built by developers/CI from LiteRT-LM C++ source and bundled as an app resource. The source tree and compiler toolchain are never present on the user's machine. Only the `.litertlm` model and TTS assets remain first-run downloads.
+
 #### macOS / Linux (LiteRT-LM path)
 
 ```ts
@@ -270,6 +291,7 @@ Explicitly conditional — defer if GPU detection adds stability risk.
 ```ts
 type ModelAssetId =
   | "llamafile-bin" // Windows only
+  | "litert-cpp-model" // Windows only if Track A replaces llamafile
   | "gemma-model" // All platforms
   | "mmproj" // Windows only (llamafile vision)
   | "tts-model"; // All platforms

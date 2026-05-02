@@ -6,10 +6,10 @@
 
 ## Gate Resolution
 
-| Field | Value |
-|---|---|
-| **Status** | Gate 1 — awaiting approval |
-| **Created** | 2026-05-01 |
+| Field          | Value                                                                               |
+| -------------- | ----------------------------------------------------------------------------------- |
+| **Status**     | Gate 1 — awaiting approval                                                          |
+| **Created**    | 2026-05-01                                                                          |
 | **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally) |
 
 ## Goal
@@ -22,16 +22,18 @@ Currently, all builds are done locally on a single developer machine. Cross-plat
 
 The CI/CD work is the last track in the distribution milestone. Completing it makes the release process repeatable and removes the need for a developer to have access to all three OS environments.
 
+If `native-windows-backend-research-spec.md` Track A passes, CI also owns the Windows LiteRT-LM C++ bridge build. The LiteRT-LM C++ source tree, Bazelisk/Bazel, and MSVC are CI/build-time inputs only; the release artifact contains the prebuilt bridge executable.
+
 ## Scope
 
 ### Track DC0 — local release workflow (immediate)
 
 Before CI is set up, document and script a repeatable manual release process so builds can be produced today.
 
-| File | Change |
-|---|---|
-| `scripts/release-local.mjs` | New: interactive checklist script that builds for the current platform, names the output file correctly, and prints next steps |
-| `docs/features/distribution-cicd-spec.md` | This spec — includes the manual release checklist below |
+| File                                      | Change                                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts/release-local.mjs`               | New: interactive checklist script that builds for the current platform, names the output file correctly, and prints next steps |
+| `docs/features/distribution-cicd-spec.md` | This spec — includes the manual release checklist below                                                                        |
 
 **Manual release checklist (current platform):**
 
@@ -59,11 +61,11 @@ name: Build distribution artifacts
 
 on:
   push:
-    branches: ['release/*']
+    branches: ["release/*"]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v0.1.0)'
+        description: "Version tag (e.g. v0.1.0)"
         required: true
 
 jobs:
@@ -74,13 +76,13 @@ jobs:
         include:
           - os: windows-latest
             platform: win
-            artifact: 'dist/*.exe'
-          - os: macos-latest       # arm64 runner
+            artifact: "dist/*.exe"
+          - os: macos-latest # arm64 runner
             platform: mac
-            artifact: 'dist/*.dmg'
+            artifact: "dist/*.dmg"
           - os: ubuntu-latest
             platform: linux
-            artifact: 'dist/*.AppImage'
+            artifact: "dist/*.AppImage"
 
     runs-on: ${{ matrix.os }}
 
@@ -89,14 +91,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build Electron app
         run: npm run build
+
+      - name: Build LiteRT C++ bridge (Windows Track A only)
+        if: matrix.platform == 'win'
+        run: npm run build:litert-cpp-bridge -- --litert-lm-dir "$env:LITERT_LM_DIR" --output-dir bin
+        shell: pwsh
 
       - name: Package (${{ matrix.platform }})
         run: npm run dist
@@ -140,7 +147,19 @@ jobs:
 
 - **`macos-latest`** as of 2026 defaults to an arm64 (Apple Silicon) runner on GitHub. If you need x64 macOS builds, add a second matrix entry with `runs-on: macos-13` (Intel). electron-builder can produce universal binaries (`arch: universal`) on arm64 runners but this doubles build time.
 - **Windows**: `windows-latest` is x64. arm64 is not a target for MVP.
+- **Windows LiteRT C++ Track A**: once validated, the Windows job must fetch or restore a pinned LiteRT-LM checkout before packaging, run `npm run build:litert-cpp-bridge`, and include the resulting `bin/delfin_litert_bridge.exe` in the Electron resources. The `.litertlm` model remains a first-run download and is not uploaded as a GitHub Actions artifact.
 - **Linux**: `ubuntu-latest` is x64. The AppImage produced here runs on any reasonably modern Linux distribution.
+
+### Track DC1a — LiteRT C++ bridge artifact handoff (conditional)
+
+This track is activated only if `native-windows-backend-research-spec.md` Track A passes. The Windows runner performs developer/CI-only build work:
+
+1. Restore or clone the pinned `google-ai-edge/LiteRT-LM` source tree.
+2. Run `npm run build:litert-cpp-bridge -- --litert-lm-dir <checkout> --output-dir bin`.
+3. Upload `bin/delfin_litert_bridge.exe` as an intermediate workflow artifact for diagnostics.
+4. Run Electron packaging with that binary included as an app resource.
+
+End users install only the packaged app and download model/TTS assets at first run. They do not receive the LiteRT-LM source tree, Bazel cache, or compiler toolchain.
 
 ### Track DC2 — code signing setup (when ready)
 
@@ -149,6 +168,7 @@ Code signing is not required for student tester builds but is required before br
 #### macOS notarization
 
 Requirements:
+
 - Apple Developer account ($99/yr)
 - Developer ID Application certificate exported as `.p12`
 - App-specific password for your Apple ID
@@ -167,6 +187,7 @@ electron-builder handles notarization automatically when these are set. The `dis
 #### Windows code signing
 
 Requirements:
+
 - EV code signing certificate from a CA (DigiCert, Sectigo, etc.) — $300–700/yr
 - Certificate exported as `.pfx`
 
@@ -185,6 +206,7 @@ Without signing, Windows Defender SmartScreen shows "Windows protected your PC".
 **Why**: Free, no infrastructure required, integrates directly with the CI workflow above. Testers get a direct download link. Versioning and changelog are built in.
 
 **How it works**:
+
 1. Push to `release/v0.1.0` branch → CI builds all three platform artifacts → creates a draft GitHub Release
 2. Developer smoke tests the artifacts and edits the release notes
 3. Developer publishes the release → download links are live
@@ -194,6 +216,7 @@ Without signing, Windows Defender SmartScreen shows "Windows protected your PC".
 ### Alternative: Direct S3 / CDN hosting
 
 If GitHub Releases becomes limiting (e.g. high download traffic, need for analytics, or custom update server for `electron-updater`), host artifacts on:
+
 - **Cloudflare R2**: S3-compatible, no egress fees
 - **AWS S3 + CloudFront**: standard and well-documented with electron-updater
 
@@ -217,6 +240,7 @@ Mac App Store and Microsoft Store require sandboxing and additional entitlements
 - [ ] `.github/workflows/dist.yml` exists and is valid YAML (passes `actionlint` or similar)
 - [ ] Pushing to `release/*` triggers the matrix build on all three runners
 - [ ] All three platform artifacts are produced and uploaded to GitHub Actions as workflow artifacts
+- [ ] If LiteRT C++ Track A is active, the Windows workflow builds `delfin_litert_bridge.exe` before packaging and the installer includes the prebuilt bridge
 - [ ] A draft GitHub Release is created automatically with all three artifacts attached
 - [ ] Workflow completes without error when signing secrets are absent (signing is skipped gracefully, not a hard failure)
 - [ ] Manual release checklist is followed at least once end-to-end before calling DC1 complete
