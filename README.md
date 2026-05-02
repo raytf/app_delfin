@@ -22,12 +22,13 @@ Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice
 
 ## Inference backends
 
-Delfin runs Gemma 4 locally using one of two backends depending on your platform:
+Delfin runs Gemma 4 locally using one of the following backends depending on your platform and development track:
 
-| Backend       | Platforms                       | Why                                                                                                                                                                                                                                                                                    |
-| ------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **LiteRT-LM** | macOS, Linux, Windows + WSL2    | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. No Windows native wheel exists — Windows users need WSL2 or the llamafile fallback. |
-| **llamafile** | Windows (no WSL2), macOS, Linux | Mozilla's single-file server based on llama.cpp. Works natively on all platforms with no Python environment required. Slower than LiteRT-LM on the same hardware, but the only practical option for Windows users who cannot or do not want to use WSL2.                               |
+| Backend           | Platforms                       | Why                                                                                                                                                                                                                                                                                    |
+| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **LiteRT-LM**     | macOS, Linux, Windows + WSL2    | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. No Windows native wheel exists — Windows users need WSL2 or the llamafile fallback. |
+| **llamafile**     | Windows (no WSL2), macOS, Linux | Mozilla's single-file server based on llama.cpp. Works natively on all platforms with no Python environment required. Slower than LiteRT-LM on the same hardware, but the only practical option for Windows users who cannot or do not want to use WSL2.                               |
+| **LiteRT-LM C++** | Native Windows research track   | Experimental path to keep LiteRT performance without WSL2. `scripts/litert-cpp-proxy.mjs` and `npm run benchmark:litert-cpp` are wired, but the native JSONL bridge binary is still being validated.                                                                                   |
 
 ---
 
@@ -161,19 +162,20 @@ The defaults are sensible for most machines. Common settings you may want to cha
 | `TTS_ENABLED`    | `true`                                      | Disable spoken playback entirely                                                                  |
 | `TTS_BACKEND`    | `kokoro`                                    | Use `web-speech` for browser-only speech, or `mlx` on Apple Silicon for GPU TTS                   |
 
-See [`.env.example`](.env.example) for the full reference including llamafile options.
+See [`.env.example`](.env.example) for the full reference including llamafile and LiteRT C++ research options.
 
 ---
 
 ## Running the app
 
-| Command                 | What it does                                                             |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `npm run dev:full`      | Starts the LiteRT sidecar + Electron together (macOS / Linux / WSL2)     |
-| `npm run dev:sidecar`   | Starts just the LiteRT sidecar (WSL2 terminal)                           |
-| `npm run dev:llamafile` | Starts the llamafile server on port 8080 (Windows without WSL2)          |
-| `npm run dev:mock`      | Starts the mock sidecar + Electron (UI development, no inference)        |
-| `npm run dev`           | Starts Electron + Vite only (when sidecar is already running separately) |
+| Command                  | What it does                                                             |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `npm run dev:full`       | Starts the LiteRT sidecar + Electron together (macOS / Linux / WSL2)     |
+| `npm run dev:sidecar`    | Starts just the LiteRT sidecar (WSL2 terminal)                           |
+| `npm run dev:llamafile`  | Starts the llamafile server on port 8080 (Windows without WSL2)          |
+| `npm run dev:litert-cpp` | Starts the LiteRT C++ research proxy on the Delfin sidecar port          |
+| `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference)        |
+| `npm run dev`            | Starts Electron + Vite only (when sidecar is already running separately) |
 
 ### Verify the sidecar is healthy
 
@@ -210,21 +212,23 @@ Electron Renderer (React / Zustand)
         ↕  contextBridge (IPC)
 Electron Main (Node.js)  ←→  WebSocket  ←→  Inference sidecar
                                                ├── LiteRT-LM + Gemma 4  (macOS / Linux / WSL2)
-                                               └── llamafile + GGUF      (Windows, benchmarking)
+                                               ├── llamafile + GGUF      (Windows, benchmarking)
+                                               └── LiteRT-LM C++ bridge  (native Windows research)
 ```
 
-| Layer                      | Technology                                                    |
-| -------------------------- | ------------------------------------------------------------- |
-| Desktop framework          | Electron 41+ via electron-vite                                |
-| Renderer                   | React 19, TypeScript, Tailwind CSS 4                          |
-| State management           | Zustand 5                                                     |
-| Validation                 | Zod 4                                                         |
-| Inference — LiteRT path    | LiteRT-LM (Python, Linux/macOS)                               |
-| Inference — llamafile path | llamafile / llama-server (C++, all platforms)                 |
-| Model                      | Gemma 4 E2B (default); E4B for 32 GB machines                 |
-| API server                 | FastAPI + uvicorn (LiteRT) / built-in HTTP server (llamafile) |
-| Voice input                | `@ricky0123/vad-web` (Silero VAD in the renderer)             |
-| TTS                        | kokoro-onnx / mlx-audio / Web Speech fallback                 |
+| Layer                       | Technology                                                    |
+| --------------------------- | ------------------------------------------------------------- |
+| Desktop framework           | Electron 41+ via electron-vite                                |
+| Renderer                    | React 19, TypeScript, Tailwind CSS 4                          |
+| State management            | Zustand 5                                                     |
+| Validation                  | Zod 4                                                         |
+| Inference — LiteRT path     | LiteRT-LM (Python, Linux/macOS)                               |
+| Inference — llamafile path  | llamafile / llama-server (C++, all platforms)                 |
+| Inference — LiteRT C++ path | Node proxy + native LiteRT-LM C++ bridge (research)           |
+| Model                       | Gemma 4 E2B (default); E4B for 32 GB machines                 |
+| API server                  | FastAPI + uvicorn (LiteRT) / built-in HTTP server (llamafile) |
+| Voice input                 | `@ricky0123/vad-web` (Silero VAD in the renderer)             |
+| TTS                         | kokoro-onnx / mlx-audio / Web Speech fallback                 |
 
 ---
 
@@ -261,21 +265,23 @@ Electron Main (Node.js)  ←→  WebSocket  ←→  Inference sidecar
 
 ### Scripts
 
-| Script                        | Description                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------- |
-| `npm run setup`               | First-run setup for env, Python venv, and TTS assets (macOS / Linux / WSL2) |
-| `npm run setup:llamafile`     | Download llamafile binary + GGUF model (~3.5 GB total, Windows fallback)    |
-| `npm run dev:full`            | Run LiteRT sidecar + Electron together                                      |
-| `npm run dev:mock`            | Run mock sidecar + Electron (no inference needed)                           |
-| `npm run dev`                 | Run Electron + Vite only                                                    |
-| `npm run dev:sidecar`         | Run the LiteRT sidecar only                                                 |
-| `npm run dev:llamafile`       | Run the llamafile server on port 8080                                       |
-| `npm run benchmark:litert`    | Benchmark the LiteRT sidecar (uses sidecar venv automatically)              |
-| `npm run benchmark:llamafile` | Benchmark llamafile (server must be running separately)                     |
-| `npm run build`               | Build the Electron app and validate VAD runtime assets                      |
-| `npm test`                    | Run Vitest unit tests                                                       |
-| `npm run check:env`           | Validate expected `.env` values                                             |
-| `npm run check:vad-runtime`   | Verify packaged VAD/ONNX runtime files                                      |
+| Script                         | Description                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `npm run setup`                | First-run setup for env, Python venv, and TTS assets (macOS / Linux / WSL2) |
+| `npm run setup:llamafile`      | Download llamafile binary + GGUF model (~3.5 GB total, Windows fallback)    |
+| `npm run dev:full`             | Run LiteRT sidecar + Electron together                                      |
+| `npm run dev:mock`             | Run mock sidecar + Electron (no inference needed)                           |
+| `npm run dev`                  | Run Electron + Vite only                                                    |
+| `npm run dev:sidecar`          | Run the LiteRT sidecar only                                                 |
+| `npm run dev:llamafile`        | Run the llamafile server on port 8080                                       |
+| `npm run dev:litert-cpp`       | Run the LiteRT C++ research WebSocket proxy                                 |
+| `npm run benchmark:litert`     | Benchmark the LiteRT sidecar (uses sidecar venv automatically)              |
+| `npm run benchmark:litert-cpp` | Benchmark the LiteRT C++ proxy on the Delfin sidecar protocol               |
+| `npm run benchmark:llamafile`  | Benchmark llamafile (server must be running separately)                     |
+| `npm run build`                | Build the Electron app and validate VAD runtime assets                      |
+| `npm test`                     | Run Vitest unit tests                                                       |
+| `npm run check:env`            | Validate expected `.env` values                                             |
+| `npm run check:vad-runtime`    | Verify packaged VAD/ONNX runtime files                                      |
 
 ### Tests
 

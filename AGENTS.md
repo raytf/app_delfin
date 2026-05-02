@@ -37,9 +37,11 @@ CLAUDE.md                            ← Claude Code shim; points back to AGENTS
 STATUS.md                            ← Live feature status tracker. Update after every implementation change.
 scripts/
 └── benchmark/                       ← Standalone inference benchmark harness (LiteRT vs llamafile/llama-server).
-    ├── SETUP.md                     ← Benchmark setup/runbook for WSL2 LiteRT + native llamafile runs.
+    ├── SETUP.md                     ← Benchmark setup/runbook for WSL2 LiteRT, LiteRT C++ proxy research, and native llamafile runs.
     ├── run.py                       ← Benchmark CLI entry point; writes JSON + CSV to results/.
-    └── backends/                    ← LiteRT WebSocket + llamafile/llama-server REST adapters.
+    └── backends/                    ← LiteRT WebSocket, LiteRT C++ proxy, and llamafile/llama-server adapters.
+scripts/litert-cpp-proxy.mjs         ← Research proxy exposing Delfin's sidecar WebSocket protocol for a LiteRT C++ bridge.
+scripts/litert-cpp-presets.mjs       ← JS preset registry used by the LiteRT C++ proxy.
 results/
 └── .gitkeep                         ← Keep the output directory; benchmark JSON/CSV files are gitignored.
 docs/
@@ -52,6 +54,7 @@ docs/
 │   ├── distribution-backend-migration-spec.md     ← 🚧 Replace LiteRT with llama-server + TTS
 │   ├── distribution-packaging-spec.md             ← 🚧 electron-builder, first-run download, installers
 │   ├── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel
+│   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation; Foundry contingency
 │   ├── waveform-ui-spec.md                ← ✅ Complete
 │   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
 │   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete

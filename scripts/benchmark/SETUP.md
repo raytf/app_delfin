@@ -1,16 +1,17 @@
 # Benchmark Setup Guide
 
-This guide walks through setting up both backends and running the benchmark
-on your Windows machine (WSL2 for LiteRT, native PowerShell for llamafile).
+This guide walks through setting up the benchmark backends and running them on
+your Windows machine (WSL2 for LiteRT, native PowerShell for native backends).
 
 ---
 
 ## Overview
 
-| Backend | Where to run | Setup command |
-|---|---|---|
-| **LiteRT-LM** | WSL2 Ubuntu terminal | `npm run setup` (existing sidecar) |
-| **llamafile** | Windows PowerShell or any platform | `npm run setup:llamafile` |
+| Backend                 | Where to run                       | Setup command                                                                           |
+| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| **LiteRT-LM**           | WSL2 Ubuntu terminal               | `npm run setup` (existing sidecar)                                                      |
+| **LiteRT-LM C++ proxy** | Native Windows PowerShell          | Build/provide a JSONL LiteRT C++ bridge, then set `LITERT_CPP_BIN` / `LITERT_CPP_MODEL` |
+| **llamafile**           | Windows PowerShell or any platform | `npm run setup:llamafile`                                                               |
 
 Run each backend in its own environment, then compare the CSV output files.
 
@@ -72,6 +73,7 @@ npm run setup:llamafile
 ```
 
 This downloads:
+
 - The llamafile binary into `llamafile/bin/` (~30 MB)
 - The Gemma 4 E2B GGUF model into `llamafile/models/` (~3 GB)
 
@@ -135,7 +137,38 @@ and appended to `results/summary-<date>.csv`.
 
 ---
 
-## Part 3 — Auto-launch mode (optional)
+## Part 3 — LiteRT-LM C++ proxy benchmark (research)
+
+The LiteRT C++ benchmark talks to the same Delfin sidecar WebSocket protocol as
+the Python sidecar. Start `scripts/litert-cpp-proxy.mjs` first; it expects
+`LITERT_CPP_BIN` to point at a JSONL/stdio bridge built on top of the LiteRT-LM
+C++ Conversation API. The upstream `litert_lm_main` demo binary is useful for
+build smoke tests but is not a drop-in Delfin bridge by itself.
+
+```powershell
+$Env:LITERT_CPP_BIN = "D:\path\to\delfin_litert_bridge.exe"
+$Env:LITERT_CPP_MODEL = "D:\path\to\gemma-4-E2B-it.litertlm"
+npm run dev:litert-cpp
+```
+
+In another terminal:
+
+```powershell
+npm run benchmark:litert-cpp
+```
+
+To pass extra flags:
+
+```powershell
+node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios s1,s2,s3
+```
+
+Results are written to `results/benchmark-litert-cpp-<platform>-gemma-4-e2b-litert-cpp-<timestamp>.json`
+and appended to `results/summary-<date>.csv`.
+
+---
+
+## Part 4 — Auto-launch mode (optional)
 
 Instead of starting the server with `npm run dev:llamafile`, the benchmark
 can manage the server process itself. In auto-launch mode `--sidecar-pid` is
@@ -154,7 +187,7 @@ On Windows PowerShell, replace the binary name with `llamafile-0.10.1.exe`.
 
 ---
 
-## Part 4 — Reading the results
+## Part 5 — Reading the results
 
 ### Console output (during run)
 
@@ -189,25 +222,27 @@ same CSV file for easy side-by-side comparison in Excel or Google Sheets.
 
 ## npm convenience scripts
 
-| Command | Equivalent |
-|---|---|
-| `npm run setup:llamafile` | Download binary + GGUF model |
-| `npm run dev:llamafile` | Start llamafile server on port 8080 |
-| `npm run benchmark:litert` | `run.py --backend litert --runs 5` |
-| `npm run benchmark:llamafile` | `run.py --backend llamafile --runs 5` |
+| Command                        | Equivalent                             |
+| ------------------------------ | -------------------------------------- |
+| `npm run setup:llamafile`      | Download binary + GGUF model           |
+| `npm run dev:llamafile`        | Start llamafile server on port 8080    |
+| `npm run benchmark:litert`     | `run.py --backend litert --runs 5`     |
+| `npm run benchmark:litert-cpp` | `run.py --backend litert-cpp --runs 5` |
+| `npm run benchmark:llamafile`  | `run.py --backend llamafile --runs 5`  |
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| `Backend unreachable` | Check the server is running; confirm host:port matches |
-| `Binary not found` | Run `npm run setup:llamafile` first |
-| `Model not found` | Run `npm run setup:llamafile` — model download may have failed |
-| Slow download (~3 GB) | Normal for first run; script resumes if interrupted (atomic .part file) |
-| Gemma 4 not supported | The llamafile version is too old — bump `LLAMAFILE_VERSION` in `.env` |
-| RSS shows N/A | Pass `--sidecar-pid` with the correct PID |
-| Very low tok/s on Windows | Expected for CPU inference; check no other heavy process is running |
-| S2 vision scenario fails | Ensure the GGUF model includes the vision encoder (multimodal GGUF) |
-| Port conflict on 8080 | Set `LLAMAFILE_PORT=<other>` in `.env` and pass `--llamafile-host localhost:<other>` |
+| Symptom                                                  | Fix                                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Backend unreachable`                                    | Check the server is running; confirm host:port matches                               |
+| `Binary not found`                                       | Run `npm run setup:llamafile` first                                                  |
+| `Model not found`                                        | Run `npm run setup:llamafile` — model download may have failed                       |
+| `Raw litert_lm_main is not yet a drop-in Delfin sidecar` | Point `LITERT_CPP_BIN` at the Delfin JSONL bridge, not the upstream demo CLI         |
+| Slow download (~3 GB)                                    | Normal for first run; script resumes if interrupted (atomic .part file)              |
+| Gemma 4 not supported                                    | The llamafile version is too old — bump `LLAMAFILE_VERSION` in `.env`                |
+| RSS shows N/A                                            | Pass `--sidecar-pid` with the correct PID                                            |
+| Very low tok/s on Windows                                | Expected for CPU inference; check no other heavy process is running                  |
+| S2 vision scenario fails                                 | Ensure the GGUF model includes the vision encoder (multimodal GGUF)                  |
+| Port conflict on 8080                                    | Set `LLAMAFILE_PORT=<other>` in `.env` and pass `--llamafile-host localhost:<other>` |
