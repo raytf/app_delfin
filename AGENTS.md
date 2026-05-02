@@ -57,6 +57,7 @@ docs/
 │   ├── distribution-packaging-spec.md             ← 🚧 electron-builder, first-run download, installers
 │   ├── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel
 │   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation; Foundry contingency
+│   ├── litert-cpp-vision-spec.md                 ← 🚧 C++ bridge vision + KV-cache session reuse; sub-feature of native-windows-backend-research-spec.md
 │   ├── waveform-ui-spec.md                ← ✅ Complete
 │   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
 │   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete
