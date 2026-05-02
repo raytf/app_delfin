@@ -21,6 +21,17 @@
 | `scripts/download-models.test.mjs` | ✅ | Vitest coverage for safe model download behavior |
 | `scripts/check-vad-runtime.mjs` | ✅ | Verifies copied VAD/ORT runtime assets |
 | `scripts/setup-check.sh` / `scripts/setup-check.ps1` | ✅ | Environment validation helpers |
+| `scripts/setup-llamafile.mjs` | ✅ | Downloads llamafile binary + GGUF model to `llamafile/bin/` and `llamafile/models/` |
+| `scripts/run-llamafile.mjs` | ✅ | Starts llamafile server; pre-flight checks for binary and model |
+| `scripts/run-benchmark.mjs` | ✅ | Node wrapper that runs benchmark/run.py using the sidecar venv Python |
+| `scripts/benchmark/run.py` | ✅ | CLI benchmark entry point — `--backend litert|llamafile`, all scenarios, JSON+CSV output |
+| `scripts/benchmark/backends/litert.py` | ✅ | LiteRT adapter over WebSocket |
+| `scripts/benchmark/backends/llamafile.py` | ✅ | llamafile adapter over OpenAI-compatible REST (streaming SSE) |
+| `scripts/benchmark/backends/memory.py` | ✅ | Background RSS poller using psutil |
+| `scripts/benchmark/scenarios.py` | ✅ | S1 (text), S2 (vision), S3 (multi-turn) scenario definitions |
+| `scripts/benchmark/reporter.py` | ✅ | JSON + CSV result writer with mean±std stats |
+| `scripts/benchmark/sysinfo.py` | ✅ | Platform/CPU/RAM/GPU detection |
+| `scripts/benchmark/SETUP.md` | ✅ | Setup and usage guide for both backends |
 
 ---
 

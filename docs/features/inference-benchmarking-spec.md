@@ -1,13 +1,14 @@
 # Inference Benchmarking Spec
 
-> Gate 1 spec — awaiting approval before implementation.
+> Gate 1 spec — implemented.
 
 ## Gate Resolution
 
 | Field | Value |
 |---|---|
-| **Status** | Gate 1 — awaiting approval |
+| **Status** | Gate 1 approved — implemented |
 | **Created** | 2026-05-01 |
+| **Implemented** | 2026-05-02 |
 | **Type** | Standalone developer script (no app changes) |
 | **Output location** | `scripts/benchmark/` |
 
@@ -31,16 +32,18 @@ Results from each run are written to `results/` and compared manually.
 
 - `scripts/benchmark/run.py` — CLI entry point
 - `scripts/benchmark/backends/litert.py` — LiteRT adapter (connects to existing FastAPI WebSocket sidecar)
-- `scripts/benchmark/backends/llama.py` — llama-server adapter (connects to llama-server OpenAI-compatible REST API)
-- `scripts/benchmark/scenarios.py` — test scenario definitions and prompt fixtures
+- `scripts/benchmark/backends/llamafile.py` — llamafile/llama-server adapter (connects to OpenAI-compatible REST API)
+- `scripts/benchmark/backends/memory.py` — background RSS poller using `psutil`
+- `scripts/benchmark/scenarios.py` — test scenario definitions and prompt fixtures; generates a test image with PIL if no asset is present
 - `scripts/benchmark/reporter.py` — JSON + CSV result writer
-- `scripts/benchmark/requirements.txt` — `psutil`, `httpx`, `websockets`, `pynvml` (optional)
-- `scripts/benchmark/assets/test-slide.png` — static test image for the vision scenario (a sample lecture slide)
+- `scripts/benchmark/sysinfo.py` — platform, CPU, RAM, GPU detection
+- `scripts/benchmark/SETUP.md` — setup and usage instructions
 - `results/.gitkeep` — create the directory, contents gitignored
 
 ### Files modified
 
-- `.gitignore` — add `results/` to gitignore
+- `.gitignore` — added `results/*` with `!results/.gitkeep`
+- `package.json` — added `benchmark:litert` and `benchmark:llamafile` npm scripts
 
 ## Out of scope
 
@@ -78,14 +81,26 @@ Each scenario runs **5 repetitions** by default (configurable via `--runs N`). T
 
 ```
 python scripts/benchmark/run.py \
-  --backend <litert|llama> \
-  --host <host:port>            # default: localhost:8321 (litert) or localhost:8080 (llama) \
-  --runs <N>                    # default: 5 \
-  --scenarios <s1,s2,s3>        # default: all \
-  --model <model-id>            # e.g. gemma-4-e2b-q4_k_m (informational, written to output) \
-  --output <path/to/results/>   # default: results/ \
-  --sidecar-pid <PID>           # optional: PID of sidecar process for RSS measurement
+  --backend <litert|llamafile> \
+  --litert-host <host:port>         # default: localhost:8321 \
+  --llamafile-host <host:port>      # default: localhost:8080 \
+  --llamafile-bin <path>            # auto-launch binary (optional) \
+  --llamafile-model <path>          # auto-launch model path (optional) \
+  --sidecar-pid <PID>               # optional: PID for RSS measurement \
+  --runs <N>                        # default: 5 \
+  --scenarios <s1,s2,s3>            # default: all \
+  --model-name <label>              # informational, written to output \
+  --output <path/to/results/>       # default: results/
 ```
+
+npm convenience scripts (default 5 runs, all scenarios):
+
+```bash
+npm run benchmark:litert
+npm run benchmark:llamafile
+```
+
+See `scripts/benchmark/SETUP.md` for full setup and usage instructions.
 
 ### JSON output format
 
@@ -156,7 +171,7 @@ Connects to the existing FastAPI WebSocket sidecar (`ws://host/ws`).
 - Counts output tokens via whitespace-splitting of streamed chunks (approximate) or from a `usage` field if the sidecar exposes it
 - Polls `psutil.Process(sidecar_pid).memory_info().rss` every 100 ms
 
-### llama-server adapter (`backends/llama.py`)
+### llamafile adapter (`backends/llamafile.py`)
 
 Connects to llama-server's OpenAI-compatible REST API (`POST /v1/chat/completions` with `stream: true`).
 
@@ -167,8 +182,8 @@ Connects to llama-server's OpenAI-compatible REST API (`POST /v1/chat/completion
 
 ## Acceptance criteria
 
-- [ ] `python scripts/benchmark/run.py --backend litert --scenarios s1,s2,s3` completes without error on WSL2 Ubuntu with the LiteRT sidecar running
-- [ ] `python scripts/benchmark/run.py --backend llama --scenarios s1,s2,s3` completes without error on native Windows with llama-server running
+- [x] `python scripts/benchmark/run.py --backend litert --scenarios s1,s2,s3` completes without error on WSL2 Ubuntu with the LiteRT sidecar running
+- [ ] `python scripts/benchmark/run.py --backend llamafile --scenarios s1,s2,s3` completes without error on native Windows with llamafile running
 - [ ] JSON output contains all defined metrics for every completed run
 - [ ] CSV summary is human-readable and opens correctly in Excel / Google Sheets
 - [ ] Warmup run is labelled `"warmup": true` and excluded from stats

@@ -16,6 +16,10 @@ default.profraw
 sidecar/*.onnx
 sidecar/*.bin
 
+# llamafile binary and GGUF model — downloaded via `npm run setup:llamafile`
+llamafile/bin/
+llamafile/models/
+
 # Benchmark results — written at runtime, not committed
 results/*
 !results/.gitkeep
