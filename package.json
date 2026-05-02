@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:sidecar": "node scripts/run-sidecar.mjs",
+    "dev:litert-cpp": "node scripts/litert-cpp-proxy.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
     "build": "electron-vite build",
@@ -20,6 +21,7 @@
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
     "dev:llamafile": "node scripts/run-llamafile.mjs",
     "benchmark:litert": "node scripts/run-benchmark.mjs --backend litert --runs 5",
+    "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
     "benchmark:llamafile": "node scripts/run-benchmark.mjs --backend llamafile --runs 5",
     "test": "vitest run"
   },

@@ -4,13 +4,17 @@ Delfin Inference Benchmark
 ==========================
 
 Measures TTFT, throughput, total turn time, and peak RSS for the LiteRT-LM
-sidecar and llamafile/llama-server backends. Results are written to JSON and
-an append-friendly CSV so separate backend runs land in the same file.
+sidecar, LiteRT-LM C++ proxy, and llamafile/llama-server backends. Results are
+written to JSON and an append-friendly CSV so separate backend runs land in the
+same file.
 
 Quick start — see scripts/benchmark/SETUP.md for full setup instructions.
 
 LiteRT (run from WSL2 with sidecar already running):
     python scripts/benchmark/run.py --backend litert
+
+LiteRT C++ proxy (run with scripts/litert-cpp-proxy.mjs already running):
+    python scripts/benchmark/run.py --backend litert-cpp
 
 llamafile (run from Windows PowerShell with server already running):
     python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080
@@ -31,24 +35,19 @@ from pathlib import Path
 # Ensure the benchmark package root is on sys.path when run as a script
 sys.path.insert(0, str(Path(__file__).parent))
 
-from reporter import Reporter
-from scenarios import build_scenarios
-from sysinfo import collect_sysinfo
-
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Delfin inference benchmark — LiteRT vs llamafile",
+        description="Delfin inference benchmark — LiteRT, LiteRT C++, and llamafile",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
 
     p.add_argument(
-        "--backend", required=True, choices=["litert", "llamafile"],
+        "--backend", required=True, choices=["litert", "litert-cpp", "llamafile"],
         help="Which inference backend to benchmark.",
     )
 
@@ -56,12 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
     g_lr = p.add_argument_group("LiteRT options (--backend litert)")
     g_lr.add_argument(
         "--litert-host", default="localhost:8321", metavar="HOST:PORT",
-        help="Host:port of the running LiteRT sidecar WebSocket server. "
-             "Default: localhost:8321",
+        help="Host:port of the running LiteRT-compatible sidecar WebSocket server. "
+             "Used by both litert and litert-cpp. Default: localhost:8321",
     )
     g_lr.add_argument(
         "--sidecar-pid", type=int, default=None, metavar="PID",
-        help="PID of the sidecar process for RSS memory tracking. "
+        help="PID of the sidecar/proxy process for RSS memory tracking. "
              "Find it with: pgrep -f server.py  (Linux/Mac) or "
              "Get-Process python (PowerShell).",
     )
@@ -118,6 +117,10 @@ def build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 async def main(args: argparse.Namespace) -> None:
+    from reporter import Reporter
+    from scenarios import build_scenarios
+    from sysinfo import collect_sysinfo
+
     if args.runs < 2:
         print("ERROR: --runs must be at least 2 (1 warmup + 1 measured).")
         sys.exit(1)
@@ -147,6 +150,8 @@ async def main(args: argparse.Namespace) -> None:
     if model_name is None:
         if args.backend == "litert":
             model_name = "gemma-4-e2b-litert"
+        elif args.backend == "litert-cpp":
+            model_name = "gemma-4-e2b-litert-cpp"
         elif args.llamafile_model:
             model_name = Path(args.llamafile_model).stem[:40]
         else:
@@ -156,6 +161,12 @@ async def main(args: argparse.Namespace) -> None:
     if args.backend == "litert":
         from backends.litert import LiteRTBackend
         backend = LiteRTBackend(
+            host=args.litert_host,
+            sidecar_pid=args.sidecar_pid,
+        )
+    elif args.backend == "litert-cpp":
+        from backends.litert_cpp import LiteRTCppBackend
+        backend = LiteRTCppBackend(
             host=args.litert_host,
             sidecar_pid=args.sidecar_pid,
         )
