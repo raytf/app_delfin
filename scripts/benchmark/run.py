@@ -31,8 +31,6 @@ from pathlib import Path
 # Ensure the benchmark package root is on sys.path when run as a script
 sys.path.insert(0, str(Path(__file__).parent))
 
-from backends.litert import LiteRTBackend
-from backends.llamafile import LlamafileBackend
 from reporter import Reporter
 from scenarios import build_scenarios
 from sysinfo import collect_sysinfo
@@ -154,13 +152,15 @@ async def main(args: argparse.Namespace) -> None:
         else:
             model_name = "gemma-4-e2b-llamafile"
 
-    # --- Backend ---
+    # --- Backend (lazy import so each backend's deps are only required when used) ---
     if args.backend == "litert":
+        from backends.litert import LiteRTBackend
         backend = LiteRTBackend(
             host=args.litert_host,
             sidecar_pid=args.sidecar_pid,
         )
     else:
+        from backends.llamafile import LlamafileBackend
         backend = LlamafileBackend(
             host=args.llamafile_host,
             bin_path=args.llamafile_bin,

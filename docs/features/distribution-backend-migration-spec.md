@@ -9,73 +9,83 @@
 |---|---|
 | **Status** | Gate 1 — awaiting approval |
 | **Created** | 2026-05-01 |
-| **Revised** | 2026-05-02 (see revision section below) |
+| **Revised** | 2026-05-02 (hybrid Path 2 — additive, not replacement) |
+| **Revised** | 2026-05-02 (proxy approach — zero changes to Electron main IPC layer) |
 | **Depends on** | Inference benchmark results (`inference-benchmarking-spec.md`) reviewed and accepted |
 | **Blocks** | `distribution-packaging-spec.md` (packaging requires a working cross-platform backend) |
-
-## Revision — 2026-05-02
-
-The original spec assumed a **full replacement** of LiteRT-LM with llama-server across all platforms. This is incorrect for the approved architecture.
-
-**Approved architecture (Path 2 — hybrid):**
-
-- **LiteRT-LM** remains the primary backend on macOS, Linux, and Windows + WSL2. It is faster, Gemma-4-optimised, and maintains a KV cache that makes follow-up turns near-instant.
-- **llamafile** is the fallback backend for Windows users without WSL2, where LiteRT-LM has no native wheel.
-
-The implementation is therefore **additive**, not a replacement. The existing `wsClient.ts` and Python sidecar are unchanged. A new llamafile client sits alongside them; a backend selector in `sidecarBridge.ts` chooses which path to activate at startup.
 
 ---
 
 ## Goal
 
-Add a llamafile integration path to the Electron main process so that users on native Windows (no WSL2) can run the full app — inference, screen capture, and (eventually) TTS — without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users.
+Add a llamafile integration path so that users on native Windows (no WSL2) can run the full app without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users. **No changes to the Electron IPC layer or renderer are required.**
 
-## Background
+---
 
-The Electron renderer communicates with the inference backend via IPC channels (`sidecar:send`, `sidecar:chunk`, `sidecar:done`, etc.). These channels are implemented in `sidecarBridge.ts`, which currently delegates exclusively to `wsClient.ts` (the LiteRT WebSocket client). The bridge layer is the only place that needs to change — the renderer and IPC channel names are unaffected.
+## Architecture
+
+### Current (LiteRT only)
 
 ```
-Current (LiteRT only):
-  Renderer ──IPC──▶ sidecarBridge.ts ──WebSocket──▶ Python FastAPI (LiteRT-LM)
-
-After (hybrid):
-  Renderer ──IPC──▶ sidecarBridge.ts ─┬─ WebSocket ──▶ Python FastAPI (LiteRT-LM)  [macOS/Linux/WSL2]
-                                       └─ REST/SSE  ──▶ llamafile server             [Windows no WSL2]
+Renderer ──IPC──► Electron Main ──WebSocket──► Python FastAPI (LiteRT-LM + kokoro-onnx)
+                  (wsClient.ts)                port 8321
 ```
 
-The llamafile server is already downloadable and startable via `npm run setup:llamafile` / `npm run dev:llamafile`. The missing piece is the Electron-side client that talks to it and feeds its output into the existing IPC pipeline.
+### After (hybrid proxy approach)
+
+```
+Renderer ──IPC──► Electron Main ──WebSocket──► Python FastAPI (LiteRT-LM)   [macOS/Linux/WSL2]
+                  (wsClient.ts                 port 8321
+                   UNCHANGED)
+                               └──WebSocket──► llamafile-proxy.mjs           [Windows no WSL2]
+                                               port 8321
+                                                   │
+                                               REST/SSE
+                                                   │
+                                               llamafile server
+                                               port 8081
+```
+
+### Why the proxy approach
+
+The previous revision of this spec proposed adding a REST/SSE client inside the Electron main process and a backend selector in `sidecarBridge.ts`. That approach works but requires changes to `wsClient.ts`, `sidecarBridge.ts`, `index.ts`, and shared types.
+
+A better approach is to put a **lightweight Node.js WebSocket proxy** between the Electron main process and the llamafile REST server. The proxy speaks the **identical WebSocket protocol** as the Python sidecar, so `wsClient.ts`, `sidecarBridge.ts`, and every IPC channel remain completely unchanged. The only new code is the proxy itself and the wiring to spawn it.
+
+The proxy is ~120 lines of Node.js and handles everything the Python sidecar does on the inference side:
+- Incoming WebSocket message → `POST /v1/chat/completions` (REST/SSE)
+- SSE token chunks → `{type: "token", text}` WebSocket frames
+- `[DONE]` → `{type: "done"}` WebSocket frame
+- Conversation history accumulated across turns (llamafile is stateless REST)
+- System prompt injection from `preset_id` (TypeScript preset registry)
+- `GET /health` HTTP endpoint so existing health check logic works unchanged
+- `{type: "interrupt"}` → `AbortController` abort on the in-flight fetch
+
+TTS: the proxy emits no `audio_*` messages → renderer falls back to Web Speech automatically. DM3 tracks a future TTS solution.
 
 ---
 
 ## Scope
 
-### Track DM0 — llamafile client
+### Track DM0 — llamafile WebSocket proxy
 
-New file: `src/main/sidecar/llamafileClient.ts`
+**New file: `scripts/llamafile-proxy.mjs`** (~120 lines)
 
-Exposes the same interface as `wsClient.ts` so `sidecarBridge.ts` can swap between them without knowing the difference:
+Starts two servers on startup:
+1. **WebSocket server** on `SIDECAR_PORT` (default 8321) — accepts the existing sidecar protocol
+2. **HTTP server** on the same port for `GET /health` — returns `{"status": "ok"}`
 
-```ts
-// Same shape as wsClient.ts exports
-connectToLlamafile(host: string): void
-sendToLlamafile(message: WsOutboundMessage | WsInterruptMessage): void
-onLlamafileMessage(handler: (message: WsInboundMessage) => void): void
-onLlamafileStatus(handler: (status: SidecarStatus) => void): void
-getLlamafileStatus(): SidecarStatus
-disconnectFromLlamafile(): void
-```
+For each incoming WebSocket connection:
+- Receives `{text, image, preset_id}` messages (same shape as sent by `wsClient.ts`)
+- Resolves `preset_id` to a system prompt string from a local preset registry
+- Maintains a `messages: {role, content}[]` array for the current session
+- On each turn: appends user message, POSTs full history to `http://LLAMAFILE_HOST/v1/chat/completions` with `stream: true`
+- Streams SSE chunks back as `{type: "token", text}` WebSocket frames
+- On `[DONE]`: appends completed assistant response to history, sends `{type: "done"}`
+- On `{type: "interrupt"}`: calls `AbortController.abort()` on the in-flight request
+- On WebSocket close: clears conversation history (session ended)
 
-#### Protocol translation
-
-| LiteRT WebSocket message | llamafile REST equivalent |
-|---|---|
-| `sendToSidecar({text, image, preset_id})` | `POST /v1/chat/completions` — messages array with system prompt from preset, user text, optional vision content |
-| `{type: "token", text}` | SSE `data:` line → `choices[0].delta.content` |
-| `{type: "done"}` | SSE `data: [DONE]` |
-| `{type: "error", message}` | HTTP error status or SSE error chunk |
-| `{type: "interrupt"}` | Abort the in-flight `fetch()` via `AbortController` |
-
-Vision content format for llamafile:
+Vision content format sent to llamafile:
 ```json
 {
   "role": "user",
@@ -86,66 +96,71 @@ Vision content format for llamafile:
 }
 ```
 
-#### Conversation history (stateless REST)
+**New file: `scripts/llamafile-presets.mjs`**
 
-LiteRT-LM is stateful: it maintains a KV cache per WebSocket connection, so only the new turn is sent each time. llamafile is stateless: the full conversation history must be sent in every request.
+Exports a `resolvePreset(presetId)` function returning the system prompt string. Mirrors `sidecar/prompts/presets.py`. Imported by the proxy.
 
-`llamafileClient.ts` maintains a `messages: {role, content}[]` array in memory, scoped to the current session:
-- On `SESSION_START` (or the first send after connect): reset history to `[]`
-- On each `sendToLlamafile()`: append the user turn, POST the full history, append the completed assistant response after `[DONE]`
-- On `SESSION_STOP`: clear history
-
-The session lifecycle hooks are provided by `sidecarBridge.ts` calling into the client.
-
-#### System prompt injection
-
-The LiteRT sidecar selects system prompts by `preset_id` server-side. llamafile has no concept of presets. `llamafileClient.ts` reads `preset_id` from the outbound message and resolves it to a system prompt string using the same registry used by the Python sidecar (`sidecar/prompts/presets.py`). A TypeScript copy of the preset strings lives at `src/main/sidecar/presets.ts`.
-
-### Track DM1 — backend selector in sidecarBridge
-
-Modify `src/main/ipc/sidecarBridge.ts` to read `INFERENCE_BACKEND` from env at startup and wire up either `wsClient` or `llamafileClient`:
-
-```ts
-const backend = process.env.INFERENCE_BACKEND ?? 'litert'  // 'litert' | 'llamafile'
+```js
+export function resolvePreset(presetId) {
+  return PRESETS[presetId] ?? PRESETS['generic-screen']
+}
 ```
 
-No other logic in `sidecarBridge.ts` changes — the two clients present identical interfaces.
+This is the only place preset strings are duplicated. If `sidecar/prompts/` changes, this file must be updated in the same PR.
 
-Pass `backend` config through `RegisterIpcHandlersOptions` from `src/main/index.ts`.
+### Track DM1 — run script updates
 
-### Track DM2 — health check
+**Modify: `scripts/run-llamafile.mjs`**
 
-`src/main/sidecar/healthCheck.ts` is currently a placeholder. Implement polling for both backends:
+Currently only spawns the llamafile binary. Update to also spawn the proxy:
 
-| Backend | Health endpoint | Ready signal |
-|---|---|---|
-| LiteRT | `GET http://localhost:8321/health` → `{"status": "ok"}` | `model_loaded: true` |
-| llamafile | `GET http://localhost:8080/health` → `{"status": "ok"}` | HTTP 200 |
+```
+npm run dev:llamafile
+  → spawns llamafile binary (port 8081, or LLAMAFILE_PORT)
+  → spawns llamafile-proxy.mjs (port 8321, or SIDECAR_PORT)
+```
 
-### Track DM3 — TTS on the llamafile path
+Both processes share stdout/stderr inheritance. SIGINT/SIGTERM forwarded to both.
 
-TTS is currently handled by the Python sidecar (kokoro-onnx), which only exists on the LiteRT path. On the llamafile path, no server-side TTS is available yet. Two candidates:
+The proxy reads `LLAMAFILE_PORT` to know where to find the llamafile server, and `SIDECAR_PORT` to know which port to bind its WebSocket server on.
 
-#### Candidate A: Piper TTS (pre-built binary)
-- Pre-built binaries for Windows x64, macOS arm64/x64, Linux x64
-- Electron main spawns `piper` CLI: pipe text in, get raw PCM back
-- ~20 MB binary + ~60 MB voice model
-- Good quality for English; fewer voice options than Kokoro
+### Track DM2 — Electron main spawning
 
-#### Candidate B: Frozen kokoro-onnx sidecar (PyInstaller)
-- Freeze the existing `sidecar/tts.py` pipeline into a standalone binary per platform
-- Electron main spawns it; it exposes `POST /tts` → streamed audio
-- ~250 MB frozen binary; same voice quality as current
-- Requires per-platform PyInstaller CI builds; espeak-ng path must be resolved
+**Modify: `src/main/index.ts`**
 
-**For MVP:** the llamafile path falls back to Web Speech (browser TTS) with no `audio_*` events emitted from the bridge. DM3 is deferred until after DM0–DM2 are stable.
+When `INFERENCE_BACKEND=llamafile`, spawn `scripts/run-llamafile.mjs` (via `node`) instead of the Python uvicorn sidecar. The `SIDECAR_WS_URL` env var already controls where `wsClient.ts` connects — no change needed there since the proxy listens on the same port.
+
+The spawn logic mirrors the existing `dev:sidecar` pattern in `scripts/run-sidecar.mjs`.
+
+`.env.example` gains `INFERENCE_BACKEND=litert` with a comment.
+
+### Track DM3 — health check
+
+**Modify: `src/main/sidecar/healthCheck.ts`** (currently a placeholder)
+
+Implement polling of `GET http://localhost:{SIDECAR_PORT}/health`:
+- Works for both backends — the Python sidecar and the proxy both expose this endpoint
+- No backend-specific branching needed
+
+### Track DM4 — TTS on the llamafile path (deferred)
+
+The proxy emits no `audio_*` messages. The renderer already handles this gracefully via its Web Speech fallback. No action needed for MVP.
+
+Future candidates for full TTS support on the llamafile path:
+
+| Candidate | Approach | Size | Quality |
+|---|---|---|---|
+| **Piper TTS** | Pre-built binary, pipe text → raw PCM | ~80 MB | Good English |
+| **Frozen kokoro-onnx** | PyInstaller per-platform binary, `POST /tts` endpoint | ~250 MB | Same as current |
+
+Decision deferred until DM0–DM3 are stable and benchmarked.
 
 ---
 
 ## Out of scope
 
-- Changes to the renderer or Zustand stores
-- Changes to the existing Python sidecar (it remains for `npm run dev:full` / `npm run dev:sidecar`)
+- Changes to `wsClient.ts`, `sidecarBridge.ts`, or any renderer code
+- Changes to the existing Python sidecar
 - VAD pipeline changes
 - Electron packaging (handled in `distribution-packaging-spec.md`)
 - GPU inference (handled in `distribution-packaging-spec.md` stretch goal)
@@ -156,61 +171,75 @@ TTS is currently handled by the Python sidecar (kokoro-onnx), which only exists 
 
 | File | Purpose |
 |---|---|
-| `src/main/sidecar/llamafileClient.ts` | REST/SSE client for llamafile; manages conversation history; same interface as `wsClient.ts` |
-| `src/main/sidecar/presets.ts` | TypeScript copy of the Python preset registry for system prompt injection |
+| `scripts/llamafile-proxy.mjs` | WebSocket server that speaks the sidecar protocol and proxies to llamafile REST |
+| `scripts/llamafile-presets.mjs` | Preset registry for system prompt injection in the proxy |
 
 ## Modified files
 
 | File | Change |
 |---|---|
-| `src/main/ipc/sidecarBridge.ts` | Read `INFERENCE_BACKEND` env var; delegate to `wsClient` or `llamafileClient` |
-| `src/main/sidecar/healthCheck.ts` | Implement polling for both backends |
-| `src/shared/types.ts` | Add `InferenceBackend = 'litert' \| 'llamafile'` and `LlamafileClientConfig` types |
-| `src/main/ipc/types.ts` | Add `backend` field to `RegisterIpcHandlersOptions` |
-| `src/main/index.ts` | Read `INFERENCE_BACKEND` from env; pass to `registerSidecarBridge` |
-| `.env.example` | Add `INFERENCE_BACKEND=litert` with comment explaining when to switch |
+| `scripts/run-llamafile.mjs` | Also spawn `llamafile-proxy.mjs` alongside the llamafile binary |
+| `src/main/index.ts` | When `INFERENCE_BACKEND=llamafile`, spawn `run-llamafile.mjs` instead of Python sidecar |
+| `src/main/sidecar/healthCheck.ts` | Implement `GET /health` polling (works for both backends via proxy) |
+| `.env.example` | Add `INFERENCE_BACKEND=litert` |
+
+**Explicitly not modified:** `wsClient.ts`, `sidecarBridge.ts`, `src/shared/types.ts`, `src/shared/schemas.ts`, `src/preload/index.ts`, any renderer file.
 
 ---
 
 ## Interface contract
 
-### New env var
+### New env vars
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `INFERENCE_BACKEND` | `litert` | Which backend to use: `litert` or `llamafile` |
+| `INFERENCE_BACKEND` | `litert` | `litert` or `llamafile` — selects which sidecar to spawn |
 
-The llamafile connection details reuse the existing `LLAMAFILE_PORT` / `LLAMAFILE_BIN` vars added for `scripts/run-llamafile.mjs`.
+Existing env vars reused by the proxy:
 
-### New shared types (`src/shared/types.ts`)
+| Variable | Used by proxy as |
+|---|---|
+| `SIDECAR_PORT` | Port the proxy WebSocket server binds to (default `8321`) |
+| `LLAMAFILE_PORT` | Port where llamafile REST server is listening (default `8081`) |
 
-```ts
-export type InferenceBackend = 'litert' | 'llamafile';
+### WebSocket protocol (proxy input — unchanged from current sidecar)
 
-export type LlamafileClientConfig = {
-  host: string;   // e.g. 'localhost:8080'
-};
+Inbound (Electron → proxy, same as `wsOutboundMessageSchema`):
+```json
+{ "text": "Explain this slide", "image": "<base64>", "preset_id": "lecture-slide" }
+{ "type": "interrupt" }
 ```
 
-No new renderer-facing IPC channels. The existing `sidecar:*` channels are preserved.
+Outbound (proxy → Electron, same as `wsInboundMessageSchema`):
+```json
+{ "type": "token", "text": "..." }
+{ "type": "done" }
+{ "type": "error", "message": "..." }
+```
+
+### Health endpoint (proxy output)
+
+`GET http://localhost:8321/health` → `{"status": "ok"}`
 
 ---
 
 ## Acceptance criteria
 
-- [ ] `INFERENCE_BACKEND=llamafile npm run dev` starts the Electron app; a text prompt completes end-to-end on native Windows with `npm run dev:llamafile` running
-- [ ] Vision prompt (screenshot attached) produces a valid response via llamafile
-- [ ] Multi-turn conversation works: each follow-up turn receives context from prior turns
-- [ ] `interrupt` (stop button) cancels in-progress generation within 500 ms
-- [ ] `INFERENCE_BACKEND=litert npm run dev:full` (default) still works unchanged on macOS / Linux / WSL2
-- [ ] Status indicator in the renderer correctly reflects connected / disconnected for both backends
-- [ ] Web Speech TTS fallback fires on the llamafile path (no `audio_*` events emitted)
+- [ ] `INFERENCE_BACKEND=llamafile npm run dev` on native Windows connects to the proxy and completes a text prompt end-to-end
+- [ ] Vision prompt (screenshot attached) produces a valid multimodal response via llamafile (requires mmproj downloaded)
+- [ ] Multi-turn conversation: follow-up turns receive context from prior turns in the session
+- [ ] `interrupt` cancels in-progress generation within 500 ms
+- [ ] Web Speech TTS fires on the llamafile path (no `audio_*` events from proxy)
+- [ ] `INFERENCE_BACKEND=litert npm run dev:full` continues to work unchanged on macOS/Linux/WSL2
+- [ ] Status indicator correctly reflects connected/disconnected for both paths
+- [ ] `wsClient.ts`, `sidecarBridge.ts`, and all renderer files have zero diffs
 
 ---
 
 ## Risks / open questions
 
-1. **Gemma 4 vision via llamafile**: confirm that `bartowski/google_gemma-4-E2B-it-IQ4_NL.gguf` supports multimodal input. The vision projector (`mmproj-*.gguf`) may need to be downloaded separately and passed via `--mmproj` flag. `scripts/setup-llamafile.mjs` will need to download it.
-2. **Slot cancellation**: llamafile inherits llama.cpp's slot API. Aborting the `fetch()` via `AbortController` should stop the response stream, but verify the server actually halts generation (not just stops sending tokens).
-3. **Context window overflow for multi-turn**: the llamafile path sends full history each request. Long sessions will exceed the 8192-token context window. The client must trim old turns when approaching the limit.
-4. **Preset strings staying in sync**: `src/main/sidecar/presets.ts` duplicates the Python preset strings. If prompts are updated in `sidecar/prompts/`, the TypeScript copy must be updated too. Consider a single JSON source of truth shared between both.
+1. **Vision projector (mmproj)**: llamafile requires a separate `mmproj-*.gguf` file passed via `--mmproj` for image input. `scripts/setup-llamafile.mjs` already downloads it; `scripts/run-llamafile.mjs` already passes `--mmproj` if present. **Resolved** — confirmed working via S2 benchmark.
+2. **AbortController and generation halt**: aborting the `fetch()` stops the proxy receiving tokens, but verify llamafile actually halts generation server-side (not just stops streaming). If not, slot cancellation via `DELETE /slots/{id}` may be needed.
+3. **Context window overflow**: the proxy accumulates full history per session. Long sessions approach the 8192-token context limit. The proxy should trim oldest non-system turns when the estimated token count nears the limit.
+4. **Preset sync**: `scripts/llamafile-presets.mjs` duplicates the Python preset strings. Changes to `sidecar/prompts/` must be reflected here. Enforce via a PR checklist note in `AGENTS.md`.
+5. **ws package availability**: the proxy uses the `ws` npm package (already in `package.json` dependencies) — no new install needed.

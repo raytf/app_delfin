@@ -20,14 +20,21 @@ const venvPython = process.platform === 'win32'
   ? join(sidecarDir, '.venv', 'Scripts', 'python.exe')
   : join(sidecarDir, '.venv', 'bin', 'python')
 
+// Fall back to system Python on machines where the sidecar venv doesn't exist
+// (e.g. native Windows without WSL2, where LiteRT-LM has no wheel).
+// Use `py` (Windows Python Launcher) on Windows — more reliable than `python`
+// when multiple Python versions are installed.
+let pythonBin = venvPython
 if (!existsSync(venvPython)) {
-  console.error('[run-benchmark] No sidecar virtualenv Python found at:', venvPython)
-  console.error('[run-benchmark] Run `npm run setup:sidecar` first.')
-  process.exit(1)
+  pythonBin = process.platform === 'win32' ? 'py' : 'python3'
+  console.warn('[run-benchmark] Sidecar venv not found — falling back to system Python.')
+  console.warn('[run-benchmark] If the benchmark fails, install deps with:')
+  console.warn('[run-benchmark]   pip install httpx psutil pillow websockets')
+  console.warn()
 }
 
 const benchmarkScript = join(rootDir, 'scripts', 'benchmark', 'run.py')
-const child = spawn(venvPython, [benchmarkScript, ...process.argv.slice(2)], {
+const child = spawn(pythonBin, [benchmarkScript, ...process.argv.slice(2)], {
   cwd: rootDir,
   stdio: 'inherit',
 })

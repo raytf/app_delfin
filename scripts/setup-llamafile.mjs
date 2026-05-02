@@ -27,7 +27,7 @@ function getBinaryName(version) {
 
 function getBinaryUrl(version) {
   // The release asset is always the un-suffixed name regardless of platform.
-  return `https://github.com/Mozilla-Ocho/llamafile/releases/download/${version}/llamafile-${version}`
+  return `https://github.com/mozilla-ai/llamafile/releases/download/${version}/llamafile-${version}`
 }
 
 function getModelUrl(modelFile) {
@@ -38,9 +38,11 @@ function getModelUrl(modelFile) {
 
 async function main() {
   const env = loadEnv()
-  const version = process.env.LLAMAFILE_VERSION ?? env['LLAMAFILE_VERSION'] ?? '0.8.17'
+  const version = process.env.LLAMAFILE_VERSION ?? env['LLAMAFILE_VERSION'] ?? '0.10.1'
   const modelFile =
     process.env.LLAMAFILE_MODEL_FILE ?? env['LLAMAFILE_MODEL_FILE'] ?? 'google_gemma-4-E2B-it-IQ4_NL.gguf'
+  const mmprojFile =
+    process.env.LLAMAFILE_MMPROJ_FILE ?? env['LLAMAFILE_MMPROJ_FILE'] ?? 'mmproj-google_gemma-4-E2B-it-f16.gguf'
 
   console.log('═'.repeat(60))
   console.log('  Delfin — llamafile setup')
@@ -48,6 +50,7 @@ async function main() {
   console.log()
   console.log(`  llamafile version : ${version}`)
   console.log(`  GGUF model        : ${modelFile}`)
+  console.log(`  Vision projector  : ${mmprojFile}`)
   console.log(`  Platform          : ${process.platform}`)
   console.log()
 
@@ -76,15 +79,27 @@ async function main() {
     console.log(`[setup-llamafile] ✅ Model already present — skipping:`)
     console.log(`   ${modelPath}`)
   } else {
-    console.log('[setup-llamafile] Downloading GGUF model (~3 GB). This may take a while…')
-    await downloadFile(getModelUrl(modelFile), modelPath, `${modelFile}`)
+    console.log('[setup-llamafile] Downloading GGUF model (~3.4 GB). This may take a while…')
+    await downloadFile(getModelUrl(modelFile), modelPath, modelFile)
+  }
+
+  // --- Vision projector (mmproj) ---
+  const mmprojPath = join(modelsDir, mmprojFile)
+
+  if (existsSync(mmprojPath)) {
+    console.log(`[setup-llamafile] ✅ Vision projector already present — skipping:`)
+    console.log(`   ${mmprojPath}`)
+  } else {
+    console.log('[setup-llamafile] Downloading vision projector (~986 MB). Required for image input…')
+    await downloadFile(getModelUrl(mmprojFile), mmprojPath, mmprojFile)
   }
 
   console.log()
   console.log('[setup-llamafile] ✅ Setup complete!')
   console.log()
-  console.log(`  Binary : ${binPath}`)
-  console.log(`  Model  : ${modelPath}`)
+  console.log(`  Binary           : ${binPath}`)
+  console.log(`  Model            : ${modelPath}`)
+  console.log(`  Vision projector : ${mmprojPath}`)
   console.log()
   console.log('  Start the server with:  npm run dev:llamafile')
   console.log()

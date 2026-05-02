@@ -122,8 +122,9 @@ Allow students on the supported desktop platforms to download, install, and run 
 - Use a manifest file to track which versions of each asset are present
 
 ### Runtime strategy
-- Keep the existing WebSocket-based renderer ↔ main IPC protocol
-- The Electron main process acts as a bridge: renderer sends prompts via IPC; main calls llama-server REST API and relays streaming tokens back
+- Keep the existing WebSocket-based renderer ↔ main IPC protocol **unchanged** — `wsClient.ts`, `sidecarBridge.ts`, and all renderer code require zero modifications
+- On the llamafile path, a lightweight Node.js WebSocket proxy (`scripts/llamafile-proxy.mjs`) sits between Electron and llamafile: it speaks the identical sidecar WebSocket protocol inbound and translates to llamafile's REST/SSE API outbound
+- Electron main selects which process to spawn via `INFERENCE_BACKEND=litert|llamafile`; both paths present the same WebSocket interface on the same port
 - In development mode, `npm run dev:full` continues to use the Python sidecar via `.venv` (no change for contributors)
 - CPU-only for MVP; CUDA (Windows/Linux) and Metal (macOS) are stretch goals once CPU path is stable
 
