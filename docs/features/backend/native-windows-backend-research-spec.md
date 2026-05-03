@@ -50,11 +50,13 @@ Track A has a strict build/runtime split:
 - ✅ Runtime files required by the app-facing copy are `bin/delfin_litert_bridge.exe` plus `bin/libGemmaModelConstraintProvider.dll`.
 - ✅ `npm run dev:litert-cpp` starts the Node proxy, loads `models/gemma-4-E2B-it.litertlm`, and serves `GET /health` with `backend=litert-cpp`.
 - ✅ WebSocket text turns stream `{type:"token"}` chunks and finish with `{type:"done"}` through the existing Electron-compatible sidecar protocol.
-- ✅ Filtered benchmark `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s3'` completed: S1 TTFT `5433.9±83.6 ms`, S1 throughput `20.4±0.9 tok/s`, S3 throughput `22.1±0.6 tok/s`.
+- ✅ Full benchmark `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'` completed: S1 TTFT `5414±66 ms`, S1 throughput `22.0±1.3 tok/s`; S2 TTFT `10639±104 ms`, S2 throughput `20.3±0.6 tok/s`; S3 Turn 2+ TTFT ~`647 ms` (KV-cache reuse confirmed).
 - ✅ Vision + KV-cache source-level fix landed (commit `570d2fa`, see `docs/features/litert-cpp-vision-spec.md`): `--vision_backend` flag, `JsonPreface` for system prompt, per-`sessionId` `g_sessions` map with `Conversation` reuse, `reset_session` handler, and `SendMessageAsync` called with the singular new user turn. The proxy now generates a `sessionId` per WebSocket connection and sends `reset_session` on close.
-- ⚠️ Runtime validation pending: the in-tree `bin/delfin_litert_bridge.exe` predates the vision/session-reuse source changes and must be rebuilt with `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path>` before S2 + KV-cache TTFT + manual lecture-slide rounds can be re-run.
+- ✅ Audio input on the C++ bridge is implemented and validated on Windows; voice-turn parity works on `npm run dev:litert-cpp`.
+- ✅ Manual repeated voice-turn validation against the Electron app now passes after renderer-side VAD/fallback lifecycle fixes; the second voice turn re-arms correctly once assistant playback ends.
+- ⚠️ Full manual lecture-slide app validation is still pending for vision, interrupt/barge-in, reconnect, and inline error checks.
+- ⚠️ Off-Python TTS is not yet implemented on the `litert-cpp` proxy path. The current Node proxy emits no `audio_*` events, so the renderer falls back to browser Web Speech even if `TTS_BACKEND=kokoro` is set.
 - ❌ macOS / Linux native bridge builds have not been attempted; cross-platform parity is required before the C++ track can replace llamafile in the distribution plan.
-- ❌ Audio input on the C++ bridge is not yet implemented. The proxy already forwards `{type:"audio", blob:"..."}` content, but `delfin_litert_bridge.cc` only decodes text + image parts. Voice turn parity with the Python sidecar requires either a bridge-side audio decode path or an explicit text+image-only contract on the C++ track.
 
 ---
 

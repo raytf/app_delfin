@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-03 (docs reorganised by feature area; LiteRT-LM C++ bridge vision + per-session KV-cache reuse + native audio input rebuilt and runtime-validated on Windows).
+> Last updated: 2026-05-03 (docs reorganised by feature area; LiteRT-LM C++ bridge vision + per-session KV-cache reuse + native audio input rebuilt/runtime-validated on Windows; repeated-turn VAD + Web Speech fallback state fix validated in the renderer).
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 >
 > Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
@@ -136,12 +136,13 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 
 | Item                                                               | Status | Notes                                                                            |
 | ------------------------------------------------------------------ | ------ | -------------------------------------------------------------------------------- |
-| `src/renderer/hooks/useVAD.ts`                                     | ✅     | Mic VAD lifecycle, speech detection, audio level tracking, and threshold control |
+| `src/renderer/hooks/useVAD.ts`                                     | ✅     | Mic VAD lifecycle, speech detection, audio level tracking, threshold control, and mic-stream reattachment after pause/resume |
 | `src/renderer/utils/audioUtils.ts`                                 | ✅     | WAV encoding for outbound voice turns and PCM decode for playback                |
 | `src/shared/types.ts` / `schemas.ts` — audio-bearing request types | ✅     | Voice turns carry optional base64 WAV audio                                      |
 | `VOICE_TURN_TEXT` contract                                         | ✅     | Shared constant for pure voice turns                                             |
 | `src/main/ipc/sessionHandlers.ts` — audio-aware submit path        | ✅     | Allows voice turns even when free-typed text is absent                           |
 | `src/renderer/App.tsx` — auto-start VAD + voice submission         | ✅     | Starts listening in active sessions and submits captured WAV on speech end       |
+| `src/renderer/features/active-session/hooks/useActiveSession.ts`   | ✅     | Assistant playback state, fallback Web Speech handling, and VAD auto-mute/unmute lifecycle for repeated voice turns |
 
 ### TTS + playback
 
@@ -153,7 +154,7 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | Sidecar audio metadata                                                             | ✅     | Emits `sample_rate`, `index`, and `tts_time` metadata                                                |
 | `src/renderer/App.tsx` — streamed playback                                         | ✅     | Decodes PCM chunks, schedules playback, and tracks assistant speaking state                          |
 | Barge-in behavior                                                                  | ✅     | Active speech playback can be interrupted by a new user voice turn                                   |
-| Web Speech fallback                                                                | ✅     | Renderer fallback when no server audio arrives                                                       |
+| Web Speech fallback                                                                | ✅     | Renderer fallback when no server audio arrives; currently also used on `npm run dev:litert-cpp` because the Node proxy does not emit `audio_*` events |
 
 ### Voice UI + tests
 
@@ -162,7 +163,7 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | `ExpandedSessionView` voice card          | ✅     | Shows listening / thinking / speaking / paused states                              |
 | `MinimizedSessionBar` voice UI            | ✅     | Keeps voice affordances available in compact and response modes                    |
 | `VoiceWaveform` + waveform utilities      | ✅     | Reusable waveform visualization and state derivation                               |
-| Renderer waveform/minimized overlay tests | ✅     | `minimizedOverlay.test.ts`, `minimizedSessionBar.test.ts`, `waveformState.test.ts` |
+| Renderer waveform/minimized overlay tests | ✅     | `minimizedOverlay.test.ts`, `minimizedSessionBar.test.ts`, `waveformState.test.ts`, plus source-contract regression checks for `useVAD` / `useActiveSession` |
 
 ### Auto-refresh (deprioritised)
 
@@ -211,7 +212,7 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 | File / Item                                                                | Status | Notes                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scripts/litert-cpp-presets.mjs`                                           | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                                                                                                                                                                                                                          |
-| `scripts/litert-cpp-proxy.mjs`                                             | ✅     | Delfin WebSocket proxy + health endpoint, validated against native `delfin_litert_bridge.exe`; text + vision turns stream successfully                                                                                                                                                                                            |
+| `scripts/litert-cpp-proxy.mjs`                                             | ✅     | Delfin WebSocket proxy + health endpoint, validated against native `delfin_litert_bridge.exe`; text + vision turns stream successfully. Current limitation: emits `token` / `done` / `error` only, so TTS falls back to renderer Web Speech on this path.                                                                 |
 | `scripts/litert-cpp-proxy.test.mjs`                                        | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                                                                                                                                                                                                                                  |
 | `native/litert-cpp-bridge/`                                                | ✅     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, `reset_session`, and native audio-input wiring; Windows binary rebuilt and runtime-validated (S1/S2/S3 benchmark, KV-cache Turn 2+ ~647 ms, text/vision/audio paths). macOS/Linux native builds not yet attempted.                                |
 | `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll` | ✅     | Gitignored local runtime artifacts from Bazel output                                                                                                                                                                                                                                                                              |

@@ -265,6 +265,11 @@ export function useActiveSession({
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
 
+  const finishFallbackSpeechPlayback = useCallback(() => {
+    aiStreamingStartedRef.current = false
+    finishAudioPlayback()
+  }, [finishAudioPlayback])
+
   const cancelCurrentAssistantTurn = useCallback(() => {
     ignoreCurrentTurnOutputRef.current = true
     ignoreIncomingSidecarAudioRef.current = true
@@ -438,10 +443,10 @@ export function useActiveSession({
           raiseThreshold()
         }
         utterance.onend = () => {
-          finishAudioPlayback()
+          finishFallbackSpeechPlayback()
         }
         utterance.onerror = () => {
-          finishAudioPlayback()
+          finishFallbackSpeechPlayback()
         }
 
         window.speechSynthesis.speak(utterance)
@@ -450,6 +455,7 @@ export function useActiveSession({
     [
       cancelSpeechSynthesis,
       clearFallbackSpeechTimer,
+      finishFallbackSpeechPlayback,
       finishAudioPlayback,
       raiseThreshold,
       setAudioPlayingState,

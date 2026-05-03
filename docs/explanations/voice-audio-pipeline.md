@@ -181,6 +181,8 @@ The message sequence over WebSocket looks like:
 
 When `TTS_BACKEND=web-speech`, the sidecar sends **no audio messages at all** — the renderer's `App.tsx` detects that no `audio_start` arrived within 500 ms of `done` and falls back to `speechSynthesis.speak(responseText)`.
 
+The same renderer fallback currently applies on `npm run dev:litert-cpp`: the LiteRT C++ Node proxy does **not** emit `audio_start` / `audio_chunk` / `audio_end`, so `TTS_BACKEND=kokoro` in `sidecar/tts.py` has no effect on that path yet.
+
 ---
 
 ## Stage 4 — The Renderer Plays Audio
@@ -208,6 +210,8 @@ base64 string → Uint8Array → Int16Array → Float32Array (÷ 32768) → Audi
 Three guards are in place, split between `useVAD` and `App.tsx`:
 
 1. **VAD muting (App.tsx)** — While the assistant is responding (`isSubmitting`, streaming tokens, playing server-side audio, or using the Web Speech fallback), `App.tsx` calls `toggleMute()` on the VAD. The Silero worklet stays mounted but stops emitting frames, so the mic is effectively off while the AI speaks.
+
+   For the Web Speech fallback specifically, the renderer must also clear its internal assistant-speaking flag when `SpeechSynthesisUtterance` ends or errors. If that flag stays set, the auto-mute effect never releases and later voice turns appear dead even though the VAD runtime is still mounted.
 
 2. **Threshold raise (useVAD)** — When `raiseThreshold()` is called, Silero's positive-speech threshold moves from `0.50` → `0.92` (and negative from `0.35` → `0.77`). If muting is ever bypassed, the AI's voice played through speakers is quieter and less consistent than direct microphone speech, so it scores below 0.92 and gets ignored.
 

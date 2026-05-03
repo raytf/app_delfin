@@ -27,6 +27,7 @@ This file is a tool-specific shim. The canonical coding-agent instructions are i
 ## Current Important Context
 
 - App runtime: Electron + React renderer, Electron main IPC bridge, Python FastAPI sidecar, LiteRT-LM/Gemma 4.
+- `npm run dev:litert-cpp` currently bypasses `sidecar/tts.py`; the Node proxy emits no `audio_*` events yet, so TTS falls back to browser Web Speech even if `TTS_BACKEND=kokoro` is set.
 - Distribution track: evaluating native packaging via llama.cpp `llama-server` / llamafile.
 - Benchmark harness: `scripts/benchmark/run.py` writes JSON/CSV to `results/`; keep only `results/.gitkeep` in git.
 - Shared IPC/WebSocket types: `src/shared/types.ts`; Zod schemas: `src/shared/schemas.ts`.

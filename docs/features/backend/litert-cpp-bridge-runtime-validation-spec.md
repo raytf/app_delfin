@@ -7,7 +7,7 @@
 
 | Field          | Value                                                                                                                                                                           |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | 🚧 Gate 1 — spec draft, awaiting human approval. Phase 1 (Windows rebuild + S1/S2/S3 benchmark) completed 2026-05-03. Phase 2 (manual app validation) partially done via proxy/WebSocket. Phases 3–4 (macOS/Linux builds) pending. |
+| **Status**     | 🚧 Gate 1 — spec draft, awaiting human approval. Phase 1 (Windows rebuild + S1/S2/S3 benchmark) completed 2026-05-03. Phase 2 (manual app validation) is partially complete: proxy/WebSocket checks and repeated voice-turn validation now pass on Windows; lecture-slide/interrupt/error/reconnect checks remain pending. Phases 3–4 (macOS/Linux builds) pending. |
 | **Created**    | 2026-05-03                                                                                                                                                                      |
 | **Depends on** | `litert-cpp-vision-spec.md` source implementation (commit `570d2fa` ✅), `native-windows-backend-research-spec.md` A0 build ✅, A3 proxy ✅                                       |
 | **Blocks**     | `desktop-distribution-mvp-spec.md` Windows backend decision; `distribution-backend-migration-spec.md` revision (llamafile removal); `distribution-packaging-spec.md` bridge packaging |
@@ -49,6 +49,7 @@ Per `native-windows-backend-research-spec.md` §A5, a passing Track A validation
 | 2e   | Interrupt/barge-in: click Stop mid-stream; no orphaned tokens appear in subsequent turns. | ⏸ Not tested in this round |
 | 2f   | Error inline: point `LITERT_CPP_MODEL` at a non-existent file; confirm the error surfaces as a chat inline message, not a crash or alert dialog. | ⏸ Not tested in this round |
 | 2g   | Reconnect: close and reopen the sidebar; the proxy spawns a new session correctly. | ⏸ Not tested in this round |
+| 2h   | Voice repeat-turn round in the Electron app: after the assistant finishes speaking, a second voice turn re-arms the waveform and triggers VAD again. | ✅ Validated on Windows after renderer fixes in `useVAD.ts` and `useActiveSession.ts` |
 
 ### Phase 3 — macOS native bridge build + validation
 
@@ -80,7 +81,7 @@ If all acceptance criteria below are met:
 
 ## Out of scope
 
-- Audio input on the C++ bridge (tracked separately — see `litert-cpp-vision-spec.md` §Risks).
+- Further audio-input contract/polish work on the C++ bridge (tracked separately in `litert-cpp-audio-input-spec.md`).
 - TTS strategy for the C++ track (Piper, frozen kokoro-onnx, or Web Speech API — separate spec needed).
 - electron-builder packaging changes, first-run download UX, or installer creation (covered by `distribution-packaging-spec.md`).
 - CI/CD automation of the bridge build (`distribution-cicd-spec.md`).
@@ -112,4 +113,4 @@ If all acceptance criteria below are met:
 | macOS Bazel build requires Xcode toolchain changes not yet documented | Medium | Document exact Xcode + Bazelisk versions in `native/litert-cpp-bridge/README.md` as part of Gate 5. |
 | KV-cache TTFT improvement is smaller than expected (> 700 ms) on real hardware | Low-Medium | Measure on at least two machines; confirm `Conversation` reuse is actually hitting the warm cache path (add a `{type:"cache_hit"}` debug event to the bridge if needed). |
 | `libGemmaModelConstraintProvider.dll` dependency chain differs across platforms | Low | Verify with `ldd` (Linux) / `otool -L` (macOS) and document required co-located shared libs. |
-| Audio turns forwarded by the proxy are silently dropped by the bridge | Certain (known gap) | Confirm the drop is silent and does not crash the bridge; add an explicit `{type:"error", message:"audio input not yet supported on litert-cpp backend"}` response in `delfin_litert_bridge.cc` so the UI shows an inline error rather than a hang. |
+| Off-Python TTS remains missing on the `litert-cpp` proxy path | Certain (known gap) | `scripts/litert-cpp-proxy.mjs` currently emits `token` / `done` / `error` only, so the renderer falls back to Web Speech even when `TTS_BACKEND=kokoro`. Resolve via the separate TTS strategy track before making `litert-cpp` the default backend. |
