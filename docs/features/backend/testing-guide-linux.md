@@ -123,38 +123,63 @@ Share the **latest JSON file** and terminal output (S1 TTFT, S2 TTFT, and S3 Tur
 
 ---
 
-## Step 5 — Optional: test inside the Electron app
+## Step 5 — Full app validation (required)
+
+This step tests the complete user-facing experience with the C++ backend. Run it after the benchmark in Step 3.
+
+### Start the app
 
 ```bash
-# Terminal 1 — proxy
+# Terminal 1 — start the C++ proxy (leave this running)
 npm run dev:litert-cpp
 
-# Terminal 2 — Electron app
+# Terminal 2 — start Electron
 npm run dev
 ```
 
-Try a text turn and a screenshot capture to verify vision works.
+> **WSL2:** The proxy runs in WSL2. Start the Electron app from a Windows terminal in the same repo directory (`npm run dev`). Ensure `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws` in `.env` on the Windows side.
 
-### Testing voice input and Piper TTS
+### Checklist
 
-Voice and TTS are both fully supported on the C++ backend path. Since you ran the test script in Step 3:
+Work through each item and note ✅ pass / ❌ fail / ⚠️ partial in your report.
 
-1. **Voice input is already on** (`VOICE_ENABLED=true` in `.env`). Say something in the app — the waveform should animate and a voice turn should be submitted.
+#### Text turns
+- [ ] Open a new study session from the home screen.
+- [ ] Type a question (e.g. "What is gradient descent?") and press Enter.
+- [ ] Tokens stream in progressively — no blank response or error banner.
+- [ ] The session saves correctly and appears on the home screen after you exit.
 
-2. **Piper TTS is already configured** (`LITERT_CPP_TTS_BACKEND=piper`). If you accepted the prompt to install the `hfc_female` voice, the app will speak responses sentence by sentence via Piper.
+#### Vision (screenshot capture)
+- [ ] Open any app with visible content (a browser page, a PDF, a slide deck).
+- [ ] In Delfin, press the capture button or wait for auto-capture.
+- [ ] Ask a question about what's on screen (e.g. "Summarise what you see").
+- [ ] The response correctly references the captured content — not a generic reply.
 
-If you need to change voices or re-install:
+#### Voice input
+> Voice should already be on (`VOICE_ENABLED=true`). The mic waveform appears in the overlay when a session is active.
+
+- [ ] Start a session and speak a question aloud.
+- [ ] The waveform animates while you speak, then stops.
+- [ ] The spoken question is submitted as a turn (visible in the transcript).
+- [ ] A streamed response arrives — same quality as a typed turn.
+
+#### Piper TTS (spoken responses)
+> Piper is configured if you accepted the `hfc_female` install prompt in Step 3.
+
+- [ ] After a text or voice turn completes, the response is read aloud by Piper.
+- [ ] Speech is sentence-by-sentence (not all-at-once at the end).
+- [ ] Voice sounds like `hfc_female` — a clear female US English voice.
+- [ ] Saying something while the app is speaking stops playback (barge-in).
+
+If you skipped the voice install prompt or need to reinstall:
 ```bash
-# List available voices
-npm run voice:list
-
-# Install/switch to a different voice
 npm run voice:install -- en/en_US/hfc_female/medium --use
+# then restart: npm run dev:litert-cpp
 ```
 
 > **Note:** If Piper is disabled or its binary is missing, the proxy falls back to browser Web Speech automatically — this is the expected graceful-degradation path.
 
-> **WSL2 note:** Audio output from Piper requires a working audio sink in WSL2. If you hear no sound, run `pactl info` to check PulseAudio, or test with `aplay <file>`. If the Linux audio subsystem is not set up, browser Web Speech via the Windows-side Electron window is the simpler path.
+> **WSL2 audio note:** Piper outputs audio via the system sound device. In WSL2, run `pactl info` to confirm PulseAudio is connected. If no sound device is found, browser Web Speech (running on the Windows-side Electron window) is the simpler fallback.
 
 ---
 
