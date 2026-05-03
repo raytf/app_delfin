@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import readline from "node:readline";
 import { dirname, resolve } from "node:path";
@@ -14,6 +14,12 @@ import { resolvePreset } from "./litert-cpp-presets.mjs";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 dotenvConfig({ path: resolve(rootDir, ".env") });
 const bridgeReadyTimeoutMs = 120_000;
+
+function sendJson(ws, payload) {
+  if (ws.readyState !== 1) return false;
+  ws.send(JSON.stringify(payload));
+  return true;
+}
 
 function isDirectExecution() {
   return (
@@ -35,6 +41,332 @@ function resolveBridgeCommand(binPath) {
     return { command: process.execPath, args: [binPath] };
   }
   return { command: binPath, args: [] };
+}
+
+function extractModelText(doneEvent, fallbackText = "") {
+  if (typeof doneEvent?.text === "string" && doneEvent.text.trim()) {
+    return doneEvent.text;
+  }
+
+  const content = doneEvent?.message?.content;
+  if (Array.isArray(content)) {
+    const text = content
+      .filter((item) => item?.type === "text")
+      .map((item) => item.text ?? "")
+      .join("");
+    if (text.trim()) return text;
+  }
+
+  return fallbackText;
+}
+
+function normalizeTtsSegment(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function splitCompleteSentences(buffer, options = {}) {
+  const segments = [];
+  let cursor = 0;
+
+  for (let index = 0; index < buffer.length; index += 1) {
+    const char = buffer[index];
+    if (char !== "." && char !== "!" && char !== "?") continue;
+
+    const previous = buffer[index - 1] ?? "";
+    const next = buffer[index + 1] ?? "";
+    if (/^[0-9]$/.test(previous) && /^[0-9]$/.test(next)) continue;
+
+    let end = index + 1;
+    while (end < buffer.length && "\"')]}".includes(buffer[end])) {
+      end += 1;
+    }
+
+    if (end < buffer.length && !/\s/.test(buffer[end])) continue;
+
+    const segment = normalizeTtsSegment(buffer.slice(cursor, end));
+    if (segment) segments.push(segment);
+
+    cursor = end;
+    while (cursor < buffer.length && /\s/.test(buffer[cursor])) cursor += 1;
+    index = cursor - 1;
+  }
+
+  const remaining = buffer.slice(cursor);
+  if (options.flush) {
+    const finalSegment = normalizeTtsSegment(remaining);
+    if (finalSegment) segments.push(finalSegment);
+    return { segments, remaining: "" };
+  }
+
+  return { segments, remaining };
+}
+
+function createNoopTtsBackend(info = {}) {
+  return {
+    getInfo() {
+      return {
+        backend: info.backend ?? "none",
+        ready: false,
+        model: info.model ?? null,
+        error: info.error ?? null,
+      };
+    },
+    start() {
+      return null;
+    },
+    startStream() {
+      return null;
+    },
+    async close() {},
+  };
+}
+
+function parsePositiveNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function readPiperSampleRate(configPath, env = process.env) {
+  const envSampleRate = parsePositiveNumber(env.PIPER_SAMPLE_RATE);
+  if (envSampleRate !== null) return envSampleRate;
+
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  const configSampleRate = parsePositiveNumber(
+    config?.audio?.sample_rate ?? config?.audio?.sampleRate,
+  );
+  if (configSampleRate !== null) return configSampleRate;
+
+  return 22050;
+}
+
+function resolveLitertCppTtsConfig() {
+  const requestedBackend =
+    process.env.LITERT_CPP_TTS_BACKEND?.trim().toLowerCase() ?? "none";
+
+  if (requestedBackend === "" || requestedBackend === "none") {
+    return { backend: "none", ready: false, model: null, error: null };
+  }
+
+  if (requestedBackend !== "piper") {
+    return {
+      backend: requestedBackend,
+      ready: false,
+      model: null,
+      error: `Unknown LITERT_CPP_TTS_BACKEND=${requestedBackend}.`,
+    };
+  }
+
+  const defaultBin = resolve(
+    rootDir,
+    "bin",
+    "piper",
+    process.platform === "win32" ? "piper.exe" : "piper",
+  );
+  const rawBinPath = process.env.PIPER_BIN ?? defaultBin;
+  const binPath = resolve(rootDir, rawBinPath);
+  if (!existsSync(binPath)) {
+    return {
+      backend: "piper",
+      ready: false,
+      model: null,
+      error: `Piper binary not found at ${binPath}. Set PIPER_BIN.`,
+    };
+  }
+
+  const rawModelPath = process.env.PIPER_MODEL;
+  if (!rawModelPath) {
+    return {
+      backend: "piper",
+      ready: false,
+      model: null,
+      error: "PIPER_MODEL is required when LITERT_CPP_TTS_BACKEND=piper.",
+    };
+  }
+
+  const modelPath = resolve(rootDir, rawModelPath);
+  if (!existsSync(modelPath)) {
+    return {
+      backend: "piper",
+      ready: false,
+      model: modelPath,
+      error: `Piper model not found at ${modelPath}. Set PIPER_MODEL.`,
+    };
+  }
+
+  const configPath = resolve(
+    rootDir,
+    process.env.PIPER_CONFIG ?? `${modelPath}.json`,
+  );
+  if (!existsSync(configPath)) {
+    return {
+      backend: "piper",
+      ready: false,
+      model: modelPath,
+      error: `Piper config not found at ${configPath}. Set PIPER_CONFIG.`,
+    };
+  }
+
+  let sampleRate;
+  try {
+    sampleRate = readPiperSampleRate(configPath);
+  } catch (error) {
+    return {
+      backend: "piper",
+      ready: false,
+      model: modelPath,
+      error: `Piper config could not be read at ${configPath}: ${error.message}`,
+    };
+  }
+
+  return {
+    backend: "piper",
+    ready: true,
+    model: modelPath,
+    error: null,
+    binPath,
+    configPath,
+    sampleRate,
+  };
+}
+
+function createPiperTtsBackend(config, options = {}) {
+  const spawnProcess = options.spawnProcess ?? spawn;
+
+  function startStream(handlers) {
+    if (!config.ready) return null;
+
+    const { command, args } = resolveBridgeCommand(config.binPath);
+    const child = spawnProcess(
+      command,
+      [...args, "--model", config.model, "--config", config.configPath, "--output-raw"],
+      {
+        cwd: rootDir,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+
+    const startedAt = Date.now();
+    let emittedAudio = false;
+    let cancelled = false;
+    let finishedInput = false;
+    let chunkIndex = 0;
+    const stderrChunks = [];
+
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+      child.once("error", (error) => {
+        rejectPromise(error);
+      });
+
+      child.stdin.on("error", (error) => {
+        if (!cancelled) rejectPromise(error);
+      });
+
+      child.stderr.on("data", (chunk) => {
+        stderrChunks.push(chunk.toString());
+        process.stderr.write(`[piper] ${chunk}`);
+      });
+
+      child.stdout.on("data", (chunk) => {
+        if (!chunk.length) return;
+        if (!emittedAudio) {
+          emittedAudio = true;
+          handlers.onStart({
+            sampleRate: config.sampleRate,
+            sentenceCount: 0,
+          });
+        }
+        handlers.onChunk({
+          audio: Buffer.from(chunk).toString("base64"),
+          index: chunkIndex++,
+        });
+      });
+
+      child.once("exit", (code, signal) => {
+        if (cancelled) {
+          resolvePromise(false);
+          return;
+        }
+
+        if (code === 0) {
+          if (emittedAudio) {
+            handlers.onEnd({ ttsTime: (Date.now() - startedAt) / 1000 });
+          }
+          resolvePromise(emittedAudio);
+          return;
+        }
+
+        const details = stderrChunks.join("").trim();
+        rejectPromise(
+          new Error(
+            `Piper exited unexpectedly (${signal ?? code ?? "unknown"})${details ? `: ${details}` : "."}`,
+          ),
+        );
+      });
+    });
+
+    return {
+      promise,
+      enqueue(text) {
+        const normalizedText = normalizeTtsSegment(text);
+        if (!normalizedText || cancelled || finishedInput) return;
+        child.stdin.write(`${normalizedText}\n`);
+      },
+      finish() {
+        if (cancelled || finishedInput) return;
+        finishedInput = true;
+        child.stdin.end();
+      },
+      cancel() {
+        cancelled = true;
+        if (!finishedInput) {
+          finishedInput = true;
+          child.stdin.destroy();
+        }
+        child.kill();
+      },
+    };
+  }
+
+  return {
+    getInfo() {
+      return {
+        backend: config.backend,
+        ready: config.ready,
+        model: config.model,
+        error: config.error,
+      };
+    },
+    start(text, handlers) {
+      const normalizedText = text.trim();
+      if (!config.ready || !normalizedText) return null;
+
+      const run = startStream(handlers);
+      if (!run) return null;
+      run.enqueue(normalizedText);
+      run.finish();
+
+      return {
+        promise: run.promise,
+        cancel() {
+          run.cancel();
+        },
+      };
+    },
+    startStream,
+    async close() {},
+  };
+}
+
+function createTtsBackend(options = {}) {
+  const config = resolveLitertCppTtsConfig();
+  if (config.backend !== "piper") {
+    return createNoopTtsBackend(config);
+  }
+  if (!config.ready) {
+    return createNoopTtsBackend(config);
+  }
+  return createPiperTtsBackend(config, options);
 }
 
 function createErroredBridge(message, options = {}) {
@@ -210,12 +542,24 @@ export async function startLitertCppProxy(options = {}) {
   const host = options.host ?? process.env.SIDECAR_HOST ?? "127.0.0.1";
   const port = Number(options.port ?? process.env.SIDECAR_PORT ?? "8321");
   let bridge;
+  let tts;
   try {
     bridge = await (options.createBridge?.() ?? createStdioBridge());
   } catch (error) {
     bridge = createErroredBridge(
       error instanceof Error ? error.message : "LiteRT C++ bridge failed to start.",
     );
+  }
+  try {
+    tts = await (options.createTtsBackend?.() ?? createTtsBackend());
+  } catch (error) {
+    tts = createNoopTtsBackend({
+      backend: process.env.LITERT_CPP_TTS_BACKEND?.trim().toLowerCase() ?? "none",
+      error:
+        error instanceof Error
+          ? error.message
+          : "LiteRT C++ proxy TTS backend failed to start.",
+    });
   }
   void bridge.ready().catch((error) => {
     console.error(
@@ -228,6 +572,7 @@ export async function startLitertCppProxy(options = {}) {
   const server = createServer((req, res) => {
     if (req.url === "/health") {
       const info = bridge.getInfo();
+      const ttsInfo = tts.getInfo();
       if (!info.ready) {
         res.writeHead(503, { "content-type": "application/json" });
         res.end(
@@ -236,6 +581,10 @@ export async function startLitertCppProxy(options = {}) {
             backend: info.backend,
             ...(info.model ? { model: info.model } : {}),
             ...(info.error ? { message: info.error } : {}),
+            tts_backend: ttsInfo.backend,
+            tts_ready: ttsInfo.ready,
+            ...(ttsInfo.model ? { tts_model: ttsInfo.model } : {}),
+            ...(ttsInfo.error ? { tts_error: ttsInfo.error } : {}),
           }),
         );
         return;
@@ -246,6 +595,10 @@ export async function startLitertCppProxy(options = {}) {
           status: "ok",
           backend: info.backend,
           model: info.model,
+          tts_backend: ttsInfo.backend,
+          tts_ready: ttsInfo.ready,
+          ...(ttsInfo.model ? { tts_model: ttsInfo.model } : {}),
+          ...(ttsInfo.error ? { tts_error: ttsInfo.error } : {}),
         }),
       );
       return;
@@ -267,7 +620,11 @@ export async function startLitertCppProxy(options = {}) {
   });
 
   wss.on("connection", (ws) => {
-    const session = { sessionId: randomUUID(), activeRequestId: null };
+    const session = {
+      sessionId: randomUUID(),
+      activeRequestId: null,
+      activeTtsRun: null,
+    };
     sessions.set(ws, session);
 
     ws.on("message", async (raw) => {
@@ -282,21 +639,88 @@ export async function startLitertCppProxy(options = {}) {
       }
 
       if (message.type === "interrupt") {
+        session.activeTtsRun?.cancel();
         bridge.interrupt(session.activeRequestId);
         return;
       }
       if (session.activeRequestId !== null) {
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message: "A LiteRT C++ request is already running.",
-          }),
-        );
+        sendJson(ws, {
+          type: "error",
+          message: "A LiteRT C++ request is already running.",
+        });
         return;
       }
 
       const requestId = randomUUID();
       session.activeRequestId = requestId;
+      let streamedText = "";
+      let ttsBuffer = "";
+      let streamingTtsRun = null;
+
+      const audioHandlers = {
+        onStart(payload) {
+          sendJson(ws, {
+            type: "audio_start",
+            sample_rate: payload.sampleRate,
+            sentence_count: payload.sentenceCount,
+          });
+        },
+        onChunk(payload) {
+          sendJson(ws, {
+            type: "audio_chunk",
+            audio: payload.audio,
+            index: payload.index,
+          });
+        },
+        onEnd(payload) {
+          sendJson(ws, {
+            type: "audio_end",
+            tts_time: payload.ttsTime,
+          });
+        },
+      };
+
+      const ensureStreamingTtsRun = () => {
+        if (streamingTtsRun || typeof tts.startStream !== "function") {
+          return streamingTtsRun;
+        }
+
+        const run = tts.startStream(audioHandlers);
+        if (!run) return null;
+
+        streamingTtsRun = run;
+        session.activeTtsRun = run;
+        run.promise.catch(() => {});
+        return run;
+      };
+
+      const enqueueStreamingTtsText = (text, options = {}) => {
+        if (!streamingTtsRun) return;
+
+        ttsBuffer += text;
+        const result = splitCompleteSentences(ttsBuffer, options);
+        ttsBuffer = result.remaining;
+        for (const segment of result.segments) {
+          streamingTtsRun.enqueue(segment);
+        }
+      };
+
+      const awaitTtsRun = async (run) => {
+        if (!run) return;
+
+        try {
+          await run.promise;
+        } catch (error) {
+          console.warn(
+            "[litert-cpp-proxy] Piper synthesis failed:",
+            error instanceof Error ? error.message : error,
+          );
+        } finally {
+          if (session.activeTtsRun === run) {
+            session.activeTtsRun = null;
+          }
+        }
+      };
 
       try {
         await bridge.generate(
@@ -308,33 +732,57 @@ export async function startLitertCppProxy(options = {}) {
           },
           {
             onToken(text) {
-              ws.send(JSON.stringify({ type: "token", text }));
+              streamedText += text;
+              sendJson(ws, { type: "token", text });
+
+              if (text.trim()) ensureStreamingTtsRun();
+              enqueueStreamingTtsText(text);
             },
-            onDone() {
-              session.activeRequestId = null;
-              ws.send(JSON.stringify({ type: "done" }));
+            async onDone(doneEvent) {
+              try {
+                const finalText = extractModelText(doneEvent, streamedText);
+
+                if (streamingTtsRun) {
+                  enqueueStreamingTtsText("", { flush: true });
+                  streamingTtsRun.finish();
+                  await awaitTtsRun(streamingTtsRun);
+                } else {
+                  const run = tts.start(finalText, audioHandlers);
+                  if (run) {
+                    session.activeTtsRun = run;
+                    await awaitTtsRun(run);
+                  }
+                }
+              } finally {
+                session.activeRequestId = null;
+                sendJson(ws, { type: "done" });
+              }
             },
             onError(errorMessage) {
+              session.activeTtsRun?.cancel();
+              session.activeTtsRun = null;
               session.activeRequestId = null;
-              ws.send(JSON.stringify({ type: "error", message: errorMessage }));
+              sendJson(ws, { type: "error", message: errorMessage });
             },
           },
         );
       } catch (error) {
+        session.activeTtsRun?.cancel();
+        session.activeTtsRun = null;
         session.activeRequestId = null;
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "LiteRT C++ bridge request failed.",
-          }),
-        );
+        sendJson(ws, {
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "LiteRT C++ bridge request failed.",
+        });
       }
     });
 
     ws.on("close", () => {
+      session.activeTtsRun?.cancel();
+      session.activeTtsRun = null;
       bridge.interrupt(session.activeRequestId);
       bridge.resetSession(session.sessionId);
       sessions.delete(ws);
@@ -354,6 +802,7 @@ export async function startLitertCppProxy(options = {}) {
     port: actualPort,
     async close() {
       for (const client of wss.clients) client.close();
+      await tts.close();
       await bridge.close();
       await new Promise((resolvePromise, rejectPromise) => {
         server.close((error) =>
