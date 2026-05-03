@@ -6,7 +6,7 @@
 
 1. Read `AGENTS.md` before editing anything.
 2. Read `docs/SPEC.md` for architecture, IPC/WebSocket contracts, env vars, and cross-cutting rules.
-3. Check `docs/README.md` to locate the relevant phase or feature spec.
+3. Check `docs/README.md` to locate the relevant feature spec under `docs/features/<area>/`.
 4. Check `STATUS.md` before claiming a feature is complete or changing lifecycle status.
 
 If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts with `docs/SPEC.md` on architecture or interfaces, `docs/SPEC.md` wins.

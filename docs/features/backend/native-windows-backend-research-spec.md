@@ -8,7 +8,7 @@
 
 | Field                  | Value                                                                                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**             | Gate 3 — native C++ bridge build + text streaming validated on Windows; vision/image-blob and per-session KV-cache reuse landed at source level (`docs/features/litert-cpp-vision-spec.md`); awaiting binary rebuild + S2/manual runtime validation |
+| **Status**             | ✅ Gate 3 passed — native C++ bridge build + text streaming + S1/S2/S3 benchmark + KV-cache Turn 2+ TTFT (~647 ms) validated on Windows; vision/image-blob and per-session KV-cache reuse runtime-validated; awaiting Phases 3–4 (macOS/Linux builds) and full manual app round |
 | **Created**            | 2026-05-02                                                                                                                                                                                                                                          |
 | **Approved**           | 2026-05-02                                                                                                                                                                                                                                          |
 | **Implemented so far** | `scripts/litert-cpp-proxy.mjs` (sessionId per connection, `reset_session` on close), `scripts/litert-cpp-presets.mjs`, `scripts/benchmark/backends/litert_cpp.py`, `native/litert-cpp-bridge/` source with vision backend + `g_sessions` map, Windows `delfin_litert_bridge.exe` build validation (text scenarios) |
@@ -255,6 +255,23 @@ Track A is **not yet verified**. Build/install reproducibility, health, WebSocke
 6. **A5 — Assess distribution next steps.** If A0–A4 pass, update the distribution plan to remove llamafile and identify remaining packaging work: bundling the binary, model download/cache, first-run setup, installer resources, and CI artifacts.
 7. **A6 — Automate build handoff.** Add/validate the bridge build helper and CI artifact handoff so `delfin_litert_bridge.exe` is produced before Electron packaging.
 8. **Track B decision gate.** Foundry Local work starts only if Track A fails and the human explicitly approves activating the contingency path.
+
+---
+
+## Completed sub-specs (consolidated)
+
+The following Track A sub-specs reached ✅ Gate 5 and have been archived. They remain in `docs/archive/features/` as historical decision records; their outcomes are summarised here.
+
+| Sub-spec                                                                                                       | Outcome                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`litert-cpp-vision-spec.md`](../../archive/features/litert-cpp-vision-spec.md)                                 | Vision support and KV-cache session reuse landed in `native/litert-cpp-bridge/delfin_litert_bridge.cc` (`--vision_backend` flag, `JsonPreface`, `g_sessions` map, `reset_session` handler, `SendMessageAsync` called with the singular new user turn). Validated 2026-05-03: S2 TTFT 10,639±104 ms / 20.3±0.6 tok/s; S3 Turn 2+ TTFT ~647 ms (vs Turn 1 ~5,400 ms) confirms KV-cache reuse is working. |
+| [`litert-cpp-audio-spec.md`](../../archive/features/litert-cpp-audio-spec.md)                                   | Native audio-input parity in the C++ bridge: `--audio_backend` flag, `EngineSettings::CreateDefault(..., vision_backend, audio_backend)`, session-level modality toggles, audio-disabled validation guard. Validated 2026-05-03 on Windows; voice-turn parity restored for `npm run dev:litert-cpp`.                                                                                                  |
+
+Open Track A sub-specs that are still in flight:
+
+- [`litert-cpp-audio-input-spec.md`](./litert-cpp-audio-input-spec.md) — 🚧 Gate 1 draft (deeper renderer/proxy audio contract work).
+- [`litert-cpp-bridge-runtime-validation-spec.md`](./litert-cpp-bridge-runtime-validation-spec.md) — 🚧 macOS / Linux native bridge builds and full manual app round.
+- [`litert-cpp-primary-backend-migration-spec.md`](./litert-cpp-primary-backend-migration-spec.md) — 🚧 Umbrella for promoting the C++ bridge to default once Track A passes on all three OSes.
 
 ---
 

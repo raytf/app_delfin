@@ -35,7 +35,7 @@ Two reasons:
 
 ### Why audio input is a blocker
 
-Voice turns are a core demo flow (see `phase-5-autorefresh-tts.md`). Flipping the default backend to a path that silently drops or rejects voice turns would regress a user-visible feature. Hence `litert-cpp-audio-input-spec.md` is a hard prerequisite (this spec's M1).
+Voice turns are a core demo flow (see [`docs/explanations/voice-audio-pipeline.md`](../../explanations/voice-audio-pipeline.md)). Flipping the default backend to a path that silently drops or rejects voice turns would regress a user-visible feature. Hence `litert-cpp-audio-input-spec.md` is a hard prerequisite (this spec's M1).
 
 ### Why TTS must move out of Python before completion
 
@@ -63,7 +63,7 @@ Implement and validate `litert-cpp-audio-input-spec.md`. Out of scope here; this
 
 | File                                               | Change                                                                                                                                                                                                                                                                |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `native/litert-cpp-bridge/delfin_litert_bridge.cc` | Add support for the `respond_to_user` tool definition in the system prompt's `JsonPreface`, mirroring the schema used by the Python sidecar (see `phase-1-sidecar.md` §1.3). Stream tool-call JSON as it arrives.                                                     |
+| `native/litert-cpp-bridge/delfin_litert_bridge.cc` | Add support for the `respond_to_user` tool definition in the system prompt's `JsonPreface`, mirroring the schema used by the Python sidecar (`sidecar/server.py`; walkthrough in [`docs/explanations/sidecar-flow.md`](../../explanations/sidecar-flow.md)). Stream tool-call JSON as it arrives.                                                     |
 | `scripts/litert-cpp-proxy.mjs`                     | Forward tool-call JSON unchanged to the WebSocket; remove (or downgrade to last-resort) the existing text-extraction fallback once tool-calling is reliable.                                                                                                          |
 | `native/litert-cpp-bridge/delfin_litert_bridge.test.mjs` | Add a tool-call assertion: a fixed prompt produces a `respond_to_user` call with the expected schema fields.                                                                                                                                                     |
 

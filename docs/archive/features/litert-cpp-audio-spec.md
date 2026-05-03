@@ -1,5 +1,7 @@
 # LiteRT-LM C++ Bridge — Native Audio Input Support
 
+> 📦 **Archived 2026-05-03** — Outcome consolidated into [`docs/features/backend/native-windows-backend-research-spec.md`](../../features/backend/native-windows-backend-research-spec.md) §Completed sub-specs. Preserved here as the historical decision record.
+>
 > Gate 5 — docs updated. Rebuilt binary + runtime validation completed on Windows.
 > Sub-feature of Track A in `native-windows-backend-research-spec.md`.
 > Closes the audio-input gap called out in `native-windows-backend-research-spec.md` §Current acceptance status and `litert-cpp-bridge-runtime-validation-spec.md` §Risks (silent audio drop / crash).

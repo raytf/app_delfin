@@ -22,7 +22,7 @@ Add audio-input parity to `delfin_litert_bridge.cc` so that voice turns sent ove
 
 ## Background and rationale
 
-Voice-driven turns are a core Delfin feature (see `phase-5-autorefresh-tts.md` and `voice-audio-pipeline.md`). The renderer captures mic audio with `@ricky0123/vad-web`, encodes it, and sends `{text, image?, audio?}` over the sidecar WebSocket. The Python sidecar passes the audio blob unchanged to LiteRT-LM via `{"type":"audio","blob":<b64>}`, relying on the engine's `audio_backend=Backend.CPU` setting (validated in §Validated Technical Decisions: "Audio backend").
+Voice-driven turns are a core Delfin feature (see [`docs/explanations/voice-audio-pipeline.md`](../../explanations/voice-audio-pipeline.md) for the live pipeline walkthrough; the original hackathon scope is in [`docs/archive/hackathon-mvp.md`](../../archive/hackathon-mvp.md) §Phase 5). The renderer captures mic audio with `@ricky0123/vad-web`, encodes it, and sends `{text, image?, audio?}` over the sidecar WebSocket. The Python sidecar passes the audio blob unchanged to LiteRT-LM via `{"type":"audio","blob":<b64>}`, relying on the engine's `audio_backend=Backend.CPU` setting (validated in §Validated Technical Decisions: "Audio backend").
 
 The C++ bridge already carries the same intent end-to-end:
 

@@ -136,7 +136,7 @@ npm run dev:llamafile     # starts llamafile on localhost:8080, keep open
 npm run dev
 ```
 
-> **Note:** The llamafile backend integration into the Electron IPC bridge is not yet implemented. Currently llamafile is supported for benchmarking only (`npm run benchmark:llamafile`). Full app support is tracked in [`docs/features/distribution-backend-migration-spec.md`](docs/features/distribution-backend-migration-spec.md).
+> **Note:** The llamafile backend integration into the Electron IPC bridge is not yet implemented. Currently llamafile is supported for benchmarking only (`npm run benchmark:llamafile`). Full app support is tracked in [`docs/features/distribution/distribution-backend-migration-spec.md`](docs/features/distribution/distribution-backend-migration-spec.md).
 
 ---
 
@@ -257,7 +257,7 @@ Electron Main (Node.js)  ←→  WebSocket  ←→  Inference sidecar
 │   └── litert-cpp-bridge/ # experimental LiteRT-LM C++ JSONL bridge source
 ├── scripts/           # setup, env checks, model downloads, benchmark runner
 ├── results/           # benchmark output JSON/CSV (gitignored except .gitkeep)
-├── docs/              # spec, phase plans, and design notes
+├── docs/              # SPEC, feature specs (backend/distribution/memory/ui), and design notes
 ├── .env.example
 ├── README.md
 └── STATUS.md
@@ -313,6 +313,6 @@ npm run build
 
 ## Documentation
 
-- [`docs/README.md`](docs/README.md) — full documentation index with lifecycle status for every spec, phase, and feature doc
+- [`docs/README.md`](docs/README.md) — full documentation index with lifecycle status for every feature spec, explanation, and archived doc
 - [`docs/SPEC.md`](docs/SPEC.md) — architecture, protocols, IPC channels, and coding rules
 - [`STATUS.md`](STATUS.md) — per-file implementation status against the codebase

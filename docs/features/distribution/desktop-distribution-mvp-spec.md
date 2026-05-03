@@ -71,12 +71,11 @@ The original monolithic execution track is now split into three focused specs:
 
 Allow students on the supported desktop platforms to download, install, and run Delfin without manually installing Node.js, Python, or a virtual environment, while preserving local-first inference and first-run model download.
 
-## Why this lives in `docs/features/`
+## Why this lives in `docs/features/distribution/`
 
-- This work does not fit the existing numbered phase sequence, because Phase 7 is already assigned to memory.
-- The implementation will cut across Electron packaging, sidecar runtime, model bootstrap UX, and release tooling.
-- `docs/SPEC.md` should remain the global source of truth for stable architecture and contracts; this file is the scoped feature plan that can later feed updates back into `docs/SPEC.md` once implemented.
-- The repo already has multiple standalone feature specs in `docs/`; introducing `docs/features/` is the cleanest place for future independent tracks.
+- The hackathon-era numbered phase sequence (Phases 0–6, archived in [`docs/archive/hackathon-mvp.md`](../../archive/hackathon-mvp.md)) is complete; new tracks like packaging are scoped as feature specs under `docs/features/<area>/`.
+- The implementation cuts across Electron packaging, sidecar runtime, model bootstrap UX, and release tooling — too broad to live inside a single existing spec.
+- `docs/SPEC.md` remains the global source of truth for stable architecture and contracts; this file is the scoped feature plan that feeds updates back into `docs/SPEC.md` once implemented.
 
 ## Scope
 

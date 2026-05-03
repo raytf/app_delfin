@@ -15,41 +15,60 @@
 
 ---
 
-## Phase specs (`phases/`)
+## How docs are organised
 
-Each phase follows the full Gate 1→5 workflow. Phases are completed in order.
+Each unit of work lives under `docs/features/<area>/<name>-spec.md` and follows the Gate 1→5 workflow defined in [`AGENTS.md`](../AGENTS.md). Every spec tracks its own state in a Gate Resolution block at the top.
 
-| File                                                                     | Status         | Description                                                         |
-| ------------------------------------------------------------------------ | -------------- | ------------------------------------------------------------------- |
-| [`phases/phase-0-scaffold.md`](phases/phase-0-scaffold.md)               | ✅ Complete    | Repo structure, configs, `.env`, dependencies, setup scripts        |
-| [`phases/phase-1-sidecar.md`](phases/phase-1-sidecar.md)                 | ✅ Complete    | FastAPI server, LiteRT-LM engine, tool calling, image preprocessing |
-| [`phases/phase-2-electron.md`](phases/phase-2-electron.md)               | ✅ Complete    | Overlay window, `desktopCapturer`, WebSocket client, IPC handlers   |
-| [`phases/phase-3-ui.md`](phases/phase-3-ui.md)                           | ✅ Complete    | React components, Zustand stores, streaming UI                      |
-| [`phases/phase-4-integration.md`](phases/phase-4-integration.md)         | ✅ Complete    | Wire all layers together, error handling, status reporting          |
-| [`phases/phase-5-autorefresh-tts.md`](phases/phase-5-autorefresh-tts.md) | ✅ Complete    | Auto-refresh with debounce, TTS pipeline, audio playback            |
-| [`phases/phase-6-polish.md`](phases/phase-6-polish.md)                   | ✅ Complete    | Styling, error states, perf optimisations, demo prep                |
-| [`phases/phase-7-memory.md`](phases/phase-7-memory.md)                   | 🚧 In Progress | Persistent on-device memory wiki (Karpathy LLM-wiki pattern)        |
+The hackathon MVP that established the current app (Electron shell, sidecar, screen capture, voice/TTS, persistent sessions) was originally tracked across seven numbered phase docs. Those have been consolidated into [`archive/hackathon-mvp.md`](archive/hackathon-mvp.md); the project is now organised by feature area instead of by phase.
 
 ---
 
-## Feature specs (`features/`)
+## Backend (`features/backend/`)
 
-Independent features that do not fit the numbered phase sequence. Each has a Gate Resolution table at the top showing its current lifecycle state.
+Inference engines, native bridges, and benchmarking. Goal: a future-proof, cross-platform inference backend that does not require WSL2 on Windows.
 
-| File                                                                                                               | Status         | Description                                                                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`features/desktop-distribution-mvp-spec.md`](features/desktop-distribution-mvp-spec.md)                           | 🚧 In Progress | Cross-platform distribution decision record. Revised 2026-05-01: llama-server binary replaces LiteRT-LM. Gate 1 approved.                                                |
-| [`features/inference-benchmarking-spec.md`](features/inference-benchmarking-spec.md)                               | ✅ Complete    | Standalone benchmark script comparing LiteRT-LM vs llamafile (TTFT, throughput, memory). Implemented in `scripts/benchmark/`.                                            |
-| [`features/distribution-backend-migration-spec.md`](features/distribution-backend-migration-spec.md)               | 🚧 In Progress | Replace LiteRT-LM with llama-server in the Electron bridge; TTS backend investigation (Piper vs frozen kokoro). Gate 1 — awaiting approval.                              |
-| [`features/distribution-packaging-spec.md`](features/distribution-packaging-spec.md)                               | 🚧 In Progress | electron-builder config, first-run download orchestration, NSIS/DMG/AppImage installers, GPU stretch goal. Gate 1 — awaiting approval.                                   |
-| [`features/distribution-cicd-spec.md`](features/distribution-cicd-spec.md)                                         | 🚧 In Progress | GitHub Actions matrix builds, distribution channel recommendations, code signing guide. Gate 1 — awaiting approval.                                                      |
-| [`features/native-windows-backend-research-spec.md`](features/native-windows-backend-research-spec.md)             | 🚧 In Progress | Sequential native Windows backend validation: LiteRT-LM C++ first, Foundry Local only as contingency. Windows bridge builds, text streams, and the vision/KV-cache source fix has landed; binary rebuild + S2 + multi-OS validation pending. |
-| [`features/litert-cpp-vision-spec.md`](features/litert-cpp-vision-spec.md)                                         | 🚧 In Progress | C++ bridge vision support and KV-cache session reuse. Source implementation landed in `570d2fa`; awaiting binary rebuild + S2/manual runtime validation before Gate 4 review.                |
-| [`features/litert-cpp-bridge-runtime-validation-spec.md`](features/litert-cpp-bridge-runtime-validation-spec.md)   | 🚧 In Progress | **Next concrete action.** Full runtime validation of the rebuilt bridge on Windows (S1/S2/S3 benchmark + manual round), then macOS arm64 + Linux x64 native builds. Gate 1 — awaiting approval. |
-| [`features/litert-cpp-audio-spec.md`](features/litert-cpp-audio-spec.md)                                           | ✅ Complete    | C++ bridge native audio-input support: `--audio_backend` flag, audio modality on `SessionConfig`, audio-disabled validation guard. Source implemented, Windows binary rebuilt, runtime validated. |
-| [`features/waveform-ui-spec.md`](features/waveform-ui-spec.md)                                                     | ✅ Complete    | Reusable `VoiceWaveform` component — state-based colour, per-bar amplitude, user/AI/idle modes                                                                           |
-| [`features/overlay-waveform-polish-spec.md`](features/overlay-waveform-polish-spec.md)                             | ✅ Complete    | Compact overlay resize and shift to analyser-driven per-bar waveform rendering                                                                                           |
-| [`features/minimized-overlay-waveform-continuity-spec.md`](features/minimized-overlay-waveform-continuity-spec.md) | ✅ Complete    | Persistent waveform/status chrome across all minimized overlay variants                                                                                                  |
+| File                                                                                                                       | Status         | Description                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`features/backend/native-windows-backend-research-spec.md`](features/backend/native-windows-backend-research-spec.md)     | 🚧 In Progress | Sequential native Windows backend validation. Track A (LiteRT-LM C++) preferred; Foundry Local as contingency. Windows build + text + vision/KV-cache validated; macOS/Linux builds pending. |
+| [`features/backend/litert-cpp-bridge-runtime-validation-spec.md`](features/backend/litert-cpp-bridge-runtime-validation-spec.md) | 🚧 In Progress | Phase 1 (Windows S1/S2/S3 benchmark) complete; Phase 2 (manual app round) partial; Phases 3–4 (macOS/Linux builds) pending.                                                  |
+| [`features/backend/litert-cpp-audio-input-spec.md`](features/backend/litert-cpp-audio-input-spec.md)                       | 🚧 In Progress | Deeper renderer/proxy audio contract for the C++ bridge. Gate 1 draft, awaiting approval.                                                                                    |
+| [`features/backend/litert-cpp-primary-backend-migration-spec.md`](features/backend/litert-cpp-primary-backend-migration-spec.md) | 🚧 In Progress | Umbrella for promoting the LiteRT C++ bridge to the default inference backend on all OSes. Gate 1 draft.                                                                     |
+| [`features/backend/inference-benchmarking-spec.md`](features/backend/inference-benchmarking-spec.md)                       | ✅ Complete    | Standalone benchmark harness (`scripts/benchmark/`) comparing LiteRT-LM, LiteRT-CPP, and llamafile (TTFT, throughput, memory).                                               |
+
+---
+
+## Distribution (`features/distribution/`)
+
+Packaging, installer, code signing, and CI/CD. Goal: a one-click installable build for student testers.
+
+| File                                                                                                               | Status         | Description                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`features/distribution/desktop-distribution-mvp-spec.md`](features/distribution/desktop-distribution-mvp-spec.md) | 🚧 In Progress | Cross-platform distribution decision record. Revised 2026-05-01: llamafile binary on Windows, frozen Python sidecar elsewhere. Gate 1 approved.                       |
+| [`features/distribution/distribution-backend-migration-spec.md`](features/distribution/distribution-backend-migration-spec.md) | 🚧 In Progress | Wire the chosen backend (llama-server / LiteRT-CPP) into the Electron main process; TTS backend investigation (Piper vs frozen kokoro). Gate 1 — awaiting approval. |
+| [`features/distribution/distribution-packaging-spec.md`](features/distribution/distribution-packaging-spec.md)     | 🚧 In Progress | electron-builder config, first-run download orchestration, NSIS/DMG/AppImage installers, GPU stretch goal. Gate 1 — awaiting approval.                                |
+| [`features/distribution/distribution-cicd-spec.md`](features/distribution/distribution-cicd-spec.md)               | 🚧 In Progress | GitHub Actions matrix builds, distribution channel recommendations, code signing guide. Gate 1 — awaiting approval.                                                  |
+
+---
+
+## Memory (`features/memory/`)
+
+Persistent on-device knowledge that compounds across sessions.
+
+| File                                                                                                 | Status         | Description                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`features/memory/memory-wiki-spec.md`](features/memory/memory-wiki-spec.md)                         | 🚧 In Progress | On-device LLM wiki (Karpathy pattern) maintained by Gemma 4 across sessions. Internal sub-phases M0 (E2B viability spike) → M3 (file ingest + runtime tools + lint). Migrated from former Phase 7. |
+
+---
+
+## UI / UX (`features/ui/`)
+
+Voice waveform, overlay polish, and other renderer-only UX work.
+
+| File                                                                                                                       | Status      | Description                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| [`features/ui/waveform-ui-spec.md`](features/ui/waveform-ui-spec.md)                                                       | ✅ Complete | Reusable `VoiceWaveform` component — state-based colour, per-bar amplitude, user/AI/idle modes.            |
+| [`features/ui/overlay-waveform-polish-spec.md`](features/ui/overlay-waveform-polish-spec.md)                               | ✅ Complete | Compact overlay resize and shift to analyser-driven per-bar waveform rendering.                            |
+| [`features/ui/minimized-overlay-waveform-continuity-spec.md`](features/ui/minimized-overlay-waveform-continuity-spec.md)   | ✅ Complete | Persistent waveform/status chrome across all minimized overlay variants.                                   |
 
 ---
 
@@ -68,22 +87,52 @@ These are not specs — they are evergreen "how does X work" technical write-ups
 
 ---
 
+## Future ideas (not yet scoped)
+
+Unscoped ideas being collected for future student-user testing. None of these are committed work — they need a Gate 1 spec before any implementation. When one is ready to scope, create `docs/features/roadmap/<name>-spec.md` (the `roadmap/` folder is created on demand) or place it directly under the matching area folder, then move the bullet from this list into the appropriate feature table above.
+
+### Reliability
+
+- **Sidecar crash recovery** — auto-restart the WebSocket sidecar on crash with backoff; surface inline reconnection state in the chat box rather than a blocking error.
+- **Resumable model downloads** — make `npm run download:models` and the first-run installer flow resumable so a flaky network does not force a 340 MB / 3.4 GB redownload.
+- **Local crash logs** — opt-in, on-device-only structured crash log file users can attach manually when reporting bugs (no telemetry, no network calls).
+- **Health metric on startup** — surface backend, model file, vision-token budget, and load time in the UI for faster bug reports.
+- **Conversation history trimming** — implement the long-standing "nice-to-have" so long study sessions do not blow the model's context window.
+- **Health-check polling** — replace the placeholder `healthCheck.ts` with real backend/model metadata polling.
+
+### UX once real users are testing
+
+- **First-run onboarding** — a short guided flow covering mic/screen permissions, name/preset selection, and a sample lecture-slide capture.
+- **In-app feedback** — a single "send feedback" button that captures the last turn (transcript + screenshot, with one-click redaction) into a local JSON file the user can email or attach to a GitHub issue.
+- **Session quality rating** — at end of session, prompt the user "Was this useful?" with thumbs-up/down + optional reason, stored locally for product analysis.
+- **Markdown rendering in chat** — render assistant Markdown (lists, code, math) instead of plain text.
+- **Dark mode toggle** — currently the UI is single-themed.
+- **Manual window picker** — fallback UI when the foreground-window heuristic picks the wrong window.
+- **Global hotkey** — `Ctrl+Shift+C` (or configurable) to capture-and-ask without alt-tabbing.
+- **Manual stop / interrupt UI** — the interrupt channel exists; expose a user-visible stop control.
+
+---
+
 ## Archive (`archive/`)
 
 Documents that are no longer active but are preserved for historical context.
 
-| File                                                                             | Status      | Description                                                                                                                 |
-| -------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [`archive/delfin-implementation-plan.md`](archive/delfin-implementation-plan.md) | 📦 Archived | Original 1.5-day hackathon team plan (streams A/B/C, Saturday/Sunday schedule). Superseded by the phase docs and `SPEC.md`. |
+| File                                                                                                       | Status      | Description                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`archive/hackathon-mvp.md`](archive/hackathon-mvp.md)                                                     | 📦 Archived | Consolidated summary of the original numbered Phases 0–6 (Electron scaffold → polish). Replaces the deleted `phase-0-scaffold.md` … `phase-6-polish.md` files.       |
+| [`archive/delfin-implementation-plan.md`](archive/delfin-implementation-plan.md)                           | 📦 Archived | Original 1.5-day hackathon team plan (streams A/B/C, Saturday/Sunday schedule). Superseded by the hackathon MVP archive and `SPEC.md`.                              |
+| [`archive/features/litert-cpp-vision-spec.md`](archive/features/litert-cpp-vision-spec.md)                 | 📦 Archived | Sub-spec of `native-windows-backend-research-spec.md`. Outcome consolidated into the parent spec's §Completed sub-specs section.                                    |
+| [`archive/features/litert-cpp-audio-spec.md`](archive/features/litert-cpp-audio-spec.md)                   | 📦 Archived | Sub-spec of `native-windows-backend-research-spec.md`. Outcome consolidated into the parent spec's §Completed sub-specs section.                                    |
 
 ---
 
 ## How to update this index
 
-| When                                                    | What to do                                      |
-| ------------------------------------------------------- | ----------------------------------------------- |
-| A feature spec moves from 🚧 In Progress to ✅ Complete | Update the status cell in the `features/` table |
-| A new feature spec is created                           | Add a row to the `features/` table              |
-| A new phase is added                                    | Add a row to the `phases/` table                |
-| A new explanation is added                              | Add a row to the `explanations/` table          |
-| A doc becomes obsolete                                  | Move it to `archive/` and update this index     |
+| When                                                                          | What to do                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A feature spec moves 🚧 In Progress → ✅ Complete                             | Update the status cell in its area table.                                                                                                                                                                             |
+| A completed sub-spec is fully consolidated into a parent spec                 | Move the file to `archive/features/`, add a 📦 Archived banner to the top of the file pointing at the consolidating doc, summarise the outcome inside the parent's §Completed sub-specs section, and update both this index and `AGENTS.md` §Documentation Map. (See `AGENTS.md` for the full rule.) |
+| A new feature spec is created                                                 | Add a row to the matching area table; if the area subfolder doesn't exist yet, create it.                                                                                                                              |
+| A new explanation is added                                                    | Add a row to the `explanations/` table.                                                                                                                                                                                |
+| A future idea is ready to scope                                               | Move it from the "Future ideas" list into a new `features/<area>/<name>-spec.md` and remove the bullet here.                                                                                                          |
+| A doc becomes obsolete                                                        | Move it to `archive/` and update this index.                                                                                                                                                                           |

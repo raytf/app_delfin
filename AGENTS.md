@@ -50,28 +50,24 @@ docs/
 ├── README.md                        ← Doc index with status for every file. Check here first.
 ├── SPEC.md                          ← Single source of truth. Read this first.
 ├── design-ai-spec.md                ← Product and brand brief
-├── features/                        ← Independent feature specs (Gate 1→5 lifecycle, any phase)
-│   ├── desktop-distribution-mvp-spec.md          ← 🚧 Decision record (revised 2026-05-01)
-│   ├── inference-benchmarking-spec.md             ← 🚧 Benchmark LiteRT vs llamafile/llama-server; script exists in scripts/benchmark
-│   ├── distribution-backend-migration-spec.md     ← 🚧 Replace LiteRT with llama-server + TTS
-│   ├── distribution-packaging-spec.md             ← 🚧 electron-builder, first-run download, installers
-│   ├── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel
-│   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation (Windows text ✅, vision/KV-cache source ✅, binary rebuild + S2 + macOS/Linux pending); Foundry contingency
-│   ├── litert-cpp-vision-spec.md                 ← 🚧 C++ bridge vision + KV-cache session reuse — source landed (`570d2fa`), runtime validation pending; sub-feature of native-windows-backend-research-spec.md
-│   ├── litert-cpp-bridge-runtime-validation-spec.md ← 🚧 Next action: rebuild + full S1/S2/S3 benchmark + manual round on Windows; macOS arm64 + Linux x64 builds; triggers distribution plan update if passing. Gate 1 — awaiting approval.
-│   ├── litert-cpp-audio-spec.md          ← ✅ C++ bridge native audio-input support (`--audio_backend`, session audio modality, audio-disabled guard); Windows binary rebuilt + runtime validated.
-│   ├── waveform-ui-spec.md                ← ✅ Complete
-│   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
-│   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete
-├── phases/                          ← Numbered product phases (completed in order)
-│   ├── phase-0-scaffold.md          ← ✅ Repo structure, deps, .env, setup scripts
-│   ├── phase-1-sidecar.md           ← ✅ FastAPI sidecar, LiteRT-LM, tool calling
-│   ├── phase-2-electron.md          ← ✅ Overlay window, desktopCapturer, WebSocket client
-│   ├── phase-3-ui.md                ← ✅ React components, Zustand stores, streaming UI
-│   ├── phase-4-integration.md       ← ✅ Wire all layers together, error handling
-│   ├── phase-5-autorefresh-tts.md   ← ✅ Auto-refresh, TTS pipeline, audio playback
-│   ├── phase-6-polish.md            ← ✅ Visual polish, perf, demo prep
-│   └── phase-7-memory.md            ← 🚧 Persistent on-device memory wiki
+├── features/                        ← Active feature specs (Gate 1→5 lifecycle), grouped by area
+│   ├── backend/                     ← Inference engines, native bridges, benchmarking
+│   │   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation (text ✅, vision ✅, KV-cache ✅, audio ✅, S1/S2/S3 benchmark ✅); macOS/Linux builds pending; Foundry contingency. Vision + audio sub-specs consolidated into §Completed sub-specs.
+│   │   ├── litert-cpp-bridge-runtime-validation-spec.md ← 🚧 Phase 1 (Windows S1/S2/S3 benchmark) ✅ 2026-05-03. Phase 2 partial. Phases 3–4 (macOS/Linux builds) pending. Gate 1 — awaiting approval.
+│   │   ├── litert-cpp-audio-input-spec.md             ← 🚧 Deeper renderer/proxy audio contract for the C++ bridge. Gate 1 — awaiting approval.
+│   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 Umbrella for promoting LiteRT-CPP to default backend on all OSes. Gate 1 draft.
+│   │   └── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
+│   ├── distribution/                ← Packaging, installers, code signing, CI/CD
+│   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-01); Gate 1 approved.
+│   │   ├── distribution-backend-migration-spec.md     ← 🚧 Wire chosen backend into Electron main; TTS strategy. Gate 1 — awaiting approval.
+│   │   ├── distribution-packaging-spec.md             ← 🚧 electron-builder, first-run download, NSIS/DMG/AppImage. Gate 1 — awaiting approval.
+│   │   └── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel. Gate 1 — awaiting approval.
+│   ├── memory/                      ← Persistent on-device knowledge that compounds across sessions
+│   │   └── memory-wiki-spec.md                        ← 🚧 On-device LLM wiki (Karpathy pattern). Internal sub-phases M0–M3. Migrated from former Phase 7.
+│   └── ui/                          ← Renderer-only UX work
+│       ├── waveform-ui-spec.md                        ← ✅ Complete
+│       ├── overlay-waveform-polish-spec.md            ← ✅ Complete
+│       └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete
 ├── explanations/                    ← Evergreen "how does X work" reference (no lifecycle)
 │   ├── electron-ipc-and-ws-message-flow.md
 │   ├── react-zustand-state-flow.md
@@ -79,19 +75,23 @@ docs/
 │   ├── session-overlay-state-machine.md
 │   ├── sidecar-flow.md
 │   └── voice-audio-pipeline.md
-└── archive/                         ← Obsolete docs preserved for history
-    └── delfin-implementation-plan.md ← 📦 Original hackathon team plan
+└── archive/                         ← Obsolete or fully consolidated docs preserved for history
+    ├── hackathon-mvp.md                              ← 📦 Consolidated summary of original Phases 0–6
+    ├── delfin-implementation-plan.md                 ← 📦 Original 1.5-day hackathon team plan
+    └── features/
+        ├── litert-cpp-vision-spec.md                 ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
+        └── litert-cpp-audio-spec.md                  ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
 ```
 
-**Start with `docs/SPEC.md`** — it contains the architecture overview, tech stack, environment variable reference, WebSocket protocol, IPC channel table, and cross-cutting code rules that apply to every phase. Each phase doc in `docs/phases/` then contains detailed pseudocode and a verification checklist for that phase only. See `docs/README.md` for the full index with lifecycle status for every document.
+**Start with `docs/SPEC.md`** — it contains the architecture overview, tech stack, environment variable reference, WebSocket protocol, IPC channel table, and cross-cutting code rules that apply to every feature. Each feature spec in `docs/features/<area>/` contains its own Gate Resolution block, scope, interface contract, and verification checklist. See `docs/README.md` for the full index with lifecycle status for every document.
 
-When `docs/SPEC.md` and any phase doc conflict, **SPEC.md wins**.
+When `docs/SPEC.md` and any feature spec conflict, **SPEC.md wins**.
 
 ---
 
 ## Feature Development Workflow
 
-Every unit of work — whether a new phase, a sub-feature within a phase, or a bug fix with non-trivial scope — **must** follow these five gates in order. Do not skip or reorder them.
+Every unit of work — whether a new feature spec, a sub-feature within an existing spec, or a bug fix with non-trivial scope — **must** follow these five gates in order. Do not skip or reorder them.
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌───────────────┐     ┌─────────────┐     ┌──────────────┐
@@ -129,7 +129,7 @@ Once the human writes **"approved"** (or equivalent), proceed to Gate 3.
 
 Implement exactly what the approved spec describes — nothing more. Follow all rules in `docs/SPEC.md` §Cross-Cutting Rules. In particular:
 
-- Run the relevant verification checklist from the phase doc before declaring work done.
+- Run the relevant verification checklist from the feature spec before declaring work done.
 - Write or update tests that cover the acceptance criteria.
 - Keep commits atomic; one logical change per commit.
 
@@ -150,38 +150,45 @@ After the human approves the implementation, update **all** affected documentati
 
 | Doc                                                       | Update if…                                                                                                                                                                                       |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `STATUS.md`                                               | **Always** — add or update a row for every file touched; set status to ✅ / ⚠️ / ❌ and bump the "Last updated" date                                                                             |
-| `docs/README.md`                                          | **Always** — update the status column when a spec changes lifecycle state (🚧 → ✅). Add a row when a new spec is created. Move the row and file to `docs/archive/` when a doc becomes obsolete. |
-| `AGENTS.md` §Documentation Map                            | A new spec was added to `docs/features/` or `docs/phases/`, or a spec changed lifecycle state — keep the tree's status icons in sync with `docs/README.md`                                       |
-| `README.md`                                               | A user-visible capability was added or removed; the install or run flow changed; a new npm script was added; or a new env var was introduced that users need to know about                       |
-| `docs/SPEC.md`                                            | New IPC channel, WebSocket message type, REST endpoint, env var, or arch decision added                                                                                                          |
-| Relevant `docs/phases/phase-N.md` or `docs/features/*.md` | Verification checklist items completed; Gate Resolution block updated to reflect new status and implemented date                                                                                 |
-| `AGENTS.md` §Validated Technical Decisions                | A new confirmed technical fact was established during implementation                                                                                                                             |
-| `AGENTS.md` §Nice-to-Haves                                | A nice-to-have was implemented or explicitly ruled out                                                                                                                                           |
-| `.env.example`                                            | A new environment variable was introduced                                                                                                                                                        |
+| `STATUS.md`                                                  | **Always** — add or update a row for every file touched; set status to ✅ / ⚠️ / ❌ and bump the "Last updated" date                                                                            |
+| `docs/README.md`                                             | **Always** — update the status column when a spec changes lifecycle state (🚧 → ✅). Add a row when a new spec is created. Move the row and file to `docs/archive/` when a doc becomes obsolete or fully consolidated. |
+| `AGENTS.md` §Documentation Map                               | A new spec was added under `docs/features/<area>/`, or a spec changed lifecycle state — keep the tree's status icons in sync with `docs/README.md`                                              |
+| `AGENTS.md` §Current Active Features                         | A whole feature area went from active to maintenance (or vice versa) — add or remove the row to reflect what is actually being worked on                                                        |
+| `README.md`                                                  | A user-visible capability was added or removed; the install or run flow changed; a new npm script was added; or a new env var was introduced that users need to know about                      |
+| `docs/SPEC.md`                                               | New IPC channel, WebSocket message type, REST endpoint, env var, or arch decision added                                                                                                          |
+| Relevant `docs/features/<area>/<name>-spec.md`               | Verification checklist items completed; Gate Resolution block updated to reflect new status and implemented date                                                                                 |
+| `AGENTS.md` §Validated Technical Decisions                   | A new confirmed technical fact was established during implementation                                                                                                                             |
+| `AGENTS.md` §Nice-to-Haves                                   | A nice-to-have was implemented or explicitly ruled out                                                                                                                                           |
+| `.env.example`                                               | A new environment variable was introduced                                                                                                                                                        |
 
 Do **not** create new documentation files unless the spec explicitly called for one.
 
-**Doc lifecycle rule — when to archive vs. when to mark complete:**
+**Doc lifecycle rule — mark complete, then consolidate, then archive:**
 
-- Mark a spec ✅ Complete (in its Gate Resolution block and in `docs/README.md`) when implementation is done. Leave the file in place — completed specs are design decision records, not clutter.
-- Move a spec to `docs/archive/` only when it is **truly obsolete**: the feature was reversed, the interface it described no longer exists, or a newer spec fully supersedes it.
+- **Mark a spec ✅ Complete** in its Gate Resolution block and in `docs/README.md` as soon as implementation passes Gate 4. Leave the file in place if the work stands on its own as a design decision record.
+- **Consolidate a completed sub-spec into its parent spec** once it is done. A "sub-spec" is any spec whose `Depends on` or framing identifies a parent spec it lives under (e.g. an item in a parent's "Sub-feature map"). When the sub-spec reaches ✅ Gate 5, the agent must:
+  1. Add a brief entry summarising the outcome (acceptance criteria met, validation date, key files touched) to a `## Completed sub-specs` section in the parent spec.
+  2. Add a 📦 Archived banner to the top of the sub-spec file pointing at the consolidating parent.
+  3. `git mv` the sub-spec into `docs/archive/features/`.
+  4. Update `docs/README.md` (move the row to the Archive table) and `AGENTS.md` §Documentation Map (move the entry under `archive/features/`).
+- **Move a spec straight to `docs/archive/`** without consolidation only when it is **truly obsolete**: the feature was reversed, the interface it described no longer exists, or a newer spec fully supersedes it. In that case, also add the 📦 Archived banner explaining what replaced it.
+
+This consolidation/archival step is part of Gate 5 and is not optional — leaving a string of completed sub-specs alongside an in-flight parent makes the active set unreadable for the next agent.
 
 ---
 
-## Phase Execution Order
+## Current Active Features
 
-Complete phases in order. Each phase follows the full Feature Development Workflow above before the gate is considered passed.
+The hackathon-era numbered phase sequence (`phase-0-scaffold.md` … `phase-6-polish.md`) was consolidated into [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md) on 2026-05-03. New work is organised by **feature area** under `docs/features/<area>/`. Each feature follows the full Feature Development Workflow above. There is no fixed cross-feature execution order — features are picked up as approved.
 
-| #   | Phase doc                                | Acceptance Gate                                                      |
-| --- | ---------------------------------------- | -------------------------------------------------------------------- |
-| 0   | `docs/phases/phase-0-scaffold.md`        | `npm run dev:full` starts Electron + sidecar; `/health` returns JSON |
-| 1   | `docs/phases/phase-1-sidecar.md`         | WebSocket turn returns structured response via `wscat`               |
-| 2   | `docs/phases/phase-2-electron.md`        | Capture button grabs foreground window; mock sidecar responds        |
-| 3   | `docs/phases/phase-3-ui.md`              | Full sidebar UI renders against mock sidecar                         |
-| 4   | `docs/phases/phase-4-integration.md`     | Core demo works end-to-end with real model                           |
-| 5   | `docs/phases/phase-5-autorefresh-tts.md` | Slide change triggers auto-capture; TTS reads response               |
-| 6   | `docs/phases/phase-6-polish.md`          | App is demo-ready                                                    |
+Keep this table in sync with [`docs/README.md`](docs/README.md) and [`STATUS.md`](STATUS.md). Move a row out of this table once every spec under that area is ✅ Complete and there is no in-flight work for it.
+
+| Area             | Folder                          | Active specs                                                                                                                            | Top-level acceptance signal                                                                                                                 |
+| ---------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend          | `docs/features/backend/`        | `native-windows-backend-research-spec.md`, `litert-cpp-bridge-runtime-validation-spec.md`, `litert-cpp-audio-input-spec.md`, `litert-cpp-primary-backend-migration-spec.md` | LiteRT-LM C++ bridge runs natively on Windows / macOS / Linux with text + vision + audio parity vs the Python sidecar; llamafile fallback removable. |
+| Distribution     | `docs/features/distribution/`   | `desktop-distribution-mvp-spec.md`, `distribution-backend-migration-spec.md`, `distribution-packaging-spec.md`, `distribution-cicd-spec.md` | A signed installer for Windows / macOS / Linux can be downloaded from a GitHub release, runs without WSL2, and downloads model assets at first run. |
+| Memory           | `docs/features/memory/`         | `memory-wiki-spec.md` (sub-phases M0–M3)                                                                                                | Live turn cites a generated wiki page; PDF drop produces source + entity pages; lint report renders in `MemoryView`.                       |
+| UI / UX          | `docs/features/ui/`             | (all ✅ — no active specs)                                                                                                              | n/a — area is in maintenance.                                                                                                               |
 
 ---
 
@@ -246,7 +253,7 @@ These are confirmed facts — do not revisit without good reason:
 | Decision                          | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Image blobs work**              | Pass images as `{"type": "image", "blob": b64_str}` directly — no temp files. Validated by the [Parlor reference impl](https://github.com/fikrikarim/parlor).                                                                                                                                                                                                                                                                                           |
-| **Single WebSocket consumer**     | Use an `asyncio.Queue` + one `receiver()` coroutine. Do **not** run two `async for … in ws.iter_text()` loops concurrently — this causes a race condition. See `docs/phases/phase-1-sidecar.md` §1.4.                                                                                                                                                                                                                                                   |
+| **Single WebSocket consumer**     | Use an `asyncio.Queue` + one `receiver()` coroutine. Do **not** run two `async for … in ws.iter_text()` loops concurrently — this causes a race condition. Implementation lives in `sidecar/server.py` (see `docs/explanations/sidecar-flow.md` for the walkthrough).                                                                                                                                                                                |
 | **Per-connection closure**        | Define `respond_to_user` and `tool_result` inside `ws_endpoint()` as a closure, not as module-level globals. This prevents data races between concurrent connections.                                                                                                                                                                                                                                                                                   |
 | **JSON extraction fallback**      | When the model does not call the `respond_to_user` tool, `_extract_structured_from_text()` tries to parse `Summary:` / `Answer:` / `Key points:` from the raw output before falling back to raw token streaming.                                                                                                                                                                                                                                        |
 | **Rolling hash for auto-refresh** | Sample base64 at 0%, 25%, 50%, 75% (2 KB each) before hashing — not just the head. Avoids false negatives on slides with shared background templates.                                                                                                                                                                                                                                                                                                   |
@@ -278,5 +285,5 @@ Full rules are in `docs/SPEC.md` §Cross-Cutting Rules. Key points:
 
 ## Nice-to-Haves (implement only if time allows)
 
-- Conversation history trimming (see `docs/phases/phase-1-sidecar.md` §1.5)
+- Conversation history trimming in the Python sidecar (`sidecar/server.py` keeps the full per-connection turn list; see `docs/explanations/sidecar-flow.md`).
 - Wayland support on Linux native (desktopCapturer may require additional Electron flags)

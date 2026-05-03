@@ -1,13 +1,13 @@
 # LiteRT-LM C++ Bridge — Runtime Validation & Cross-Platform Builds
 
-> Gate 1 — spec draft awaiting human approval.
+> Gate 1 — spec draft awaiting human approval. Phase 1 (Windows rebuild + benchmark) completed 2026-05-03.
 > Closes out the pending items in `native-windows-backend-research-spec.md` phases A1–A4 and the runtime-validation gate in `litert-cpp-vision-spec.md`. If all acceptance criteria pass, triggers A5: update `desktop-distribution-mvp-spec.md` and `distribution-backend-migration-spec.md` to make the LiteRT C++ bridge the primary Windows backend and remove llamafile from the active distribution plan.
 
 ## Gate Resolution
 
 | Field          | Value                                                                                                                                                                           |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec draft, awaiting human approval                                                                                                                                    |
+| **Status**     | 🚧 Gate 1 — spec draft, awaiting human approval. Phase 1 (Windows rebuild + S1/S2/S3 benchmark) completed 2026-05-03. Phase 2 (manual app validation) partially done via proxy/WebSocket. Phases 3–4 (macOS/Linux builds) pending. |
 | **Created**    | 2026-05-03                                                                                                                                                                      |
 | **Depends on** | `litert-cpp-vision-spec.md` source implementation (commit `570d2fa` ✅), `native-windows-backend-research-spec.md` A0 build ✅, A3 proxy ✅                                       |
 | **Blocks**     | `desktop-distribution-mvp-spec.md` Windows backend decision; `distribution-backend-migration-spec.md` revision (llamafile removal); `distribution-packaging-spec.md` bridge packaging |
@@ -30,25 +30,25 @@ Per `native-windows-backend-research-spec.md` §A5, a passing Track A validation
 
 ## Scope
 
-### Phase 1 — Windows rebuild + full benchmark
+### Phase 1 — Windows rebuild + full benchmark ✅ Completed 2026-05-03
 
-| Step | Command / Action |
-| ---- | ---------------- |
-| 1a   | `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path-to-LiteRT-LM>` → verify `bin/delfin_litert_bridge.exe` and `bin/libGemmaModelConstraintProvider.dll` are up-to-date. |
-| 1b   | `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'` on the native Windows host with the rebuilt binary. Capture JSON + CSV in `results/`. |
-| 1c   | Record S1 TTFT, S1 throughput, S2 TTFT, S2 throughput, S3 throughput, and Turn 2+ TTFT (KV-cache reuse). Compare S1 baseline to previous run (`S1 TTFT 5433.9±83.6 ms`, throughput `20.4±0.9 tok/s`). |
+| Step | Command / Action | Result |
+| ---- | ---------------- | ------ |
+| 1a   | `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path-to-LiteRT-LM>` → verify `bin/delfin_litert_bridge.exe` and `bin/libGemmaModelConstraintProvider.dll` are up-to-date. | ✅ Built with `--output_user_root=D:\b` workaround; binary copied to `bin/` |
+| 1b   | `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'` on the native Windows host with the rebuilt binary. Capture JSON + CSV in `results/`. | ✅ Completed; JSON + CSV written to `results/` |
+| 1c   | Record S1 TTFT, S1 throughput, S2 TTFT, S2 throughput, S3 throughput, and Turn 2+ TTFT (KV-cache reuse). Compare S1 baseline to previous run (`S1 TTFT 5433.9±83.6 ms`, throughput `20.4±0.9 tok/s`). | ✅ **S1** TTFT 5,414±66 ms / 22.0±1.3 tok/s (within 20% baseline); **S2** TTFT 10,639±104 ms / 20.3±0.6 tok/s; **S3** Turn 1 ~5,400 ms, Turn 2+ ~647 ms (KV-cache reuse confirmed) |
 
-### Phase 2 — Windows manual app validation
+### Phase 2 — Windows manual app validation (proxy/WebSocket round)
 
-| Step | Check |
-| ---- | ----- |
-| 2a   | `npm run dev:litert-cpp` starts without error; `GET /health` returns `{"backend":"litert-cpp","status":"ok"}`. |
-| 2b   | Text turn: send a plain-text question; receive streamed tokens ending with `{type:"done"}`. |
-| 2c   | Vision turn: capture a lecture slide screenshot; send with a "Explain this slide" prompt; receive a structured explanation referencing visual content. |
-| 2d   | KV-cache multi-turn: send three follow-up turns on the same session; Turn 2+ TTFT should be ≤ 700 ms (vs. ~5,300 ms without session reuse). |
-| 2e   | Interrupt/barge-in: click Stop mid-stream; no orphaned tokens appear in subsequent turns. |
-| 2f   | Error inline: point `LITERT_CPP_MODEL` at a non-existent file; confirm the error surfaces as a chat inline message, not a crash or alert dialog. |
-| 2g   | Reconnect: close and reopen the sidebar; the proxy spawns a new session correctly. |
+| Step | Check | Result |
+| ---- | ----- | ------ |
+| 2a   | `npm run dev:litert-cpp` starts without error; `GET /health` returns `{"backend":"litert-cpp","status":"ok"}`. | ✅ Proxy starts; health returns `{"status":"ok","backend":"litert-cpp","model":"..."}` |
+| 2b   | Text turn: send a plain-text question; receive streamed tokens ending with `{type:"done"}`. | ✅ WebSocket text turn streams token `"Hello"` + `done` |
+| 2c   | Vision turn: capture a lecture slide screenshot; send with a "Explain this slide" prompt; receive a structured explanation referencing visual content. | ⚠️ Image decode path validated (base64 reaches decoder); full lecture-slide round deferred to Electron app test |
+| 2d   | KV-cache multi-turn: send three follow-up turns on the same session; Turn 2+ TTFT should be ≤ 700 ms (vs. ~5,300 ms without session reuse). | ✅ Benchmark S3 confirms Turn 2+ TTFT ~647 ms |
+| 2e   | Interrupt/barge-in: click Stop mid-stream; no orphaned tokens appear in subsequent turns. | ⏸ Not tested in this round |
+| 2f   | Error inline: point `LITERT_CPP_MODEL` at a non-existent file; confirm the error surfaces as a chat inline message, not a crash or alert dialog. | ⏸ Not tested in this round |
+| 2g   | Reconnect: close and reopen the sidebar; the proxy spawns a new session correctly. | ⏸ Not tested in this round |
 
 ### Phase 3 — macOS native bridge build + validation
 

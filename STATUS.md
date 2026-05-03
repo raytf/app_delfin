@@ -1,11 +1,17 @@
-# Delfin — Gemma 4-Powered Implementation Status
+# Delfin — Implementation Status
 
-> Last updated: 2026-05-03 (LiteRT-LM C++ bridge: vision + per-session KV-cache reuse + native audio input rebuilt and runtime-validated on Windows)
+> Last updated: 2026-05-03 (docs reorganised by feature area; LiteRT-LM C++ bridge vision + per-session KV-cache reuse + native audio input rebuilt and runtime-validated on Windows).
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
+>
+> Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
 
 ---
 
-## Phase 0 — Project Scaffold
+# Foundations (Hackathon MVP)
+
+The current shipping app. Originally tracked as Phases 0–6; preserved here as the working baseline that newer features build on top of.
+
+## Project scaffold & build tooling
 
 | File / Item                                                                  | Status | Notes                                                                                                                   |
 | ---------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
@@ -21,27 +27,12 @@
 | `scripts/download-models.test.mjs`                                           | ✅     | Vitest coverage for safe model download behavior                                                                        |
 | `scripts/check-vad-runtime.mjs`                                              | ✅     | Verifies copied VAD/ORT runtime assets                                                                                  |
 | `scripts/setup-check.sh` / `scripts/setup-check.ps1`                         | ✅     | Environment validation helpers                                                                                          |
-| `scripts/setup-llamafile.mjs`                                                | ✅     | Downloads llamafile 0.10.1 binary + GGUF model to `llamafile/bin/` and `llamafile/models/`                              |
-| `scripts/run-llamafile.mjs`                                                  | ✅     | Starts llamafile 0.10.1 server by default; pre-flight checks for binary and model                                       |
-| `scripts/run-benchmark.mjs`                                                  | ✅     | Node wrapper that runs benchmark/run.py using the sidecar venv Python                                                   |
-| `scripts/benchmark/run.py`                                                   | ✅     | CLI benchmark entry point — `--backend litert\|litert-cpp\|llamafile`, all scenarios, JSON+CSV output                   |
-| `scripts/benchmark/backends/litert.py`                                       | ✅     | LiteRT adapter over WebSocket                                                                                           |
-| `scripts/benchmark/backends/litert_cpp.py`                                   | ✅     | LiteRT C++ proxy adapter over the same Delfin WebSocket sidecar protocol                                                |
-| `scripts/benchmark/backends/llamafile.py`                                    | ✅     | llamafile adapter over OpenAI-compatible REST (streaming SSE)                                                           |
-| `scripts/benchmark/backends/memory.py`                                       | ✅     | Background RSS poller using psutil                                                                                      |
-| `scripts/benchmark/scenarios.py`                                             | ✅     | S1 (text), S2 (vision), S3 (multi-turn) scenario definitions                                                            |
-| `scripts/benchmark/reporter.py`                                              | ✅     | JSON + CSV result writer with mean±std stats                                                                            |
-| `scripts/benchmark/sysinfo.py`                                               | ✅     | Platform/CPU/RAM/GPU detection                                                                                          |
-| `scripts/benchmark/SETUP.md`                                                 | ✅     | Setup and usage guide for LiteRT, LiteRT C++ proxy research, and llamafile examples                                     |
-| `scripts/litert-cpp-presets.mjs`                                             | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                 |
-| `scripts/litert-cpp-proxy.mjs`                                               | ✅     | Delfin WebSocket proxy and health endpoint validated against native `delfin_litert_bridge.exe`; text turns stream successfully |
-| `scripts/litert-cpp-proxy.test.mjs`                                          | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                        |
-| `native/litert-cpp-bridge/`                                                  | ✅     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, `reset_session`, and native audio-input wiring (`--audio_backend`, session modality flags, audio-disabled guard); Windows binary rebuilt and runtime-validated (text, vision, audio paths); macOS/Linux native builds not yet attempted |
-| `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll`   | ✅     | Gitignored local runtime artifacts from Bazel output; current Windows binary predates the vision/session-reuse source changes and must be rebuilt before re-validation |
+
+> Backend research scripts (benchmark harness, llamafile setup/runner, LiteRT C++ proxy and native bridge) used to live in this section. They have moved to [§Backend (`docs/features/backend/`)](#backend-docsfeaturesbackend) below.
 
 ---
 
-## Phase 1 — Inference Sidecar
+## Sidecar (Python LiteRT-LM)
 
 | File / Item                                                   | Status | Notes                                                                                 |
 | ------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
@@ -65,7 +56,7 @@
 
 ---
 
-## Phase 2 — Electron Shell + Capture
+## Electron main + capture
 
 | File / Item                                                        | Status | Notes                                                                                |
 | ------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------ |
@@ -83,7 +74,7 @@
 
 ---
 
-## Phase 3 — React Sidebar UI
+## React renderer
 
 | File / Item                                                      | Status | Notes                                                                                                                                                      |
 | ---------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +101,7 @@
 
 ---
 
-## Phase 4 — End-to-End Integration
+## End-to-end integration & persistence
 
 | Feature                                                       | Status | Notes                                                                                                 |
 | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
@@ -129,7 +120,7 @@
 
 ---
 
-## Phase 5 — Voice Pipeline + TTS
+## Voice pipeline + TTS
 
 > **Current direction:** Voice is the default interaction mode when `VOICE_ENABLED=true`. VAD runs in the renderer, voice turns send base64 WAV audio alongside the captured screen, Gemma 4 handles the multimodal turn in the sidecar, and TTS audio streams back sentence by sentence when server-side speech is available.
 
@@ -183,20 +174,94 @@
 
 ---
 
-## Phase 6 — Polish + Stretch Goals
+## Foundations — known polish gaps
 
-| Feature                                 | Status | Notes                                                                                             |
-| --------------------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
-| Global keyboard shortcut `Ctrl+Shift+C` | ❌     | Not implemented                                                                                   |
-| Error state polish                      | ⚠️     | Inline renderer errors exist, but broader disconnected/loading/capture polish is still incomplete |
-| Visual styling pass                     | ⚠️     | Major ocean-themed UI styling is in place; final demo polish can still improve                    |
-| Markdown rendering in chat box          | ❌     | Conversation text is rendered as plain text                                                       |
-| Dark mode toggle                        | ❌     | Not implemented                                                                                   |
-| Manual window picker dropdown           | ❌     | Not implemented                                                                                   |
-| Ollama fallback engine                  | ❌     | Not implemented                                                                                   |
-| Dockerfile for sidecar                  | ❌     | Not implemented                                                                                   |
-| `demo-content/` — slide screenshots     | ❌     | Directory exists with only a README                                                               |
-| README — complete setup instructions    | ✅     | Refreshed on 2026-04-13                                                                           |
+The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracked here. Stretch items that did not ship (global hotkey, Markdown rendering, dark mode, manual window picker, Dockerfile, etc.) were moved to [`docs/README.md` §Future ideas](docs/README.md#future-ideas-not-yet-scoped). The two items still worth tracking against the current shipping app are:
+
+| Item                | Status | Notes                                                                                                |
+| ------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| Visual styling pass | ⚠️     | Major ocean-themed UI styling is in place; final polish can still improve before public distribution. |
+| Error state polish  | ⚠️     | Inline renderer errors exist, but broader disconnected/loading/capture polish is still incomplete.    |
+
+---
+
+# Active features
+
+## Backend (`docs/features/backend/`)
+
+> Specs: [`native-windows-backend-research-spec.md`](docs/features/backend/native-windows-backend-research-spec.md), [`litert-cpp-bridge-runtime-validation-spec.md`](docs/features/backend/litert-cpp-bridge-runtime-validation-spec.md), [`litert-cpp-audio-input-spec.md`](docs/features/backend/litert-cpp-audio-input-spec.md), [`litert-cpp-primary-backend-migration-spec.md`](docs/features/backend/litert-cpp-primary-backend-migration-spec.md), [`inference-benchmarking-spec.md`](docs/features/backend/inference-benchmarking-spec.md). Completed sub-specs (vision, native audio input) are summarised in the parent research spec and archived under [`docs/archive/features/`](docs/archive/features/).
+
+### Benchmark harness
+
+| File / Item                                | Status | Notes                                                                                               |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------- |
+| `scripts/run-benchmark.mjs`                | ✅     | Node wrapper that runs benchmark/run.py using the sidecar venv Python                               |
+| `scripts/benchmark/run.py`                 | ✅     | CLI benchmark entry point — `--backend litert\|litert-cpp\|llamafile`, all scenarios, JSON+CSV output |
+| `scripts/benchmark/backends/litert.py`     | ✅     | LiteRT adapter over WebSocket                                                                        |
+| `scripts/benchmark/backends/litert_cpp.py` | ✅     | LiteRT C++ proxy adapter over the same Delfin WebSocket sidecar protocol                             |
+| `scripts/benchmark/backends/llamafile.py`  | ✅     | llamafile adapter over OpenAI-compatible REST (streaming SSE)                                       |
+| `scripts/benchmark/backends/memory.py`     | ✅     | Background RSS poller using psutil                                                                   |
+| `scripts/benchmark/scenarios.py`           | ✅     | S1 (text), S2 (vision), S3 (multi-turn) scenario definitions                                         |
+| `scripts/benchmark/reporter.py`            | ✅     | JSON + CSV result writer with mean±std stats                                                         |
+| `scripts/benchmark/sysinfo.py`             | ✅     | Platform/CPU/RAM/GPU detection                                                                       |
+| `scripts/benchmark/SETUP.md`               | ✅     | Setup and usage guide for LiteRT, LiteRT C++ proxy research, and llamafile examples                 |
+
+### LiteRT-LM C++ bridge & proxy
+
+| File / Item                                                                | Status | Notes                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/litert-cpp-presets.mjs`                                           | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                                                                                                                                                                                                                          |
+| `scripts/litert-cpp-proxy.mjs`                                             | ✅     | Delfin WebSocket proxy + health endpoint, validated against native `delfin_litert_bridge.exe`; text + vision turns stream successfully                                                                                                                                                                                            |
+| `scripts/litert-cpp-proxy.test.mjs`                                        | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                                                                                                                                                                                                                                  |
+| `native/litert-cpp-bridge/`                                                | ✅     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, `reset_session`, and native audio-input wiring; Windows binary rebuilt and runtime-validated (S1/S2/S3 benchmark, KV-cache Turn 2+ ~647 ms, text/vision/audio paths). macOS/Linux native builds not yet attempted.                                |
+| `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll` | ✅     | Gitignored local runtime artifacts from Bazel output                                                                                                                                                                                                                                                                              |
+| Renderer/main wiring of LiteRT-CPP as default                              | ❌     | Tracked in `litert-cpp-primary-backend-migration-spec.md` (Gate 1 draft)                                                                                                                                                                                                                                                          |
+
+### llamafile fallback
+
+| File / Item                   | Status | Notes                                                                                            |
+| ----------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `scripts/setup-llamafile.mjs` | ✅     | Downloads llamafile 0.10.1 binary + GGUF model to `llamafile/bin/` and `llamafile/models/`        |
+| `scripts/run-llamafile.mjs`   | ✅     | Starts llamafile 0.10.1 server by default; pre-flight checks for binary and model                 |
+| Electron main wiring          | ❌     | llamafile is benchmark-only; full app integration tracked in `distribution-backend-migration-spec.md` |
+
+---
+
+## Distribution (`docs/features/distribution/`)
+
+> Specs: [`desktop-distribution-mvp-spec.md`](docs/features/distribution/desktop-distribution-mvp-spec.md), [`distribution-backend-migration-spec.md`](docs/features/distribution/distribution-backend-migration-spec.md), [`distribution-packaging-spec.md`](docs/features/distribution/distribution-packaging-spec.md), [`distribution-cicd-spec.md`](docs/features/distribution/distribution-cicd-spec.md).
+
+| Item                                                  | Status | Notes                                                                                       |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
+| Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; revised 2026-05-01 (llamafile / LiteRT-CPP hybrid) |
+| Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
+| First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
+| NSIS / DMG / AppImage installers                      | ❌     | Not started                                                                                 |
+| GitHub Actions matrix builds                          | ❌     | Not started; tracked in `distribution-cicd-spec.md`                                         |
+| Code signing (Windows Authenticode, macOS notarization) | ❌    | Not started                                                                                 |
+| TTS backend strategy for packaged builds              | ❌     | DM3 in `distribution-backend-migration-spec.md` (Piper vs frozen Kokoro investigation)      |
+
+---
+
+## Memory (`docs/features/memory/`)
+
+> Spec: [`memory-wiki-spec.md`](docs/features/memory/memory-wiki-spec.md). Sub-phases M0 → M3.
+
+| Item                                                              | Status | Notes                                                                                  |
+| ----------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------- |
+| M0 — E2B viability spike (`sidecar/memory/spike.py`)              | ❌     | Spec written; standalone script not yet implemented                                    |
+| M1 — Read-only wiki infrastructure (`store.py`, `index.py`, REST) | ❌     | Not started                                                                             |
+| M2 — Session ingest pipeline                                      | ❌     | Not started                                                                             |
+| M3 — File ingest + runtime tools + lint                           | ❌     | Not started                                                                             |
+| Renderer `MemoryView` reader                                      | ❌     | Not started                                                                             |
+
+---
+
+## UI / UX (`docs/features/ui/`)
+
+> Specs: [`waveform-ui-spec.md`](docs/features/ui/waveform-ui-spec.md), [`overlay-waveform-polish-spec.md`](docs/features/ui/overlay-waveform-polish-spec.md), [`minimized-overlay-waveform-continuity-spec.md`](docs/features/ui/minimized-overlay-waveform-continuity-spec.md).
+
+All three feature specs are ✅ Complete. The implementation files (`VoiceWaveform`, waveform utilities, `MinimizedSessionBar`, expanded voice card) are listed in the [Voice pipeline + TTS](#voice-pipeline--tts) section above as part of the working app.
 
 ---
 

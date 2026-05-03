@@ -1,8 +1,10 @@
-# Phase 7 — Memory System (LLM Wiki)
+# Memory System (LLM Wiki)
+
+> Migrated 2026-05-03 from the former `docs/phases/phase-7-memory.md` to `docs/features/memory/memory-wiki-spec.md` as part of the move from numbered hackathon phases to feature-area planning. Internal sub-phases below (M0–M3) are unchanged and remain the unit of work.
 
 > **Goal**: Give Delfin a persistent, compounding, on-device memory modelled on Karpathy's LLM wiki pattern. A single global markdown wiki is maintained by the local model (Gemma 4 E2B) across all sessions. The model queries it at runtime via tool calls to produce answers grounded in the user's accumulated history. No cloud, no vector DB, no second model.
 
-**Depends on**: Phase 4 (persistent session storage, sidecar tool calling, IPC bridge all working)
+**Depends on**: The Foundations baseline from the hackathon MVP — persistent session storage, sidecar tool calling, and the IPC bridge are all already shipping (see [`STATUS.md` §Foundations](../../../STATUS.md#foundations-hackathon-mvp) and [`docs/archive/hackathon-mvp.md`](../../archive/hackathon-mvp.md)).
 
 ---
 

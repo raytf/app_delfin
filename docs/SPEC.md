@@ -1,6 +1,6 @@
 # Delfin — Implementation Spec
 
-> **Purpose**: This spec is the single source of truth for an AI coding agent building Delfin from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
+> **Purpose**: This spec is the single source of truth for the architecture, interface contracts, and cross-cutting code rules that every feature in Delfin must respect. Per-feature scope, acceptance criteria, and verification checklists live in the individual specs under [`docs/features/<area>/`](./features/) and are tracked in [`STATUS.md`](../STATUS.md). The original numbered hackathon phases (0–6) were consolidated into [`archive/hackathon-mvp.md`](./archive/hackathon-mvp.md) on 2026-05-03.
 
 ## What is Delfin?
 
@@ -58,21 +58,23 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
 | TTS               | kokoro-onnx (Linux/WSL2), mlx-audio (macOS), Web Speech API (fallback) |
 | WebSocket         | ws (Node.js client), FastAPI built-in (server)                         |
 
-## Phase Map
+## Active Work Map
 
-| Phase | Name                                                      | What Gets Built                                                     | Depends On |
-| ----- | --------------------------------------------------------- | ------------------------------------------------------------------- | ---------- |
-| 0     | [Project Scaffold](./phases/phase-0-scaffold.md)          | Repo structure, configs, .env, dependencies, setup scripts          | Nothing    |
-| 1     | [Inference Sidecar](./phases/phase-1-sidecar.md)          | FastAPI server, LiteRT-LM engine, tool calling, image preprocessing | Phase 0    |
-| 2     | [Electron Shell + Capture](./phases/phase-2-electron.md)  | Overlay window, desktopCapturer, WebSocket client, IPC handlers     | Phase 0    |
-| 3     | [React Sidebar UI](./phases/phase-3-ui.md)                | All React components, Zustand stores, streaming display             | Phase 2    |
-| 4     | [End-to-End Integration](./phases/phase-4-integration.md) | Wire all three layers together, error handling, status reporting    | Phases 1–3 |
-| 5     | [Auto-Refresh + TTS](./phases/phase-5-autorefresh-tts.md) | Auto-refresh with debounce, TTS pipeline, audio playback            | Phase 4    |
-| 6     | [Polish + Optimisation](./phases/phase-6-polish.md)       | Styling, error states, perf optimisations, demo prep                | Phase 5    |
+The hackathon-era numbered phase sequence (Phase 0 scaffold → Phase 6 polish) is complete and archived. New work is organised by feature area; each spec carries its own scope and verification checklist.
+
+| Area         | Folder                                                     | Headline                                                                                                                                                                |
+| ------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foundations  | n/a — shipping app                                         | Hackathon MVP (Electron shell + Python LiteRT sidecar + voice/TTS pipeline). See [`STATUS.md`](../STATUS.md#foundations-hackathon-mvp) and [`archive/hackathon-mvp.md`](./archive/hackathon-mvp.md). |
+| Backend      | [`features/backend/`](./features/backend/)                 | Native LiteRT-LM C++ bridge (text/vision/audio/KV-cache validated on Windows; macOS/Linux pending) and the inference benchmark harness.                                |
+| Distribution | [`features/distribution/`](./features/distribution/)       | Desktop packaging (electron-builder, signed installers), backend selection for distribution, GitHub Actions CI/CD.                                                       |
+| Memory       | [`features/memory/`](./features/memory/)                   | On-device LLM wiki with internal sub-phases M0–M3.                                                                                                                       |
+| UI / UX      | [`features/ui/`](./features/ui/)                           | Waveform / overlay polish — all specs ✅ Complete; area is in maintenance.                                                                                              |
+
+See [`docs/README.md`](./README.md) for the full per-spec index with lifecycle status.
 
 ## Cross-Cutting Rules
 
-These rules apply to every phase. The agent must follow them throughout.
+These rules apply to every feature. The agent must follow them throughout.
 
 ### Code Style
 
