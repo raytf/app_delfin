@@ -129,9 +129,14 @@ VISION_TOKEN_BUDGET=280
 MAX_IMAGE_WIDTH=512
 
 # === LiteRT-LM C++ research backend ===
-LITERT_CPP_BIN=./bin/litert_lm_main.exe
+LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
 
+# LITERT_CPP_BIN must point at the Delfin JSONL/stdio bridge built from
+# native/litert-cpp-bridge/ (delfin_litert_bridge[.exe]). The upstream
+# litert_lm_main demo CLI is not a drop-in replacement — it does not speak
+# the Delfin JSONL protocol.
+#
 # For packaged Windows builds, LITERT_CPP_BIN points at the bundled prebuilt
 # delfin_litert_bridge.exe resource and LITERT_CPP_MODEL points at the user's
 # first-run-downloaded .litertlm model under app.getPath('userData').

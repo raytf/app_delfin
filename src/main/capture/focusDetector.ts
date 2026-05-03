@@ -1,11 +1,11 @@
 import { desktopCapturer, type DesktopCapturerSource } from "electron";
 
-const CAPTURE_THUMBNAIL_SIZE = {
+export const CAPTURE_THUMBNAIL_SIZE = {
   width: 1920,
   height: 1080,
 } as const;
 
-function isCapturableSource(source: DesktopCapturerSource): boolean {
+export function isCapturableSource(source: DesktopCapturerSource): boolean {
   return source.name.trim().length > 0 && !source.name.includes("Delfin");
 }
 

@@ -1,17 +1,20 @@
 # LiteRT-LM C++ Bridge — Vision Support and KV-Cache Session Reuse
 
-> Gate 1 — Draft spec awaiting human approval.
+> Gate 3 — source implementation landed; awaiting runtime validation before Gate 4 review.
 > Sub-feature of Track A in `native-windows-backend-research-spec.md`.
 > Closes the vision blocker (S2, lecture-slide workflow) and adds session-level KV-cache for dramatic multi-turn latency improvement.
 
 ## Gate Resolution
 
-| Field          | Value                                                                                    |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec draft, awaiting human approval                                             |
-| **Created**    | 2026-05-02                                                                               |
-| **Depends on** | `native-windows-backend-research-spec.md` Track A (build ✅, text streaming ✅)          |
-| **Blocks**     | Benchmark S2, Track A acceptance, full Delfin lecture-slide validation on native Windows |
+| Field             | Value                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**        | Gate 3 — source implementation landed (commit `570d2fa`); awaiting binary rebuild + runtime validation (S2 benchmark, KV-cache TTFT, manual lecture-slide round) before Gate 4 review                                                                                                                                                                       |
+| **Created**       | 2026-05-02                                                                                                                                                                                                                                                                                                                                                  |
+| **Approved**      | 2026-05-02                                                                                                                                                                                                                                                                                                                                                  |
+| **Implemented**   | `native/litert-cpp-bridge/delfin_litert_bridge.cc` (`--vision_backend` flag, `JsonPreface`, `g_sessions` map, `AcquireConversation`/`ReleaseConversation`, `reset_session` handler, `SendMessageAsync` called with the singular new user turn); `scripts/litert-cpp-proxy.mjs` (per-connection `sessionId`, `buildUserMessage`, `bridge.resetSession` on close); source-contract tests in `native/litert-cpp-bridge/delfin_litert_bridge.test.mjs` |
+| **Pending**       | Rebuild `bin/delfin_litert_bridge.exe` from post-`570d2fa` source; benchmark S2 run; KV-cache Turn 2+ TTFT measurement; manual lecture-slide round                                                                                                                                                                                                          |
+| **Depends on**    | `native-windows-backend-research-spec.md` Track A (build ✅, text streaming ✅)                                                                                                                                                                                                                                                                             |
+| **Blocks**        | Benchmark S2, Track A acceptance, full Delfin lecture-slide validation on native Windows                                                                                                                                                                                                                                                                    |
 
 ---
 

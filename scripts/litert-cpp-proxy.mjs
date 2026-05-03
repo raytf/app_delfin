@@ -37,11 +37,34 @@ function resolveBridgeCommand(binPath) {
   return { command: binPath, args: [] };
 }
 
+function createErroredBridge(message, options = {}) {
+  const error = message instanceof Error ? message : new Error(message);
+  const backend = options.backend ?? "litert-cpp";
+  const model = options.model ?? null;
+
+  return {
+    async ready() {
+      throw error;
+    },
+    getInfo() {
+      return { ready: false, backend, model, error: error.message };
+    },
+    async generate(_request, handlers) {
+      handlers.onError(error.message);
+    },
+    interrupt() {},
+    resetSession() {},
+    async close() {},
+  };
+}
+
 function createStdioBridge() {
   const defaultBin = resolve(
     rootDir,
     "bin",
-    process.platform === "win32" ? "litert_lm_main.exe" : "litert_lm_main",
+    process.platform === "win32"
+      ? "delfin_litert_bridge.exe"
+      : "delfin_litert_bridge",
   );
   const defaultModel = resolve(
     rootDir,
@@ -52,13 +75,15 @@ function createStdioBridge() {
   const modelPath = resolve(process.env.LITERT_CPP_MODEL ?? defaultModel);
 
   if (!existsSync(binPath)) {
-    throw new Error(
+    return createErroredBridge(
       `LiteRT C++ bridge binary not found at ${binPath}. Set LITERT_CPP_BIN.`,
+      { model: modelPath },
     );
   }
   if (!existsSync(modelPath)) {
-    throw new Error(
+    return createErroredBridge(
       `LiteRT C++ model not found at ${modelPath}. Set LITERT_CPP_MODEL.`,
+      { model: modelPath },
     );
   }
 
@@ -79,10 +104,11 @@ function createStdioBridge() {
     resolveReady = resolvePromise;
     rejectReady = rejectPromise;
   });
+  readyPromise.catch(() => {});
 
   const startupTimer = setTimeout(() => {
     const error = new Error(
-      "LiteRT C++ bridge did not emit a JSON ready event. Raw litert_lm_main is not yet a drop-in Delfin sidecar.",
+      "LiteRT C++ bridge did not emit a JSON ready event within the timeout. Ensure LITERT_CPP_BIN points at delfin_litert_bridge[.exe] built from native/litert-cpp-bridge/ — the upstream litert_lm_main demo binary does not speak the Delfin JSONL protocol.",
     );
     readyError = error;
     rejectReady(error);
@@ -141,6 +167,7 @@ function createStdioBridge() {
     const message =
       readyError?.message ??
       `LiteRT C++ bridge exited unexpectedly (${signal ?? code ?? "unknown"}).`;
+    readyError ??= new Error(message);
     if (!ready) rejectReady(new Error(message));
     flushPendingWithError(message);
   });
@@ -150,7 +177,7 @@ function createStdioBridge() {
       await readyPromise;
     },
     getInfo() {
-      return { ready, backend, model };
+      return { ready, backend, model, error: readyError?.message ?? null };
     },
     async generate(request, handlers) {
       await readyPromise;
@@ -182,8 +209,20 @@ function createStdioBridge() {
 export async function startLitertCppProxy(options = {}) {
   const host = options.host ?? process.env.SIDECAR_HOST ?? "127.0.0.1";
   const port = Number(options.port ?? process.env.SIDECAR_PORT ?? "8321");
-  const bridge = await (options.createBridge?.() ?? createStdioBridge());
-  await bridge.ready();
+  let bridge;
+  try {
+    bridge = await (options.createBridge?.() ?? createStdioBridge());
+  } catch (error) {
+    bridge = createErroredBridge(
+      error instanceof Error ? error.message : "LiteRT C++ bridge failed to start.",
+    );
+  }
+  void bridge.ready().catch((error) => {
+    console.error(
+      "[litert-cpp-proxy] Bridge unavailable:",
+      error instanceof Error ? error.message : error,
+    );
+  });
 
   const sessions = new Map();
   const server = createServer((req, res) => {
@@ -191,7 +230,14 @@ export async function startLitertCppProxy(options = {}) {
       const info = bridge.getInfo();
       if (!info.ready) {
         res.writeHead(503, { "content-type": "application/json" });
-        res.end(JSON.stringify({ status: "starting", backend: info.backend }));
+        res.end(
+          JSON.stringify({
+            status: info.error ? "error" : "starting",
+            backend: info.backend,
+            ...(info.model ? { model: info.model } : {}),
+            ...(info.error ? { message: info.error } : {}),
+          }),
+        );
         return;
       }
       res.writeHead(200, { "content-type": "application/json" });

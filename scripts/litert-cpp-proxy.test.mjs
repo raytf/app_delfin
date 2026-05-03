@@ -83,6 +83,17 @@ async function collectUntil(socket, terminalType) {
   })
 }
 
+async function waitFor(predicate, timeoutMs = 500) {
+  const startedAt = Date.now()
+
+  while (!predicate()) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error('Timed out waiting for test condition.')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
 describe('startLitertCppProxy', () => {
   let proxy
 
@@ -135,6 +146,7 @@ describe('startLitertCppProxy', () => {
     const closed = new Promise((resolve) => socket.once('close', resolve))
     socket.close()
     await closed
+    await waitFor(() => bridge.resetSessions.length === 1)
     expect(bridge.resetSessions).toEqual([bridge.requests[0].sessionId])
   })
 
@@ -152,6 +164,35 @@ describe('startLitertCppProxy', () => {
     const interrupted = await collectUntil(socket, 'error')
 
     expect(interrupted.at(-1)).toMatchObject({ type: 'error', message: 'Generation interrupted.' })
+    socket.close()
+  })
+
+  it('surfaces bridge startup failures through health and websocket errors', async () => {
+    const startupError =
+      'LiteRT C++ model not found at D:/missing/gemma-4-E2B-it.litertlm. Set LITERT_CPP_MODEL.'
+
+    proxy = await startLitertCppProxy({
+      host: '127.0.0.1',
+      port: 0,
+      createBridge: () => {
+        throw new Error(startupError)
+      },
+    })
+
+    const healthResponse = await fetch(`http://127.0.0.1:${proxy.port}/health`)
+    const healthPayload = await healthResponse.json()
+    expect(healthResponse.status).toBe(503)
+    expect(healthPayload).toMatchObject({
+      status: 'error',
+      backend: 'litert-cpp',
+      message: startupError,
+    })
+
+    const socket = await openSocket(`ws://127.0.0.1:${proxy.port}/ws`)
+    socket.send(JSON.stringify({ text: 'hello?', preset_id: 'generic-screen' }))
+    const response = await collectUntil(socket, 'error')
+
+    expect(response.at(-1)).toMatchObject({ type: 'error', message: startupError })
     socket.close()
   })
 })
