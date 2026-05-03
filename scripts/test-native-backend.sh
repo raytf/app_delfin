@@ -103,6 +103,22 @@ set_env "LITERT_CPP_BIN"   "./bin/delfin_litert_bridge"
 set_env "LITERT_CPP_MODEL" "./models/gemma-4-E2B-it.litertlm"
 ok ".env updated (LITERT_CPP_BIN, LITERT_CPP_MODEL)"
 
+# ── Piper TTS setup ─────────────────────────────────────────────────────────
+echo ""; echo "=== Piper TTS setup (recommended for voice feedback) ==="
+set_env "VOICE_ENABLED" "true"
+set_env "LITERT_CPP_TTS_BACKEND" "piper"
+
+# Check if any Piper voice is already configured
+if ! grep -q "PIPER_MODEL=" "$ENV_FILE" 2>/dev/null; then
+  echo "⚠️  No Piper voice configured in .env."
+  read -rp "Install recommended hfc_female voice? [Y/n] " VOICE_DL
+  if [[ "${VOICE_DL:-y}" =~ ^[Yy] ]]; then
+    npm --prefix "$ROOT" run voice:install -- en/en_US/hfc_female/medium --use
+  fi
+else
+  ok "Piper voice already configured in .env"
+fi
+
 # ── Start proxy ─────────────────────────────────────────────────────────────
 echo ""; echo "=== Starting litert-cpp proxy (model load can take 1–2 min on first run) ==="
 node "$ROOT/scripts/litert-cpp-proxy.mjs" &

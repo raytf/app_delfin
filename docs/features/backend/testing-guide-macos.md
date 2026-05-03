@@ -70,17 +70,21 @@ npm run setup:sidecar   # creates sidecar/.venv with benchmark Python deps
 
 ## Step 3 — Run the automated test script
 
-This single command checks prerequisites, builds the bridge, downloads the model if needed, starts the proxy, and runs the full benchmark. Pass the path to your **LiteRT-LM clone** (the one you created outside of `app_delfin/` in Step 1):
+This single command checks prerequisites, builds the bridge, downloads the model, and configures voice/TTS (Piper). Pass the path to your **LiteRT-LM clone** (the one you created outside of `app_delfin/` in Step 1):
 
 ```bash
 # Run from inside app_delfin/
 ./scripts/test-native-backend.sh ~/LiteRT-LM
-
-# If you cloned to a different path, use that instead:
-# ./scripts/test-native-backend.sh ~/projects/LiteRT-LM
 ```
 
 > **First run takes 10–20 minutes** — Bazel downloads dependencies and compiles ~200 C++ source files. Subsequent runs use the Bazel cache and take under 30 seconds.
+
+**What the script does for you:**
+1. **Builds the C++ bridge** binary inside your LiteRT-LM tree.
+2. **Downloads the model** (`gemma-4-E2B-it.litertlm`) if missing.
+3. **Patches your `.env`** with `LITERT_CPP_BIN` and `LITERT_CPP_MODEL`.
+4. **Sets up Piper TTS**: it enables `VOICE_ENABLED=true`, sets `LITERT_CPP_TTS_BACKEND=piper`, and prompts to install the recommended `hfc_female` voice.
+5. **Starts the proxy** and runs the S1/S2/S3 benchmark sweep.
 
 Watch for `✅ Built: .../bin/delfin_litert_bridge` to confirm the build succeeded, then wait for `ready` before the benchmark starts.
 
@@ -116,28 +120,26 @@ npm run dev:litert-cpp
 npm run dev
 ```
 
-The script already wrote `LITERT_CPP_BIN` and `LITERT_CPP_MODEL` to your `.env`. Try a text turn and a screenshot capture to verify vision.
+Try a text turn and a screenshot capture to verify vision.
 
 ### Testing voice input and Piper TTS
 
-Voice and TTS are both fully supported on the C++ backend path. To test them:
+Voice and TTS are both fully supported on the C++ backend path. Since you ran the test script in Step 3:
 
-1. **Voice input is on by default** when `VOICE_ENABLED=true` in `.env`. Say something in the app — the waveform should animate and a voice turn should be submitted.
+1. **Voice input is already on** (`VOICE_ENABLED=true` in `.env`). Say something in the app — the waveform should animate and a voice turn should be submitted.
 
-2. **Piper TTS (optional):** Install a voice and point the proxy at it:
-   ```bash
-   # List available voices
-   npm run voice:list
+2. **Piper TTS is already configured** (`LITERT_CPP_TTS_BACKEND=piper`). If you accepted the prompt to install the `hfc_female` voice, the app will speak responses sentence by sentence via Piper.
 
-   # Install a voice (downloads from rhasspy/piper-voices)
-   npm run voice:install -- en/en_US/hfc_female/medium --use
+If you need to change voices or re-install:
+```bash
+# List available voices
+npm run voice:list
 
-   # Or switch to an already-installed voice
-   npm run voice:use -- en_US-hfc_female-medium
-   ```
-   Then add `LITERT_CPP_TTS_BACKEND=piper` to `.env` and restart the proxy. The app should speak responses sentence by sentence via Piper rather than browser Web Speech.
+# Install/switch to a different voice
+npm run voice:install -- en/en_US/hfc_female/medium --use
+```
 
-   > If Piper is not configured or its binary is missing, the proxy falls back to browser Web Speech automatically — this is the expected graceful-degradation path.
+> **Note:** If Piper is disabled or its binary is missing, the proxy falls back to browser Web Speech automatically — this is the expected graceful-degradation path.
 
 ---
 

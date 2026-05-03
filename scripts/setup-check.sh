@@ -90,6 +90,16 @@ else
   echo "⚠️  Kokoro voices ($KOKORO_VOICES): missing (run: npm run download:models)"
 fi
 
+# Piper TTS check
+if grep -q "LITERT_CPP_TTS_BACKEND=piper" .env 2>/dev/null; then
+  PIPER_MODEL=$(grep -E '^PIPER_MODEL=' .env 2>/dev/null | cut -d= -f2)
+  if [[ -n "$PIPER_MODEL" && -f "$PIPER_MODEL" ]]; then
+    echo "✅ Piper model: present ($PIPER_MODEL)"
+  else
+    echo "⚠️  Piper model: missing or not configured (run: npm run voice:install -- en/en_US/hfc_female/medium --use)"
+  fi
+fi
+
 # Sidecar health check
 SIDECAR_PORT=${SIDECAR_PORT:-8321}
 if curl -s "http://localhost:$SIDECAR_PORT/health" > /dev/null 2>&1; then
