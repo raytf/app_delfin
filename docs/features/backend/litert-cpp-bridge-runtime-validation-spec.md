@@ -82,7 +82,7 @@ If all acceptance criteria below are met:
 ## Out of scope
 
 - Further audio-input contract/polish work on the C++ bridge (tracked separately in `litert-cpp-audio-input-spec.md`).
-- TTS strategy for the C++ track (Piper, frozen kokoro-onnx, or Web Speech API — separate spec needed).
+- ~~TTS strategy for the C++ track~~ — **resolved**: Piper via Node proxy (M3 complete 2026-05-03, see archived `litert-cpp-proxy-piper-tts-spec.md`).
 - electron-builder packaging changes, first-run download UX, or installer creation (covered by `distribution-packaging-spec.md`).
 - CI/CD automation of the bridge build (`distribution-cicd-spec.md`).
 - Track B (Foundry Local) — this spec assumes Track A passes; activate Track B only if a blocking criterion fails (see `native-windows-backend-research-spec.md` §Track B).
@@ -113,4 +113,4 @@ If all acceptance criteria below are met:
 | macOS Bazel build requires Xcode toolchain changes not yet documented | Medium | Document exact Xcode + Bazelisk versions in `native/litert-cpp-bridge/README.md` as part of Gate 5. |
 | KV-cache TTFT improvement is smaller than expected (> 700 ms) on real hardware | Low-Medium | Measure on at least two machines; confirm `Conversation` reuse is actually hitting the warm cache path (add a `{type:"cache_hit"}` debug event to the bridge if needed). |
 | `libGemmaModelConstraintProvider.dll` dependency chain differs across platforms | Low | Verify with `ldd` (Linux) / `otool -L` (macOS) and document required co-located shared libs. |
-| Off-Python TTS remains missing on the `litert-cpp` proxy path | Certain (known gap) | `scripts/litert-cpp-proxy.mjs` currently emits `token` / `done` / `error` only, so the renderer falls back to Web Speech even when `TTS_BACKEND=kokoro`. Resolve via the separate TTS strategy track before making `litert-cpp` the default backend. |
+| ~~Off-Python TTS remains missing on the `litert-cpp` proxy path~~ | **Resolved** | Piper via Node proxy implemented (2026-05-03). `scripts/litert-cpp-proxy.mjs` now emits sentence-level `audio_start` / `audio_chunk` / `audio_end`. Web Speech fallback retained for when Piper is disabled. |

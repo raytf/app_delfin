@@ -29,12 +29,25 @@ python3 -V  # need 3.12+
 
 ---
 
-## Step 1 — Clone LiteRT-LM
+## Step 1 — Clone LiteRT-LM (outside the Delfin repo)
 
-The bridge source is injected into Google's upstream tree to compile. You need a local clone:
+The build script injects the bridge source into Google's upstream tree to compile with Bazel. The LiteRT-LM clone must live **outside** the Delfin repository — placing it inside `app_delfin/` would pollute the project's working tree and confuse git.
+
+Clone it somewhere like your home directory:
 
 ```bash
-git clone https://github.com/google-ai-edge/LiteRT-LM.git ~/LiteRT-LM
+# ⚠️  Run this from your home directory (or any path outside app_delfin/)
+cd ~
+git clone https://github.com/google-ai-edge/LiteRT-LM.git
+# Result: ~/LiteRT-LM   ← this is the path you'll pass to the test script
+```
+
+You can also use any other parent directory — just note the full path:
+
+```bash
+# Alternative: a dedicated projects folder
+git clone https://github.com/google-ai-edge/LiteRT-LM.git ~/projects/LiteRT-LM
+# Then pass ~/projects/LiteRT-LM as the argument in Step 3
 ```
 
 > The clone is ~500 MB. Bazel will download additional dependencies on the first build (~1 GB). Both are one-time costs.
@@ -43,7 +56,10 @@ git clone https://github.com/google-ai-edge/LiteRT-LM.git ~/LiteRT-LM
 
 ## Step 2 — Pull the branch and set up Delfin
 
+Run these from inside the `app_delfin/` directory:
+
 ```bash
+cd /path/to/app_delfin   # wherever you cloned Delfin
 git pull
 git checkout research/distribution-and-native-backend
 npm install
@@ -54,10 +70,14 @@ npm run setup:sidecar   # creates sidecar/.venv with benchmark Python deps
 
 ## Step 3 — Run the automated test script
 
-This single command checks prerequisites, builds the bridge, downloads the model if needed, starts the proxy, and runs the full benchmark:
+This single command checks prerequisites, builds the bridge, downloads the model if needed, starts the proxy, and runs the full benchmark. Pass the path to your **LiteRT-LM clone** (the one you created outside of `app_delfin/` in Step 1):
 
 ```bash
+# Run from inside app_delfin/
 ./scripts/test-native-backend.sh ~/LiteRT-LM
+
+# If you cloned to a different path, use that instead:
+# ./scripts/test-native-backend.sh ~/projects/LiteRT-LM
 ```
 
 > **First run takes 10–20 minutes** — Bazel downloads dependencies and compiles ~200 C++ source files. Subsequent runs use the Bazel cache and take under 30 seconds.
@@ -98,12 +118,33 @@ npm run dev
 
 The script already wrote `LITERT_CPP_BIN` and `LITERT_CPP_MODEL` to your `.env`. Try a text turn and a screenshot capture to verify vision.
 
+### Testing voice input and Piper TTS
+
+Voice and TTS are both fully supported on the C++ backend path. To test them:
+
+1. **Voice input is on by default** when `VOICE_ENABLED=true` in `.env`. Say something in the app — the waveform should animate and a voice turn should be submitted.
+
+2. **Piper TTS (optional):** Install a voice and point the proxy at it:
+   ```bash
+   # List available voices
+   npm run voice:list
+
+   # Install a voice (downloads from rhasspy/piper-voices)
+   npm run voice:install -- en/en_US/hfc_female/medium --use
+
+   # Or switch to an already-installed voice
+   npm run voice:use -- en_US-hfc_female-medium
+   ```
+   Then add `LITERT_CPP_TTS_BACKEND=piper` to `.env` and restart the proxy. The app should speak responses sentence by sentence via Piper rather than browser Web Speech.
+
+   > If Piper is not configured or its binary is missing, the proxy falls back to browser Web Speech automatically — this is the expected graceful-degradation path.
+
 ---
 
 ## Troubleshooting
 
 **Build fails with `no such target '//runtime/engine:delfin_litert_bridge'`**
-The build script patches the upstream `BUILD` file once. If it already ran but the binary was missing, check `~/LiteRT-LM/runtime/engine/BUILD` for the `delfin_litert_bridge` target. If it is absent, the patch failed silently — re-run the script.
+The build script patches the upstream `BUILD` file once. If it already ran but the binary was missing, check `<your-LiteRT-LM-path>/runtime/engine/BUILD` for the `delfin_litert_bridge` target. If it is absent, the patch failed silently — re-run the script.
 
 **Bazel downloads are very slow**
 Bazel respects `HTTP_PROXY` / `HTTPS_PROXY`. If you are on a slow connection, set these to an appropriate proxy.
@@ -112,7 +153,7 @@ Bazel respects `HTTP_PROXY` / `HTTPS_PROXY`. If you are on a slow connection, se
 The build script omits `--config` on macOS (Bazel auto-detects clang). If your LiteRT-LM version requires a specific config, override:
 ```bash
 node scripts/build-litert-cpp-bridge.mjs \
-  --litert-lm-dir ~/LiteRT-LM \
+  --litert-lm-dir ~/LiteRT-LM \   # adjust to your actual clone path
   --bazel-config --config=macos
 ```
 

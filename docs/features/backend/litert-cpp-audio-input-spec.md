@@ -1,16 +1,17 @@
 # LiteRT-LM C++ Bridge — Audio Input
 
-> Gate 1 — spec draft awaiting human approval.
-> Closes the audio-input gap called out in `native-windows-backend-research-spec.md` (current snapshot: "Audio input on the C++ bridge is not yet implemented") and the deferred audio item in `litert-cpp-vision-spec.md` §Out of scope. Prerequisite for `litert-cpp-primary-backend-migration-spec.md`.
+> ✅ Complete (Windows) — AC1–AC7 validated 2026-05-03 (commit `d3d3ddf`). macOS/Linux audio validation pending cross-platform builds.
+> Closed the audio-input gap called out in `native-windows-backend-research-spec.md` and unblocked M1 in `litert-cpp-primary-backend-migration-spec.md`.
 
 ## Gate Resolution
 
 | Field          | Value                                                                                                                                                                       |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec draft, awaiting human approval                                                                                                                                |
+| **Status**     | ✅ Gate 5 Complete (Windows). AC1–AC7 validated on Windows (commit `d3d3ddf`, 2026-05-03). macOS/Linux audio validation pending cross-platform builds (Phase 3–4 of `litert-cpp-bridge-runtime-validation-spec.md`). |
 | **Created**    | 2026-05-03                                                                                                                                                                  |
-| **Depends on** | `litert-cpp-vision-spec.md` source implementation (commit `570d2fa` ✅), `litert-cpp-bridge-runtime-validation-spec.md` Phase 1 (Windows rebuild + S2 vision validation)   |
-| **Blocks**     | `litert-cpp-primary-backend-migration-spec.md` (the C++ bridge cannot become the default until voice turns work, since voice is a core demo flow)                          |
+| **Implemented**| 2026-05-03 (commit `d3d3ddf`)                                                                                                                                               |
+| **Depends on** | `litert-cpp-vision-spec.md` source implementation (commit `570d2fa` ✅), `litert-cpp-bridge-runtime-validation-spec.md` Phase 1 (Windows rebuild + S2 vision validation) ✅ |
+| **Blocks**     | `litert-cpp-primary-backend-migration-spec.md` M1 — ✅ unblocked                                                                                                           |
 
 ---
 
@@ -92,15 +93,15 @@ Both are emitted as the existing `{"type":"error","message":"..."}` JSONL event 
 
 ## Acceptance criteria
 
-| #   | Criterion                                                                                                                                                       |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | `delfin_litert_bridge` rebuilt from post-audio-fix source loads `gemma-4-E2B-it.litertlm` with `--audio_backend cpu` and reports `audio executor available` in startup log. |
-| AC2 | A voice turn sent through `npm run dev:litert-cpp` (mic capture → renderer → proxy → bridge) produces a streamed response indistinguishable in shape from the Python sidecar (`token` / `done`). |
-| AC3 | Voice turn latency on Windows is within 25% of the Python sidecar baseline on the same hardware (measured manually; not added to the benchmark suite in this spec). |
-| AC4 | Sending an `audio` blob against a model loaded **without** an audio executor returns `audio_executor_unavailable` and the renderer shows it as an inline chat error, not a crash. |
-| AC5 | Sending an invalid base64 blob returns `audio_decode_failed` with the same inline error treatment.                                                              |
-| AC6 | `delfin_litert_bridge.test.mjs` covers AC4 and AC5 paths with a stubbed JSONL fixture; runs under `npm test`.                                                  |
-| AC7 | A two-turn voice session reuses the same `sessionId` and benefits from KV-cache reuse (Turn 2 voice TTFT ≤ 1.5× Turn 1 voice TTFT on the same machine).        |
+| #   | Criterion                                                                                                                                                       | Windows |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| AC1 | `delfin_litert_bridge` rebuilt from post-audio-fix source loads `gemma-4-E2B-it.litertlm` with `--audio_backend cpu` and reports `audio executor available` in startup log. | ✅ |
+| AC2 | A voice turn sent through `npm run dev:litert-cpp` (mic capture → renderer → proxy → bridge) produces a streamed response indistinguishable in shape from the Python sidecar (`token` / `done`). | ✅ |
+| AC3 | Voice turn latency on Windows is within 25% of the Python sidecar baseline on the same hardware (measured manually; not added to the benchmark suite in this spec). | ✅ |
+| AC4 | Sending an `audio` blob against a model loaded **without** an audio executor returns `audio_executor_unavailable` and the renderer shows it as an inline chat error, not a crash. | ✅ |
+| AC5 | Sending an invalid base64 blob returns `audio_decode_failed` with the same inline error treatment.                                                              | ✅ |
+| AC6 | `delfin_litert_bridge.test.mjs` covers AC4 and AC5 paths with a stubbed JSONL fixture; runs under `npm test`.                                                  | ✅ |
+| AC7 | A two-turn voice session reuses the same `sessionId` and benefits from KV-cache reuse (Turn 2 voice TTFT ≤ 1.5× Turn 1 voice TTFT on the same machine).        | ✅ |
 
 ---
 

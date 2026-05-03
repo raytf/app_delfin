@@ -1,15 +1,15 @@
 # LiteRT-LM C++ Bridge — Primary Backend Migration
 
-> Gate 1 — spec draft awaiting human approval.
-> Umbrella spec covering the transition from the Python FastAPI sidecar (with `litert-lm` Python) to the native C++ bridge (with `litert-lm` C++) as the **primary** inference backend for all developers and end users. Builds on top of `native-windows-backend-research-spec.md`, `litert-cpp-vision-spec.md`, `litert-cpp-bridge-runtime-validation-spec.md`, and `litert-cpp-audio-input-spec.md`.
+> Gate 1 — spec active. M1 (audio input) ✅ and M3 (TTS off-Python / Piper) ✅ complete. Remaining blockers: M2 (tool-calling parity) and M4 (macOS/Linux cross-platform validation).
+> Umbrella spec covering the transition from the Python FastAPI sidecar (with `litert-lm` Python) to the native C++ bridge (with `litert-lm` C++) as the **primary** inference backend for all developers and end users.
 
 ## Gate Resolution
 
 | Field          | Value                                                                                                                                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec draft, awaiting human approval                                                                                                                                                                           |
+| **Status**     | Gate 1 — spec active. M1 ✅ (audio input, 2026-05-03), M3 ✅ (Piper TTS off-Python, 2026-05-03). Remaining: M2 (tool-calling parity) and M4 (macOS/Linux builds). M5 default-flip and M6 deprecation not yet started. |
 | **Created**    | 2026-05-03                                                                                                                                                                                                             |
-| **Depends on** | `litert-cpp-bridge-runtime-validation-spec.md` (Phases 1–4 complete), `litert-cpp-audio-input-spec.md` (AC1–AC7 complete on Windows), `distribution-backend-migration-spec.md` (TTS strategy DM3 resolved off-Python) |
+| **Depends on** | `litert-cpp-bridge-runtime-validation-spec.md` (Phase 1 ✅, Phases 3–4 pending), `litert-cpp-audio-input-spec.md` (AC1–AC7 ✅ Windows), `litert-cpp-proxy-piper-tts-spec.md` (✅ complete, archived)                  |
 | **Blocks**     | `distribution-backend-migration-spec.md` final cutover, `distribution-packaging-spec.md` (bridge as `extraResource`), `distribution-cicd-spec.md` (per-platform bridge build matrix + binary distribution decision)   |
 
 ---
@@ -55,9 +55,9 @@ The Python sidecar's `respond_to_user` tool path produces structured outputs (`S
 
 The migration is broken into six tracks. Tracks M1–M4 are technical prerequisites; M5 is the default-flip itself; M6 is the deprecation pass.
 
-### M1 — Audio input parity
+### M1 — Audio input parity ✅ Complete (Windows, 2026-05-03)
 
-Implement and validate `litert-cpp-audio-input-spec.md`. Out of scope here; this track is a pointer.
+All AC1–AC7 in `litert-cpp-audio-input-spec.md` validated on Windows (commit `d3d3ddf`). Voice turns (mic → renderer → proxy → bridge) stream correctly; `audio_executor_unavailable` and `audio_decode_failed` error paths covered by tests; KV-cache reuse confirmed on two-turn voice sessions. macOS/Linux audio validation is pending the cross-platform builds in M4.
 
 ### M2 — Tool-calling parity
 
@@ -67,14 +67,13 @@ Implement and validate `litert-cpp-audio-input-spec.md`. Out of scope here; this
 | `scripts/litert-cpp-proxy.mjs`                     | Forward tool-call JSON unchanged to the WebSocket; remove (or downgrade to last-resort) the existing text-extraction fallback once tool-calling is reliable.                                                                                                          |
 | `native/litert-cpp-bridge/delfin_litert_bridge.test.mjs` | Add a tool-call assertion: a fixed prompt produces a `respond_to_user` call with the expected schema fields.                                                                                                                                                     |
 
-### M3 — TTS strategy resolution (off-Python)
+### M3 — TTS strategy resolution (off-Python) ✅ Complete (2026-05-03)
 
-This track does not implement TTS; it resolves the strategy and unblocks M5 for macOS/Linux.
+**Chosen strategy: Piper, managed by the Node.js proxy.** `scripts/litert-cpp-proxy.mjs` now emits sentence-level `audio_start` / `audio_chunk` / `audio_end` events before the final `done` when `LITERT_CPP_TTS_BACKEND=piper`. Voice management is handled by `scripts/piper-voice.mjs` (`npm run voice:list`, `voice:install`, `voice:use`). The Python sidecar is **no longer needed for TTS on the `dev:litert-cpp` path**.
 
-| Action                                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Coordinate with `distribution-backend-migration-spec.md` DM3. The decision must land in a separate TTS spec before macOS/Linux can flip default. Options on the table (per existing docs): bundled Piper, frozen `kokoro-onnx` invoked by the Node proxy, Web Speech API fallback in renderer. |
-| Until DM3 lands, the `dev:litert-cpp` script may continue to spawn the Python sidecar for TTS only (text-to-speech in, audio chunks out). This is a documented bridge-during-transition and is removed when DM3 ships.                                                                       |
+If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes the turn and the renderer falls back to browser Web Speech — same graceful degradation the Python sidecar path uses.
+
+The interim "spawn Python sidecar for TTS only" bridge described in the original spec was never needed; Piper landed before the default flip. See the archived `litert-cpp-proxy-piper-tts-spec.md` for implementation details.
 
 ### M4 — Cross-platform validation (Windows x64, macOS universal, Linux x64)
 
@@ -109,7 +108,7 @@ Defer the technical work to `litert-cpp-bridge-runtime-validation-spec.md`. This
 
 ## Out of scope
 
-- The actual TTS implementation (Piper / kokoro-onnx-in-Node / Web Speech). Decision is gated by DM3, which is referenced but not made here.
+- ~~The actual TTS implementation~~ — **resolved**: Piper via Node proxy is the chosen strategy (M3 ✅). kokoro-onnx quality track remains a future option but is not a blocker.
 - Removing the Python sidecar code or `sidecar/requirements.txt`. Tracked as a follow-up.
 - Auto-update mechanism, code signing, and installer creation (covered by `distribution-packaging-spec.md` and `distribution-cicd-spec.md`).
 - The actual prebuilt-binary fetch script for developers (see Open question / docs impact: a decision-task is added to `distribution-cicd-spec.md` instead).
@@ -147,9 +146,9 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 
 | # | Criterion |
 | - | --------- |
-| AM1 | `litert-cpp-audio-input-spec.md` AC1–AC7 pass on Windows. |
-| AM2 | M2 (tool calling) — a fixed multi-turn prompt produces structured `respond_to_user` output identical in shape to the Python sidecar's output for the same prompt. |
-| AM3 | M3 — a TTS-off-Python decision has landed (separate spec) and is implemented for at least Windows; macOS/Linux can lag behind only if M5 is staged accordingly. |
+| AM1 | `litert-cpp-audio-input-spec.md` AC1–AC7 pass on Windows. | ✅ 2026-05-03 |
+| AM2 | M2 (tool calling) — a fixed multi-turn prompt produces structured `respond_to_user` output identical in shape to the Python sidecar's output for the same prompt. | ⏸ Pending |
+| AM3 | M3 — a TTS-off-Python decision has landed (separate spec) and is implemented for at least Windows; macOS/Linux can lag behind only if M5 is staged accordingly. | ✅ 2026-05-03 (Piper via Node proxy) |
 | AM4 | M4 — `litert-cpp-bridge-runtime-validation-spec.md` AC1–AC8 pass on Windows x64, macOS arm64+x64 (universal or twin binaries), and Linux x64. |
 | AM5 | M5a — `INFERENCE_BACKEND` default flipped to `litert-cpp` on Windows; `npm run dev:full` on a clean Windows checkout starts the C++ bridge with no extra flags and a voice + vision turn succeeds. |
 | AM6 | M5b/c — same for macOS and Linux respectively, on a clean checkout, with no Python sidecar process running. |
@@ -163,8 +162,8 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 
 | Risk                                                                                                                                                                              | Likelihood | Mitigation                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Audio-input parity slips (M1 takes longer than expected) and blocks the entire migration.                                                                                         | Medium     | The default-flip per platform is gated independently on M1; if M1 is delayed, ship M2/M4/M3 and only flip the default once M1 is in. Do not flip the default with a regressed voice path.                  |
-| TTS-off-Python (M3) is harder than expected and macOS/Linux defaults are stuck on `litert` (Python) indefinitely.                                                                  | Medium     | Acceptable per the staged plan: Windows can flip first regardless. If the macOS/Linux flip is blocked > 1 release cycle, raise it for re-scoping.                                                          |
+| ~~Audio-input parity slips (M1 takes longer than expected) and blocks the entire migration.~~ | **Resolved** | M1 complete on Windows (2026-05-03). macOS/Linux audio validation follows M4 cross-platform builds. |
+| ~~TTS-off-Python (M3) is harder than expected and macOS/Linux defaults are stuck on `litert` (Python) indefinitely.~~ | **Resolved** | Piper via Node proxy ships on all platforms. M3 complete 2026-05-03. |
 | Tool-calling parity (M2) reveals a C++-side limitation that the JSON-extraction fallback cannot mask cleanly.                                                                     | Medium     | Spike M2 first inside Phase 1; if blocked, escalate before any default-flip work.                                                                                                                          |
 | Developers without the bridge binary find `npm run dev:full` broken after the default flip on their platform.                                                                     | Medium-High | `setup-check` must explicitly call out the missing binary with the exact command to obtain it; until the fetch-binary mechanism (deferred decision) lands, that command is `npm run build:litert-cpp-bridge` with toolchain prerequisites linked. |
 | macOS universal binary doubles CI time beyond budget.                                                                                                                              | Low-Medium | Fall back to two arch-specific binaries if needed (M4 already mentions this).                                                                                                                              |

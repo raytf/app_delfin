@@ -54,8 +54,8 @@ docs/
 │   ├── backend/                     ← Inference engines, native bridges, benchmarking
 │   │   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation (text ✅, vision ✅, KV-cache ✅, audio ✅, S1/S2/S3 benchmark ✅); macOS/Linux builds pending; Foundry contingency. Vision + audio sub-specs consolidated into §Completed sub-specs.
 │   │   ├── litert-cpp-bridge-runtime-validation-spec.md ← 🚧 Phase 1 (Windows S1/S2/S3 benchmark) ✅ 2026-05-03. Phase 2 partial. Phases 3–4 (macOS/Linux builds) pending. Gate 1 — awaiting approval.
-│   │   ├── litert-cpp-audio-input-spec.md             ← 🚧 Deeper renderer/proxy audio contract for the C++ bridge. Gate 1 — awaiting approval.
-│   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 Umbrella for promoting LiteRT-CPP to default backend on all OSes. Gate 1 draft.
+│   │   ├── litert-cpp-audio-input-spec.md             ← ✅ Complete (Windows, 2026-05-03) — AC1–AC7 validated; macOS/Linux audio pending M4 cross-platform builds.
+│   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. Gate 1 active.
 │   │   └── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
 │   ├── distribution/                ← Packaging, installers, code signing, CI/CD
 │   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-01); Gate 1 approved.
