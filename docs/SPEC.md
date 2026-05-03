@@ -133,6 +133,13 @@ MAX_IMAGE_WIDTH=512
 # === LiteRT-LM C++ research backend ===
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
+LITERT_CPP_TTS_BACKEND=none
+PIPER_BIN=./bin/piper/piper.exe
+PIPER_MODEL=./models/piper/en_US-lessac-medium.onnx
+PIPER_CONFIG=./models/piper/en_US-lessac-medium.onnx.json
+# Optional override; if omitted, the LiteRT C++ proxy reads audio.sample_rate
+# from PIPER_CONFIG. `npm run voice:use` writes this automatically.
+PIPER_SAMPLE_RATE=22050
 
 # LITERT_CPP_BIN must point at the Delfin JSONL/stdio bridge built from
 # native/litert-cpp-bridge/ (delfin_litert_bridge[.exe]). The upstream
@@ -149,6 +156,8 @@ TTS_BACKEND=web-speech
 KOKORO_VOICE=af_heart
 KOKORO_SPEED=1.1
 ```
+
+For `npm run dev:litert-cpp`, `TTS_BACKEND` does **not** control proxy speech output. Use `LITERT_CPP_TTS_BACKEND=piper` plus the `PIPER_*` paths to enable off-Python audio on the LiteRT C++ proxy; `npm run voice:list`, `npm run voice:use -- <voice-name>`, and `npm run voice:install -- <hf-path> --use` manage local Piper voice files and `.env`. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
 
 ## WebSocket Message Protocol
 
@@ -191,14 +200,14 @@ interface WsInboundMessage {
   };
   audio?: string; // for 'audio_chunk' — base64 int16 PCM
   sample_rate?: number; // for 'audio_start' — PCM sample rate
-  sentence_count?: number; // for 'audio_start' — number of sentence chunks
+  sentence_count?: number; // for 'audio_start' — optional sentence metadata (proxy may send 0 when unknown)
   index?: number; // for 'audio_chunk' — sentence index
   tts_time?: number; // for 'audio_end' — synthesis time in seconds
   message?: string; // for 'error'
 }
 ```
 
-For turns with server-side TTS, message ordering is:
+For turns with server-side TTS (Python sidecar or Piper-backed LiteRT C++ proxy), message ordering is:
 
 ```text
 token* → audio_start → audio_chunk* → audio_end → done

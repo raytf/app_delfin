@@ -13,7 +13,7 @@ Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice
 - Capture the current foreground window for every study turn
 - Accept **voice-first** questions with always-on VAD, or typed prompts
 - Stream Gemma 4 answers token-by-token over WebSocket
-- Play back spoken responses with Kokoro TTS, with Web Speech fallback when server audio is unavailable
+- Play back spoken responses with Kokoro TTS on the Python sidecar, Piper on the LiteRT C++ proxy path, and Web Speech fallback when server audio is unavailable
 - Persist named study sessions, saved screenshots, and conversation history
 - Browse, reopen, and delete past sessions from the home screen
 - Run against either the real sidecar or a mock sidecar for UI work
@@ -28,7 +28,7 @@ Delfin runs Gemma 4 locally using one of the following backends depending on you
 | ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **LiteRT-LM**     | macOS, Linux, Windows + WSL2    | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. No Windows native wheel exists — Windows users need WSL2 or the llamafile fallback. |
 | **llamafile**     | Windows (no WSL2), macOS, Linux | Mozilla's single-file server based on llama.cpp. Works natively on all platforms with no Python environment required. Slower than LiteRT-LM on the same hardware, but the only practical option for Windows users who cannot or do not want to use WSL2.                               |
-| **LiteRT-LM C++** | Native Windows research track (macOS/Linux planned) | Experimental path to keep LiteRT performance without WSL2. `scripts/litert-cpp-proxy.mjs`, `npm run benchmark:litert-cpp`, the native JSONL bridge source (`native/litert-cpp-bridge/`), and the per-session KV-cache + vision source fix have all landed. Pending: rebuild the Windows binary, re-run the S2 benchmark, validate the lecture-slide app round, and produce native macOS/Linux bridge builds.                                                                                       |
+| **LiteRT-LM C++** | Native Windows research track (macOS/Linux planned) | Experimental path to keep LiteRT performance without WSL2. `scripts/litert-cpp-proxy.mjs`, `npm run benchmark:litert-cpp`, the native JSONL bridge source (`native/litert-cpp-bridge/`), per-session KV-cache + vision support, audio-input parity, and Piper-backed sentence-level TTS have all landed on Windows. Pending: full lecture-slide/manual validation wrap-up and native macOS/Linux bridge builds. |
 
 For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by developers or CI to build `delfin_litert_bridge.exe`. End users should receive a prebuilt bridge executable in the packaged app and download only the `.litertlm` model/TTS assets at first run.
 
@@ -163,6 +163,8 @@ The defaults are sensible for most machines. Common settings you may want to cha
 | `VOICE_ENABLED`  | `true`                                      | Disable always-on voice input if you only want text prompts                                       |
 | `TTS_ENABLED`    | `true`                                      | Disable spoken playback entirely                                                                  |
 | `TTS_BACKEND`    | `kokoro`                                    | Use `web-speech` for browser-only speech, or `mlx` on Apple Silicon for GPU TTS                   |
+| `LITERT_CPP_TTS_BACKEND` | `none`                               | Set to `piper` to enable off-Python speech on `npm run dev:litert-cpp`                            |
+| `PIPER_MODEL`    | unset                                       | Usually managed by `npm run voice:use -- <voice-name>` for LiteRT C++ Piper voices               |
 
 See [`.env.example`](.env.example) for the full reference including llamafile and LiteRT C++ research options.
 
@@ -175,9 +177,19 @@ See [`.env.example`](.env.example) for the full reference including llamafile an
 | `npm run dev:full`       | Starts the LiteRT sidecar + Electron together (macOS / Linux / WSL2)     |
 | `npm run dev:sidecar`    | Starts just the LiteRT sidecar (WSL2 terminal)                           |
 | `npm run dev:llamafile`  | Starts the llamafile server on port 8080 (Windows without WSL2)          |
-| `npm run dev:litert-cpp` | Starts the LiteRT C++ research proxy on the Delfin sidecar port          |
+| `npm run dev:litert-cpp` | Starts the LiteRT C++ research proxy on the Delfin sidecar port; set `LITERT_CPP_TTS_BACKEND=piper` to enable Piper audio |
 | `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference)        |
 | `npm run dev`            | Starts Electron + Vite only (when sidecar is already running separately) |
+
+### Piper voice helpers
+
+| Command | What it does |
+| --- | --- |
+| `npm run voice:list` | Lists local Piper voices under `models/piper` and shows detected sample rates |
+| `npm run voice:use -- en_US-hfc_female-medium` | Updates `.env` to use an installed Piper voice |
+| `npm run voice:install -- en/en_US/hfc_female/medium --use` | Downloads a voice from `rhasspy/piper-voices`, reads its sample rate, and switches `.env` |
+
+Piper voice switching only affects `npm run dev:litert-cpp`. `PIPER_SAMPLE_RATE` is now optional when the selected `.onnx.json` config contains `audio.sample_rate`.
 
 ### Verify the sidecar is healthy
 
@@ -230,7 +242,7 @@ Electron Main (Node.js)  ←→  WebSocket  ←→  Inference sidecar
 | Model                       | Gemma 4 E2B (default); E4B for 32 GB machines                 |
 | API server                  | FastAPI + uvicorn (LiteRT) / built-in HTTP server (llamafile) |
 | Voice input                 | `@ricky0123/vad-web` (Silero VAD in the renderer)             |
-| TTS                         | kokoro-onnx / mlx-audio / Web Speech fallback                 |
+| TTS                         | kokoro-onnx / Piper / mlx-audio / Web Speech fallback         |
 
 ---
 

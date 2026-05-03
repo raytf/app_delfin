@@ -63,7 +63,7 @@ The proxy is ~120 lines of Node.js and handles everything the Python sidecar doe
 - `GET /health` HTTP endpoint so existing health check logic works unchanged
 - `{type: "interrupt"}` → `AbortController` abort on the in-flight fetch
 
-TTS: the proxy emits no `audio_*` messages → renderer falls back to Web Speech automatically. DM3 tracks a future TTS solution.
+TTS: the LiteRT C++ reference proxy can now emit `audio_*` messages directly when `LITERT_CPP_TTS_BACKEND=piper` is enabled. Proxy paths that do not emit `audio_*` messages still fall back to Web Speech automatically.
 
 ---
 
@@ -144,18 +144,18 @@ Implement polling of `GET http://localhost:{SIDECAR_PORT}/health`:
 - Works for both backends — the Python sidecar and the proxy both expose this endpoint
 - No backend-specific branching needed
 
-### Track DM4 — TTS on the llamafile path (deferred)
+### Track DM4 — Off-Python TTS for packaged proxy paths (partially validated, packaging deferred)
 
-The proxy emits no `audio_*` messages. The renderer already handles this gracefully via its Web Speech fallback. No action needed for MVP.
+The LiteRT C++ reference proxy now has a working Piper-backed implementation that emits `audio_*` messages and preserves the existing renderer contract. Packaging/distribution work for proxy-path TTS is still deferred; proxy paths that do not yet ship a server-side TTS backend continue to rely on the renderer's Web Speech fallback.
 
-Future candidates for full TTS support on the llamafile path:
+Future candidates for full TTS support on the packaged proxy path:
 
 | Candidate | Approach | Size | Quality |
 |---|---|---|---|
 | **Piper TTS** | Pre-built binary, pipe text → raw PCM | ~80 MB | Good English |
-| **Frozen kokoro-onnx** | PyInstaller per-platform binary, `POST /tts` endpoint | ~250 MB | Same as current |
+| **Native Kokoro track** | `kokoro-js` or native/C++ ONNX wrapper, emit `audio_*` without Python | ~80–250 MB depending on quantization/runtime | Best quality / closest to current sidecar |
 
-Decision deferred until DM0–DM3 are stable and benchmarked.
+Decision updated 2026-05-03: prototype **Piper first** for the off-Python path because it best matches Delfin's existing `audio_start` / `audio_chunk` / `audio_end` flow and has the lowest packaging risk. The reference implementation is now validated in `scripts/litert-cpp-proxy.mjs`; keep **native Kokoro** as the follow-up quality track once packaged proxy paths are stable.
 
 ---
 
@@ -231,7 +231,7 @@ Outbound (proxy → Electron, same as `wsInboundMessageSchema`):
 - [ ] Vision prompt (screenshot attached) produces a valid multimodal response via llamafile (requires mmproj downloaded)
 - [ ] Multi-turn conversation: follow-up turns receive context from prior turns in the session
 - [ ] `interrupt` cancels in-progress generation within 500 ms
-- [ ] Web Speech TTS fires on the llamafile path (no `audio_*` events from proxy)
+- [ ] Web Speech TTS fires on proxy paths that emit no `audio_*` events (for example the current llamafile path)
 - [ ] `INFERENCE_BACKEND=litert npm run dev:full` continues to work unchanged on macOS/Linux/WSL2
 - [ ] Status indicator correctly reflects connected/disconnected for both paths
 - [ ] `wsClient.ts`, `sidecarBridge.ts`, and all renderer files have zero diffs

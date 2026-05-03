@@ -80,7 +80,8 @@ docs/
     ├── delfin-implementation-plan.md                 ← 📦 Original 1.5-day hackathon team plan
     └── features/
         ├── litert-cpp-vision-spec.md                 ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
-        └── litert-cpp-audio-spec.md                  ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
+        ├── litert-cpp-audio-spec.md                  ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
+        └── litert-cpp-proxy-piper-tts-spec.md        ← 📦 Consolidated into native-windows-backend-research-spec.md §Completed sub-specs
 ```
 
 **Start with `docs/SPEC.md`** — it contains the architecture overview, tech stack, environment variable reference, WebSocket protocol, IPC channel table, and cross-cutting code rules that apply to every feature. Each feature spec in `docs/features/<area>/` contains its own Gate Resolution block, scope, interface contract, and verification checklist. See `docs/README.md` for the full index with lifecycle status for every document.
@@ -212,6 +213,11 @@ uvicorn server:app --host 0.0.0.0 --port 8321
 # Environment check
 bash scripts/setup-check.sh
 
+# Piper voice management for the LiteRT C++ proxy path
+npm run voice:list
+npm run voice:use -- en_US-hfc_female-medium
+npm run voice:install -- en/en_US/hfc_female/medium --use
+
 # Test WebSocket sidecar manually (install wscat: npm i -g wscat)
 wscat -c ws://localhost:8321/ws
 # then type: {"text": "Summarize this slide", "preset_id": "lecture-slide"}
@@ -261,7 +267,7 @@ These are confirmed facts — do not revisit without good reason:
 | **Voice turn text field**         | For pure voice turns, `text` is set to the constant `VOICE_TURN_TEXT = "Please respond to what the user just asked."`. Empty string is not used because `sessionHandlers.ts` has an empty-text guard; the fixed instruction also gives the model explicit context about its role.                                                                                                                                                                       |
 | **Audio backend**                 | `audio_backend` in `litert_lm.Engine` is always CPU (GPU audio not supported). Exposed as `LITERT_AUDIO_BACKEND` env var but defaults to `CPU`. The engine already has `audio_backend=litert_lm.Backend.CPU` in both GPU-attempt and CPU-fallback paths.                                                                                                                                                                                                |
 | **Web Speech fallback cleanup**  | When the renderer falls back to `SpeechSynthesisUtterance`, it must clear the assistant-speaking state on `onend` / `onerror`. If that state is left `true`, the VAD auto-mute effect never releases and later voice turns appear dead even though `vad-web` is still mounted.                                                                                                                                                                         |
-| **LiteRT C++ proxy TTS**         | `npm run dev:litert-cpp` bypasses `sidecar/tts.py`; the current `scripts/litert-cpp-proxy.mjs` forwards `token` / `done` / `error` only and emits no `audio_*` messages. As a result, `TTS_BACKEND=kokoro` has no effect on that path yet and the renderer falls back to browser Web Speech.                                                                                                                                                       |
+| **LiteRT C++ proxy TTS**         | `npm run dev:litert-cpp` bypasses `sidecar/tts.py`. Off-Python speech on that path is controlled by `LITERT_CPP_TTS_BACKEND`; with `piper`, `scripts/litert-cpp-proxy.mjs` emits sentence-level `audio_start` / `audio_chunk` / `audio_end` before final `done`. If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes and the renderer falls back to browser Web Speech.                                                                 |
 | **Barge-in protection**           | Two-layer: (1) raise Silero `positiveSpeechThreshold` from 0.50 → 0.92 while AI is speaking; (2) 800 ms grace period after `audio_start` during which `onSpeechStart` is silently ignored, preventing the mic from picking up the AI's own voice.                                                                                                                                                                                                       |
 | **WSL2 espeak-ng fix**            | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`.                                                                                                                                                                                                      |
 | **Benchmark harness**             | `scripts/benchmark/run.py` compares the current LiteRT sidecar over WebSocket with llamafile/`llama-server` over OpenAI-compatible REST streaming. It measures TTFT, throughput, total turn time, approximate/exact output token count, peak RSS when a PID is available, and system metadata.                                                                                                                                                          |
