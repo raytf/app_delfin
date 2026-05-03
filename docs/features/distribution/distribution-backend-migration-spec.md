@@ -7,20 +7,42 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Gate 1 — awaiting approval |
+| **Status** | Gate 1 — awaiting approval (**2026-05-03: DM0 llamafile proxy superseded — see revision banner**) |
 | **Created** | 2026-05-01 |
 | **Revised** | 2026-05-02 (hybrid Path 2 — additive, not replacement) |
 | **Revised** | 2026-05-02 (proxy approach — zero changes to Electron main IPC layer) |
+| **Revised** | **2026-05-03 (llamafile superseded; DM0 replaced by LiteRT-LM C++ proxy wiring — see revision banner below)** |
 | **Depends on** | Inference benchmark results (`inference-benchmarking-spec.md`) reviewed and accepted |
 | **Blocks** | `distribution-packaging-spec.md` (packaging requires a working cross-platform backend) |
 
 ---
 
-## Goal
+## Revision — 2026-05-03
 
-Add a llamafile integration path so that **all packaged Windows users** — whether or not they have WSL2 — can run the full app without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users **running from source**. **No changes to the Electron IPC layer or renderer are required.**
+### What changed and why
 
-> **Packaging decision:** Packaged Windows builds always use llamafile regardless of WSL2 availability. Bootstrapping LiteRT-LM inside WSL2 from a packaged Electron app is impractical. WSL2 users who want LiteRT-LM speed run from source. See `desktop-distribution-mvp-spec.md` for the full rationale.
+The llamafile integration path described in this spec (DM0 — llamafile WebSocket proxy; DM1 — env var selector; DM2 — dev-mode script; DM3 — TTS binary) is **superseded** by the LiteRT-LM C++ bridge, which has been validated on Windows for text, vision, audio input, and KV-cache reuse.
+
+`scripts/litert-cpp-proxy.mjs` is **already implemented and validated**. It speaks the identical Delfin sidecar WebSocket protocol on port 8321, manages the bridge subprocess, forwards image/audio blobs, handles interrupts, and emits Piper sentence-level `audio_*` messages when `LITERT_CPP_TTS_BACKEND=piper`. No new proxy code is required; DM0 is reduced to wiring the existing proxy into the packaged Electron runtime startup flow.
+
+| Track | 2026-05-02 scope | 2026-05-03 scope |
+|---|---|---|
+| **DM0** | New `scripts/llamafile-proxy.mjs` (~120 lines) | **Wire existing `scripts/litert-cpp-proxy.mjs` into packaged Windows startup via `INFERENCE_BACKEND=litert-cpp`** |
+| **DM1** | `INFERENCE_BACKEND` env-var selector in `src/main/index.ts` | Same — switch value `llamafile` → `litert-cpp` |
+| **DM2** | `npm run dev:llamafile` dev-mode script | `npm run dev:litert-cpp` (already exists) — no new script needed |
+| **DM3** | Investigate Piper TTS vs frozen kokoro-onnx | **Piper** selected — `LITERT_CPP_TTS_BACKEND=piper`; `npm run voice:install` provisions voices |
+
+The remaining implementation work for this spec is now: wiring `INFERENCE_BACKEND=litert-cpp` into the packaged Electron startup path and ensuring the bridge binary is resolved from `app.getPath('userData')` or the app resources directory in packaged mode.
+
+The `llamafile` value for `INFERENCE_BACKEND` is removed from all runtime paths. The standalone benchmark harness (`scripts/benchmark/`) retains a llamafile adapter for comparison purposes only.
+
+---
+
+## Goal _(original, partially superseded — see 2026-05-03 revision above)_
+
+~~Add a llamafile integration path so that **all packaged Windows users** — whether or not they have WSL2 — can run the full app without WSL2 or a Python virtual environment.~~ **Updated goal:** Wire `scripts/litert-cpp-proxy.mjs` into the packaged Electron runtime so that all Windows users get the LiteRT-LM C++ backend without WSL2 or a Python virtual environment. The LiteRT-LM path must continue to work unchanged for macOS, Linux, and Windows + WSL2 users **running from source**. **No changes to the Electron IPC layer or renderer are required.**
+
+> **Packaging decision (updated 2026-05-03):** Packaged Windows builds use the LiteRT-LM C++ bridge (`delfin_litert_bridge.exe`) via `scripts/litert-cpp-proxy.mjs`. See `desktop-distribution-mvp-spec.md` §Revision 2026-05-03 for the full rationale.
 
 ---
 

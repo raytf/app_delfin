@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-03 (docs reorganised by feature area; LiteRT-LM C++ bridge vision + per-session KV-cache reuse + native audio input rebuilt/runtime-validated on Windows; repeated-turn VAD + Web Speech fallback state fix validated in the renderer; LiteRT C++ proxy Piper streaming TTS and voice switching implemented and documented).
+> Last updated: 2026-05-03 (docs reorganised by feature area; LiteRT-LM C++ bridge vision + per-session KV-cache reuse + native audio input rebuilt/runtime-validated on Windows; repeated-turn VAD + Web Speech fallback state fix validated in the renderer; LiteRT C++ proxy Piper streaming TTS and voice switching implemented and documented; **`scripts/setup-litert-cpp.mjs` orchestrator added and llamafile fallback marked deprecated** — LiteRT-LM C++ is now the recommended native-Windows backend).
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 >
 > Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
@@ -16,7 +16,7 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | File / Item                                                                  | Status | Notes                                                                                                                   |
 | ---------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Electron + Vite + React + TypeScript scaffold                                | ✅     | `electron.vite.config.ts`, `package.json`                                                                               |
-| `.env.example` + dotenv loading                                              | ✅     | Shared env contract for Electron, sidecar, voice/TTS settings, llamafile 0.10.1 defaults, and LiteRT C++ bridge paths   |
+| `.env.example` + dotenv loading                                              | ✅     | Shared env contract for Electron, sidecar, voice/TTS settings, and LiteRT C++ bridge paths. `LLAMAFILE_*` block removed 2026-05-03. |
 | `src/shared/types.ts`                                                        | ✅     | IPC, WebSocket, session history, overlay, and audio-bearing turn types                                                  |
 | `src/shared/schemas.ts`                                                      | ✅     | Zod validation for WS and session prompt contracts                                                                      |
 | `src/shared/constants.ts`                                                    | ✅     | Presets, sidebar constants, `VOICE_TURN_TEXT`                                                                           |
@@ -218,15 +218,18 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 | `scripts/litert-cpp-proxy.test.mjs`                                        | ✅     | Vitest coverage for health, token streaming/history, Piper audio ordering, early sentence-level audio, fallback behavior, sample-rate fallback, and interrupt forwarding                                                                                                                                                       |
 | `native/litert-cpp-bridge/`                                                | ✅     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, `reset_session`, and native audio-input wiring; Windows binary rebuilt and runtime-validated (S1/S2/S3 benchmark, KV-cache Turn 2+ ~647 ms, text/vision/audio paths). macOS/Linux native builds not yet attempted.                                |
 | `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll` | ✅     | Gitignored local runtime artifacts from Bazel output                                                                                                                                                                                                                                                                              |
+| `scripts/setup-litert-cpp.mjs`                                             | ✅     | One-shot orchestrator: clones LiteRT-LM, builds the bridge, initialises `.env`, installs default Piper voice, and copies/downloads the `.litertlm` model. Idempotent; supports `--dry-run`, `--install-prereqs`, `--skip-build`, `--no-piper`, `--no-model`. Exposed as `npm run setup:litert-cpp`.                              |
 | Renderer/main wiring of LiteRT-CPP as default                              | ❌     | Tracked in `litert-cpp-primary-backend-migration-spec.md` (Gate 1 draft)                                                                                                                                                                                                                                                          |
 
-### llamafile fallback
+### llamafile fallback (removed)
 
-| File / Item                   | Status | Notes                                                                                            |
-| ----------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
-| `scripts/setup-llamafile.mjs` | ✅     | Downloads llamafile 0.10.1 binary + GGUF model to `llamafile/bin/` and `llamafile/models/`        |
-| `scripts/run-llamafile.mjs`   | ✅     | Starts llamafile 0.10.1 server by default; pre-flight checks for binary and model                 |
-| Electron main wiring          | ❌     | llamafile is benchmark-only; full app integration tracked in `distribution-backend-migration-spec.md` |
+> **Removed 2026-05-03.** Superseded by the LiteRT-LM C++ backend for native Windows. The npm scripts (`setup:llamafile`, `dev:llamafile`, `benchmark:llamafile`) and source files (`scripts/setup-llamafile.mjs`, `scripts/run-llamafile.mjs`) have been deleted. The standalone Python benchmark adapter (`scripts/benchmark/backends/llamafile.py`) is retained for comparison runs only.
+
+| File / Item                   | Status      | Notes                                                                                                    |
+| ----------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `scripts/setup-llamafile.mjs` | ❌ Removed  | Deleted 2026-05-03. For llamafile benchmarks, install the binary manually and use the Python harness directly. |
+| `scripts/run-llamafile.mjs`   | ❌ Removed  | Deleted 2026-05-03.                                                                                      |
+| Electron main wiring          | ❌ Cancelled | llamafile was never wired into the app runtime; LiteRT-LM C++ is the native Windows backend.            |
 
 ---
 
@@ -236,7 +239,7 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 
 | Item                                                  | Status | Notes                                                                                       |
 | ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
-| Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; revised 2026-05-01 (llamafile / LiteRT-CPP hybrid) |
+| Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; revised 2026-05-03 (LiteRT-LM C++ on Windows; llamafile removed) |
 | Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
 | First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
 | NSIS / DMG / AppImage installers                      | ❌     | Not started                                                                                 |

@@ -6,11 +6,12 @@
 
 ## Gate Resolution
 
-| Field          | Value                                                                               |
-| -------------- | ----------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — awaiting approval                                                          |
-| **Created**    | 2026-05-01                                                                          |
-| **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally) |
+| Field          | Value                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Status**     | Gate 1 — awaiting approval                                                                                       |
+| **Created**    | 2026-05-01                                                                                                       |
+| **Revised**    | **2026-05-03 (Windows CI: llamafile download → LiteRT-LM C++ bridge build/bundle; see Background revision)**    |
+| **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally)                             |
 
 ## Goal
 
@@ -22,7 +23,7 @@ Currently, all builds are done locally on a single developer machine. Cross-plat
 
 The CI/CD work is the last track in the distribution milestone. Completing it makes the release process repeatable and removes the need for a developer to have access to all three OS environments.
 
-If `native-windows-backend-research-spec.md` Track A passes, CI also owns the Windows LiteRT-LM C++ bridge build. The LiteRT-LM C++ source tree, Bazelisk/Bazel, and MSVC are CI/build-time inputs only; the release artifact contains the prebuilt bridge executable.
+> **Revised 2026-05-03:** The conditional "if Track A passes" from the original spec is now resolved. The LiteRT-LM C++ bridge is validated on Windows. CI **must** own the Windows LiteRT-LM C++ bridge build: the Windows runner installs Bazelisk + MSVC, builds `delfin_litert_bridge.exe` + `libGemmaModelConstraintProvider.dll`, and bundles them as app resources via `electron-builder extraResources`. The LiteRT-LM C++ source tree, Bazelisk, and MSVC are CI/build-time inputs only — end users never need compiler tooling. The llamafile download step previously described for the Windows runner is removed.
 
 ## Scope
 

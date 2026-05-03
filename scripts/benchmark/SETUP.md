@@ -7,11 +7,11 @@ your Windows machine (WSL2 for LiteRT, native PowerShell for native backends).
 
 ## Overview
 
-| Backend                 | Where to run                       | Setup command                                                                           |
-| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| **LiteRT-LM**           | WSL2 Ubuntu terminal               | `npm run setup` (existing sidecar)                                                      |
-| **LiteRT-LM C++ proxy** | Native Windows PowerShell          | Build/provide a JSONL LiteRT C++ bridge, then set `LITERT_CPP_BIN` / `LITERT_CPP_MODEL` |
-| **llamafile**           | Windows PowerShell or any platform | `npm run setup:llamafile`                                                               |
+| Backend                 | Where to run                       | Setup command                                                                                       |
+| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **LiteRT-LM**           | WSL2 Ubuntu terminal               | `npm run setup` (existing sidecar)                                                                  |
+| **LiteRT-LM C++ proxy** | Native Windows PowerShell          | `npm run setup:litert-cpp` (builds bridge, installs Piper voice, copies/downloads model)            |
+| **llamafile**           | Windows PowerShell or any platform | Download manually (see Part 2). `npm run setup:llamafile` was **removed** 2026-05-03.              |
 
 Run each backend in its own environment, then compare the CSV output files.
 
@@ -64,54 +64,35 @@ and appended to `results/summary-<date>.csv`.
 
 ## Part 2 — llamafile benchmark
 
-### 2.1 Download the binary and model (one-time setup)
+> **Note (2026-05-03):** The `npm run setup:llamafile`, `npm run dev:llamafile`, and `npm run benchmark:llamafile` convenience scripts have been **removed**. llamafile is retained only for benchmark comparison via the Python harness. Follow the manual steps below.
 
-Run this once from the repo root — works on Windows PowerShell, macOS, and Linux:
+### 2.1 Download the binary and model (one-time, manual)
 
-```bash
-npm run setup:llamafile
+Download llamafile and the GGUF model manually:
+
+```powershell
+# PowerShell — download llamafile 0.10.1 (example; adjust version as needed)
+Invoke-WebRequest -Uri "https://github.com/mozilla-ai/llamafile/releases/download/0.10.1/llamafile-0.10.1.exe" -OutFile "llamafile\bin\llamafile-0.10.1.exe"
+
+# Download Gemma 4 E2B GGUF model from HuggingFace (~3 GB)
+# https://huggingface.co/bartowski/google_gemma-4-E2B-it-GGUF/resolve/main/google_gemma-4-E2B-it-IQ4_NL.gguf
 ```
-
-This downloads:
-
-- The llamafile binary into `llamafile/bin/` (~30 MB)
-- The Gemma 4 E2B GGUF model into `llamafile/models/` (~3 GB)
-
-The script is **idempotent** — running it again skips files already present.
-
-> **Configuring version or model:** Override via `.env` before running:
->
-> ```
-> LLAMAFILE_VERSION=0.10.1
-> LLAMAFILE_MODEL_FILE=google_gemma-4-E2B-it-IQ4_NL.gguf
-> ```
->
-> See `.env.example` for all available llamafile env vars.
 
 ### 2.2 Start the llamafile server
 
 In one terminal window (keep it open):
 
-```bash
-npm run dev:llamafile
+```powershell
+.\llamafile\bin\llamafile-0.10.1.exe --server --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-mmap -m llamafile\models\google_gemma-4-E2B-it-IQ4_NL.gguf
 ```
-
-This starts `llamafile --server --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-mmap`.
 
 Wait for the message: `llama server listening at http://127.0.0.1:8080`
 
 Model loading typically takes 15–60 seconds on first run.
 
-> **Changing the port:** Set `LLAMAFILE_PORT=<port>` in `.env` before running.
-
 ### 2.3 Find the llamafile PID (for memory tracking)
 
-In another terminal:
-
-```bash
-# Linux / WSL2 / macOS
-pgrep -f "llamafile" -a
-
+```powershell
 # Windows PowerShell
 Get-Process llamafile | Select-Object Id, Name
 ```
@@ -120,16 +101,8 @@ Note the PID — pass it via `--sidecar-pid`.
 
 ### 2.4 Run the benchmark
 
-The npm script uses the sidecar virtualenv automatically — no separate `pip install` needed:
-
 ```bash
-npm run benchmark:llamafile
-```
-
-To pass extra flags (e.g. `--sidecar-pid` for RSS tracking):
-
-```bash
-node scripts/run-benchmark.mjs --backend llamafile --sidecar-pid <PID_FROM_STEP_2.3> --runs 5
+python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --sidecar-pid <PID_FROM_STEP_2.3> --runs 5 --scenarios s1,s2,s3
 ```
 
 Results are written to `results/benchmark-llamafile-<platform>-gemma-4-e2b-IQ4_NL-<timestamp>.json`
@@ -178,20 +151,18 @@ and appended to `results/summary-<date>.csv`.
 
 ## Part 4 — Auto-launch mode (optional)
 
-Instead of starting the server with `npm run dev:llamafile`, the benchmark
-can manage the server process itself. In auto-launch mode `--sidecar-pid` is
-unnecessary — the benchmark tracks the spawned process's PID automatically.
+Instead of starting the llamafile server manually, the benchmark can manage the server process itself. In auto-launch mode `--sidecar-pid` is unnecessary — the benchmark tracks the spawned process's PID automatically.
 
 ```bash
 python scripts/benchmark/run.py \
   --backend llamafile \
-  --llamafile-bin llamafile/bin/llamafile-0.10.1 \
+  --llamafile-bin llamafile/bin/llamafile-0.10.1.exe \
   --llamafile-model llamafile/models/google_gemma-4-E2B-it-IQ4_NL.gguf \
   --runs 5 \
   --scenarios s1,s2,s3
 ```
 
-On Windows PowerShell, replace the binary name with `llamafile-0.10.1.exe`.
+On Linux/macOS, omit the `.exe` extension from the binary name.
 
 ---
 
@@ -230,13 +201,13 @@ same CSV file for easy side-by-side comparison in Excel or Google Sheets.
 
 ## npm convenience scripts
 
+> **Note (2026-05-03):** `npm run setup:llamafile`, `npm run dev:llamafile`, and `npm run benchmark:llamafile` have been **removed**. Use the Python harness directly for llamafile benchmarks (see Part 2).
+
 | Command                        | Equivalent                             |
 | ------------------------------ | -------------------------------------- |
-| `npm run setup:llamafile`      | Download binary + GGUF model           |
-| `npm run dev:llamafile`        | Start llamafile server on port 8080    |
 | `npm run benchmark:litert`     | `run.py --backend litert --runs 5`     |
 | `npm run benchmark:litert-cpp` | `run.py --backend litert-cpp --runs 5` |
-| `npm run benchmark:llamafile`  | `run.py --backend llamafile --runs 5`  |
+| llamafile (manual)             | See Part 2 — run `run.py --backend llamafile --llamafile-host localhost:8080 ...` directly |
 
 ---
 
@@ -245,11 +216,11 @@ same CSV file for easy side-by-side comparison in Excel or Google Sheets.
 | Symptom                                                  | Fix                                                                                  |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `Backend unreachable`                                    | Check the server is running; confirm host:port matches                               |
-| `Binary not found`                                       | Run `npm run setup:llamafile` first                                                  |
-| `Model not found`                                        | Run `npm run setup:llamafile` — model download may have failed                       |
+| `Binary not found`                                       | Download the llamafile binary manually (see Part 2.1)                                |
+| `Model not found`                                        | Download the GGUF model manually (see Part 2.1)                                      |
 | `Raw litert_lm_main is not yet a drop-in Delfin sidecar` | Point `LITERT_CPP_BIN` at the Delfin JSONL bridge, not the upstream demo CLI         |
 | Slow download (~3 GB)                                    | Normal for first run; script resumes if interrupted (atomic .part file)              |
-| Gemma 4 not supported                                    | The llamafile version is too old — bump `LLAMAFILE_VERSION` in `.env`                |
+| Gemma 4 not supported                                    | The llamafile binary version is too old — download a newer release manually          |
 | RSS shows N/A                                            | Pass `--sidecar-pid` with the correct PID                                            |
 | Very low tok/s on Windows                                | Expected for CPU inference; check no other heavy process is running                  |
 | S2 vision scenario fails with llamafile                  | Ensure the GGUF model includes the vision encoder (multimodal GGUF)                  |

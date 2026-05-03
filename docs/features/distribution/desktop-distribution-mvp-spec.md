@@ -8,16 +8,57 @@
 |---|---|
 | **Status** | Gate 1 approved — ready for implementation |
 | **Approval date** | 2026-04-22 |
-| **Revised on** | 2026-05-01 (see revision section below) |
+| **Revised on** | 2026-05-01 (hybrid llamafile-on-Windows decision); **2026-05-03 (LiteRT-LM C++ replaces llamafile on Windows — see revision section below)** |
 | **Approver** | Human reviewer |
 | **Bundle identifier** | `com.delfin.desktop` |
 | **Target platforms** | Windows x64, macOS x64, macOS arm64, Linux x64 |
-| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → llamafile binary on Windows (first-run download); frozen Python sidecar on macOS/Linux; see revision |
-| **Model delivery** | First-run download (llamafile binary + GGUF model + mmproj + TTS assets) |
+| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → ~~llamafile binary on Windows (first-run download); frozen Python sidecar on macOS/Linux~~ → **LiteRT-LM C++ bridge bundled on Windows; frozen Python sidecar on macOS/Linux**; see 2026-05-03 revision |
+| **Model delivery** | First-run download (`.litertlm` model + Piper voice on Windows; `.litertlm` + Kokoro assets on macOS/Linux) |
 | **Inference scope** | CPU-only for MVP; CUDA/Metal as stretch goal |
 | **Deferred by approval** | Docker, full CI/CD publishing, auto-update implementation |
 
-## Revision — 2026-05-01
+## Revision — 2026-05-03
+
+### What changed and why
+
+The 2026-05-01 hybrid decision (llamafile on Windows, frozen Python sidecar on macOS/Linux) is **superseded**. The native LiteRT-LM C++ research track (`docs/features/backend/native-windows-backend-research-spec.md`) reached runtime validation on Windows for text, vision, audio input, and per-session KV-cache reuse — including the S1/S2/S3 benchmark sweep. With a working native-Windows LiteRT-LM C++ bridge, there is no longer any reason to ship llamafile in the packaged Windows app: LiteRT-LM is faster, has a stateful KV-cache, and matches the inference engine used on the other platforms.
+
+### Decision: LiteRT-LM C++ for packaged Windows; frozen Python sidecar elsewhere
+
+| Axis                              | 2026-05-01 decision                            | 2026-05-03 decision                                                                                          |
+| --------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Inference — packaged Windows      | llamafile binary (first-run download)          | **LiteRT-LM C++ bridge** (`delfin_litert_bridge.exe` bundled as app resource) + `scripts/litert-cpp-proxy.mjs` |
+| Inference — packaged macOS/Linux  | LiteRT-LM via frozen Python sidecar            | Unchanged (frozen Python sidecar). Native LiteRT-LM C++ on macOS/Linux is planned but blocked on a non-Windows build of the bridge. |
+| Inference — dev mode              | LiteRT-LM via `.venv` (or `dev:llamafile`)     | LiteRT-LM via `.venv` on macOS/Linux/WSL2; `npm run dev:litert-cpp` on native Windows                        |
+| Windows TTS                       | Investigate Piper or freeze kokoro-onnx        | **Piper** via `LITERT_CPP_TTS_BACKEND=piper`; the LiteRT C++ proxy emits sentence-level `audio_*` messages   |
+| Backend selector                  | `INFERENCE_BACKEND=litert\|llamafile`          | `INFERENCE_BACKEND=litert\|litert-cpp`. The `llamafile` value is removed from the Electron runtime path.     |
+| `setup:llamafile` / `dev:llamafile` / `benchmark:llamafile` npm scripts | Active app fallback | **Removed.** llamafile remains comparable only via the standalone benchmark harness (`scripts/benchmark/`). |
+
+### Why this is now possible
+
+- The LiteRT-LM C++ bridge (`native/litert-cpp-bridge/`) wraps the same LiteRT-LM runtime used in the Python sidecar, so KV-cache, vision token budgets, and audio-input behaviour are by-construction equivalent.
+- `scripts/litert-cpp-proxy.mjs` already speaks the Delfin sidecar WebSocket protocol on port 8321; no changes to `wsClient.ts` or `sidecarBridge.ts` are needed for a Windows packaged build to use the bridge.
+- The bridge executable + DLL are a single ~tens-of-MB drop-in. The `.litertlm` model and Piper voice are downloaded at first run, mirroring the original first-run flow.
+- The previously-approved 2026-05-01 first-run download UX, model bootstrap IPC contract, writable-path policy, and packaging output contract carry over unchanged — only the binary that gets downloaded/bundled changes.
+
+### Sub-spec impact
+
+| Sub-spec                              | Effect of this revision                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `distribution-backend-migration-spec.md` | DM0 (llamafile WebSocket proxy) is **superseded**. The replacement is wiring `scripts/litert-cpp-proxy.mjs` (already implemented and validated) into the packaged Windows runtime. See that spec's 2026-05-03 revision banner. |
+| `distribution-packaging-spec.md`     | Windows row in the per-platform backend table flips from llamafile → LiteRT-LM C++. `extraResources` ships `delfin_litert_bridge.exe` + DLL + `litert-cpp-proxy.mjs` instead of the llamafile binary. |
+| `distribution-cicd-spec.md`          | Windows CI matrix builds (or downloads a prebuilt) `delfin_litert_bridge.exe` instead of fetching llamafile. macOS/Linux jobs unchanged.                |
+
+### What is preserved from the 2026-05-01 revision
+
+- The decision to **never bundle the Gemma model** inside installers (first-run download to `app.getPath('userData')`).
+- The Model Bootstrap IPC contract and the writable-path policy.
+- CPU-only for MVP; GPU as a stretch goal.
+- macOS/Linux strategy (frozen Python sidecar) is unchanged.
+
+---
+
+## Revision — 2026-05-01 _(superseded by 2026-05-03)_
 
 ### What changed and why
 

@@ -8,7 +8,7 @@
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
-Current app runtime is still Electron → Python FastAPI sidecar → LiteRT-LM. The desktop distribution track is evaluating a future llama.cpp `llama-server` / llamafile backend for native cross-platform packaging.
+Current app runtime is Electron → Python FastAPI sidecar → LiteRT-LM on macOS / Linux / WSL2, and Electron → Node WebSocket proxy → LiteRT-LM C++ bridge on native Windows. The legacy llamafile / `llama-server` path is **deprecated** — kept only for benchmark comparison (`scripts/benchmark/`); it is no longer the desktop distribution target.
 
 ---
 
@@ -186,7 +186,7 @@ Keep this table in sync with [`docs/README.md`](docs/README.md) and [`STATUS.md`
 
 | Area             | Folder                          | Active specs                                                                                                                            | Top-level acceptance signal                                                                                                                 |
 | ---------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend          | `docs/features/backend/`        | `native-windows-backend-research-spec.md`, `litert-cpp-bridge-runtime-validation-spec.md`, `litert-cpp-audio-input-spec.md`, `litert-cpp-primary-backend-migration-spec.md` | LiteRT-LM C++ bridge runs natively on Windows / macOS / Linux with text + vision + audio parity vs the Python sidecar; llamafile fallback removable. |
+| Backend          | `docs/features/backend/`        | `native-windows-backend-research-spec.md`, `litert-cpp-bridge-runtime-validation-spec.md`, `litert-cpp-audio-input-spec.md`, `litert-cpp-primary-backend-migration-spec.md` | LiteRT-LM C++ bridge runs natively on Windows / macOS / Linux with text + vision + audio parity vs the Python sidecar; llamafile backend removed. |
 | Distribution     | `docs/features/distribution/`   | `desktop-distribution-mvp-spec.md`, `distribution-backend-migration-spec.md`, `distribution-packaging-spec.md`, `distribution-cicd-spec.md` | A signed installer for Windows / macOS / Linux can be downloaded from a GitHub release, runs without WSL2, and downloads model assets at first run. |
 | Memory           | `docs/features/memory/`         | `memory-wiki-spec.md` (sub-phases M0–M3)                                                                                                | Live turn cites a generated wiki page; PDF drop produces source + entity pages; lint report renders in `MemoryView`.                       |
 | UI / UX          | `docs/features/ui/`             | (all ✅ — no active specs)                                                                                                              | n/a — area is in maintenance.                                                                                                               |

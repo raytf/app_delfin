@@ -6,6 +6,18 @@ This folder contains the Delfin-specific native bridge source for Track A of
 The upstream `litert_lm_main` target is a demo CLI. Delfin needs a long-lived
 stdio process that speaks a tiny JSONL protocol to `scripts/litert-cpp-proxy.mjs`.
 
+## Quick start
+
+Run the one-shot setup script — it clones LiteRT-LM, builds the bridge, configures Piper TTS, and resolves the model file:
+
+```powershell
+npm run setup:litert-cpp
+```
+
+Pass `--help` to see all options (`--litert-lm-dir`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, `--dry-run`, …).
+
+---
+
 ## Current status — 2026-05-03
 
 - Native Windows build of `delfin_litert_bridge.exe` is validated with Visual

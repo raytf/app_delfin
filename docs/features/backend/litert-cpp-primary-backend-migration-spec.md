@@ -139,6 +139,7 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 | `npm run dev:sidecar`             | Unchanged. Documented as deprecated fallback once the corresponding platform's default has flipped.                                                                                             |
 | `npm run dev:litert-cpp`          | Unchanged.                                                                                                                                                                                       |
 | `npm run setup`                   | Unchanged composition; behaviour change is in `setup-check` and `init-env` only.                                                                                                                |
+| `npm run setup:litert-cpp`        | **New** — one-shot C++ backend bring-up: clones LiteRT-LM, builds the bridge via Bazel, initialises `.env`, upserts `LITERT_CPP_BIN` / `LITERT_CPP_MODEL`, installs the default Piper voice, and copies or downloads the `.litertlm` model. All steps are idempotent. See `scripts/setup-litert-cpp.mjs`. |
 
 ---
 

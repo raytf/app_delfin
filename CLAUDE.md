@@ -20,8 +20,8 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 
 ## Project-Specific Reminders
 
-- Current app runtime: Electron + React renderer, Electron main IPC bridge, Python FastAPI sidecar, LiteRT-LM/Gemma 4.
-- Distribution work is evaluating a future llama.cpp `llama-server` / llamafile backend; do not replace the current sidecar unless an approved spec says so.
+- Current app runtime: Electron + React renderer, Electron main IPC bridge. Inference backend is the Python FastAPI sidecar (LiteRT-LM/Gemma 4) on macOS / Linux / WSL2, and the LiteRT-LM C++ bridge via `scripts/litert-cpp-proxy.mjs` on native Windows.
+- The legacy llamafile / `llama-server` backend is **deprecated** and retained only for benchmark comparison under `scripts/benchmark/`. Do not introduce new app-runtime code paths that depend on it.
 - `npm run dev:litert-cpp` currently bypasses `sidecar/tts.py`; the Node proxy emits no `audio_*` events yet, so TTS falls back to browser Web Speech even if `TTS_BACKEND=kokoro` is set.
 - TypeScript is strict; avoid `any`.
 - Shared IPC/WebSocket types live in `src/shared/types.ts` and schemas in `src/shared/schemas.ts`.
