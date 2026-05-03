@@ -34,6 +34,8 @@ ABSL_FLAG(std::string, model_path, "", "Path to the .litertlm model file.");
 ABSL_FLAG(int, timeout_seconds, 600, "Generation timeout per request.");
 ABSL_FLAG(std::string, vision_backend, "cpu",
           "LiteRT vision backend: cpu, gpu, npu, ...");
+ABSL_FLAG(std::string, audio_backend, "cpu",
+          "LiteRT audio backend: cpu, gpu, npu, none, ...");
 
 namespace {
 using ::litert::lm::Backend;
@@ -92,6 +94,14 @@ std::string ExtractText(const Message& message) {
   return text;
 }
 
+bool MessageHasContentType(const ordered_json& message, const std::string& content_type) {
+  if (!message.contains("content") || !message["content"].is_array()) return false;
+  for (const auto& part : message["content"]) {
+    if (part.contains("type") && part["type"] == content_type) return true;
+  }
+  return false;
+}
+
 absl::StatusOr<std::unique_ptr<Engine>> CreateEngine(const std::string& model_path) {
   if (model_path.empty()) return absl::InvalidArgumentError("model_path is empty");
   ASSIGN_OR_RETURN(ModelAssets model_assets, ModelAssets::Create(model_path));
@@ -100,15 +110,28 @@ absl::StatusOr<std::unique_ptr<Engine>> CreateEngine(const std::string& model_pa
   ASSIGN_OR_RETURN(
       Backend vision_backend,
       litert::lm::GetBackendFromString(absl::GetFlag(FLAGS_vision_backend)));
+
+  std::optional<Backend> audio_backend;
+  const std::string audio_backend_str = absl::GetFlag(FLAGS_audio_backend);
+  if (audio_backend_str != "none") {
+    ASSIGN_OR_RETURN(Backend parsed,
+                     litert::lm::GetBackendFromString(audio_backend_str));
+    audio_backend = parsed;
+  }
+
   ASSIGN_OR_RETURN(EngineSettings settings,
                    EngineSettings::CreateDefault(std::move(model_assets), backend,
-                                                 vision_backend));
+                                                 vision_backend, audio_backend));
   return litert::lm::EngineFactory::CreateAny(std::move(settings));
 }
 
 absl::StatusOr<std::unique_ptr<Conversation>> CreateConversation(
     Engine& engine, const std::string& system_prompt) {
   auto session_config = SessionConfig::CreateDefault();
+  session_config.SetVisionModalityEnabled(
+      engine.GetEngineSettings().GetVisionExecutorSettings().has_value());
+  session_config.SetAudioModalityEnabled(
+      engine.GetEngineSettings().GetAudioExecutorSettings().has_value());
   auto builder = ConversationConfig::Builder().SetSessionConfig(session_config);
   if (!system_prompt.empty()) {
     JsonPreface preface;
@@ -174,6 +197,12 @@ absl::Status Generate(Engine& engine, const ordered_json& request) {
   if (session_id.empty()) return absl::InvalidArgumentError("sessionId is required");
   if (!request.contains("message") || !request["message"].is_object()) {
     return absl::InvalidArgumentError("message object is required");
+  }
+
+  if (MessageHasContentType(request["message"], "audio") &&
+      !engine.GetEngineSettings().GetAudioExecutorSettings().has_value()) {
+    return absl::InvalidArgumentError(
+        "Audio input is disabled for this LiteRT C++ bridge.");
   }
 
   std::lock_guard<std::mutex> generation_lock(g_generation_mutex);

@@ -1,6 +1,6 @@
 # Delfin — Gemma 4-Powered Implementation Status
 
-> Last updated: 2026-05-03 (LiteRT-LM C++ bridge: vision + per-session KV-cache reuse landed at source level; runtime validation and native audio input specs added; validation pending)
+> Last updated: 2026-05-03 (LiteRT-LM C++ bridge: vision + per-session KV-cache reuse + native audio input rebuilt and runtime-validated on Windows)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 
 ---
@@ -36,7 +36,7 @@
 | `scripts/litert-cpp-presets.mjs`                                             | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                 |
 | `scripts/litert-cpp-proxy.mjs`                                               | ✅     | Delfin WebSocket proxy and health endpoint validated against native `delfin_litert_bridge.exe`; text turns stream successfully |
 | `scripts/litert-cpp-proxy.test.mjs`                                          | ✅     | Vitest coverage for health, token streaming/history, and interrupt forwarding with a mock bridge                        |
-| `native/litert-cpp-bridge/`                                                  | ⚠️     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, and `reset_session`; awaiting binary rebuild + runtime S2/manual validation; audio support spec added (Gate 1); macOS/Linux native builds not yet attempted |
+| `native/litert-cpp-bridge/`                                                  | ✅     | Source implements vision backend, image-blob decode, per-session KV-cache reuse, `reset_session`, and native audio-input wiring (`--audio_backend`, session modality flags, audio-disabled guard); Windows binary rebuilt and runtime-validated (text, vision, audio paths); macOS/Linux native builds not yet attempted |
 | `bin/delfin_litert_bridge.exe` + `bin/libGemmaModelConstraintProvider.dll`   | ✅     | Gitignored local runtime artifacts from Bazel output; current Windows binary predates the vision/session-reuse source changes and must be rebuilt before re-validation |
 
 ---

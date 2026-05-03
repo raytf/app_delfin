@@ -1,6 +1,6 @@
 # LiteRT-LM C++ Bridge — Native Audio Input Support
 
-> Gate 1 — spec draft awaiting human approval.
+> Gate 5 — docs updated. Rebuilt binary + runtime validation completed on Windows.
 > Sub-feature of Track A in `native-windows-backend-research-spec.md`.
 > Closes the audio-input gap called out in `native-windows-backend-research-spec.md` §Current acceptance status and `litert-cpp-bridge-runtime-validation-spec.md` §Risks (silent audio drop / crash).
 > Restores voice-turn parity between the LiteRT C++ bridge and the Python sidecar so `npm run dev:litert-cpp` can serve the default voice-first demo without crashing on `audio` content parts.
@@ -9,8 +9,11 @@
 
 | Field          | Value                                                                                                                                                                                                                                                |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec draft, awaiting human approval                                                                                                                                                                                                         |
+| **Status**     | ✅ Gate 5 complete — source implemented, binary rebuilt, Windows runtime validated, docs updated                                                                                                                                                     |
 | **Created**    | 2026-05-03                                                                                                                                                                                                                                            |
+| **Approved**   | 2026-05-03                                                                                                                                                                                                                                            |
+| **Implemented** | `native/litert-cpp-bridge/delfin_litert_bridge.cc` (`--audio_backend` flag, `EngineSettings::CreateDefault(..., vision_backend, audio_backend)`, session `SetVisionModalityEnabled` / `SetAudioModalityEnabled`, `MessageHasContentType` audio-disabled guard); source-contract coverage in `native/litert-cpp-bridge/delfin_litert_bridge.test.mjs` |
+| **Validated**  | 2026-05-03 — Bridge emits `ready` with `--audio_backend=cpu`; text turn streams via proxy; fake audio blob reaches miniaudio decoder (error -10 = invalid data, proving path is open); `--audio_backend=none` returns exact JSONL error `"Audio input is disabled for this LiteRT C++ bridge."`; `npm test` passes (21/21) |
 | **Depends on** | `litert-cpp-vision-spec.md` source implementation (commit `570d2fa` ✅), `native-windows-backend-research-spec.md` A0 build ✅, A3 proxy ✅                                                                                                            |
 | **Blocks**     | Voice-turn parity for `npm run dev:litert-cpp`; lifting the explicit audio-not-supported guard described in `litert-cpp-bridge-runtime-validation-spec.md` §Risks; Track A acceptance for the voice-first demo on the native Windows / macOS / Linux bridges |
 

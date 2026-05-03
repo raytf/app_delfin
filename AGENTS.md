@@ -59,7 +59,7 @@ docs/
 │   ├── native-windows-backend-research-spec.md    ← 🚧 LiteRT-LM C++ native Windows validation (Windows text ✅, vision/KV-cache source ✅, binary rebuild + S2 + macOS/Linux pending); Foundry contingency
 │   ├── litert-cpp-vision-spec.md                 ← 🚧 C++ bridge vision + KV-cache session reuse — source landed (`570d2fa`), runtime validation pending; sub-feature of native-windows-backend-research-spec.md
 │   ├── litert-cpp-bridge-runtime-validation-spec.md ← 🚧 Next action: rebuild + full S1/S2/S3 benchmark + manual round on Windows; macOS arm64 + Linux x64 builds; triggers distribution plan update if passing. Gate 1 — awaiting approval.
-│   ├── litert-cpp-audio-spec.md          ← 🚧 C++ bridge native audio-input support (`--audio_backend`, session audio modality, audio-disabled guard); restores voice-turn parity. Gate 1 — awaiting approval.
+│   ├── litert-cpp-audio-spec.md          ← ✅ C++ bridge native audio-input support (`--audio_backend`, session audio modality, audio-disabled guard); Windows binary rebuilt + runtime validated.
 │   ├── waveform-ui-spec.md                ← ✅ Complete
 │   ├── overlay-waveform-polish-spec.md    ← ✅ Complete
 │   └── minimized-overlay-waveform-continuity-spec.md ← ✅ Complete

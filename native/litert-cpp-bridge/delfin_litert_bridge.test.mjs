@@ -25,6 +25,21 @@ describe('delfin_litert_bridge source contract', () => {
     expect(source).toContain('request["message"]')
   })
 
+  it('declares the audio backend flag and wires it into engine settings', () => {
+    expect(source).toContain('FLAGS_audio_backend')
+    expect(source).toContain('GetAudioExecutorSettings')
+  })
+
+  it('enables vision and audio modality on the session config when executors are present', () => {
+    expect(source).toContain('SetVisionModalityEnabled')
+    expect(source).toContain('SetAudioModalityEnabled')
+  })
+
+  it('has an audio-disabled validation guard before generation', () => {
+    expect(source).toContain('MessageHasContentType')
+    expect(source).toContain('Audio input is disabled for this LiteRT C++ bridge.')
+  })
+
   it('declares the Bazel bridge binary target', () => {
     expect(buildFile).toContain('cc_binary')
     expect(buildFile).toContain('delfin_litert_bridge')

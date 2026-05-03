@@ -9,21 +9,17 @@ stdio process that speaks a tiny JSONL protocol to `scripts/litert-cpp-proxy.mjs
 ## Current status — 2026-05-03
 
 - Native Windows build of `delfin_litert_bridge.exe` is validated with Visual
-  Studio 2022 17.14 / MSVC 14.44 (text scenarios).
+  Studio 2022 17.14 / MSVC 14.44 (text, vision, and audio scenarios).
 - App-facing runtime copy needs both `delfin_litert_bridge.exe` and
   `libGemmaModelConstraintProvider.dll` next to it in `bin/`.
-- Text turns stream successfully through `npm run dev:litert-cpp`.
-- Vision + per-session KV-cache reuse have **landed at source level** (commit
-  `570d2fa`, see `docs/features/litert-cpp-vision-spec.md`): `--vision_backend`
-  flag, `JsonPreface` for system prompt, `g_sessions` map keyed by `sessionId`
-  with `Conversation` reuse, `reset_session` handler, and `SendMessageAsync`
-  called with the singular new user turn. The in-tree binary in `bin/` predates
-  these changes and must be rebuilt before runtime validation (S2 benchmark,
-  Turn 2+ TTFT, lecture-slide manual round).
+- Text, vision, and audio turns stream successfully through `npm run dev:litert-cpp`.
+- Vision + per-session KV-cache reuse + native audio input are all **built and
+  runtime-validated** in the current `bin/delfin_litert_bridge.exe`:
+  - `--vision_backend` flag, `JsonPreface`, `g_sessions` map, `reset_session`
+  - `--audio_backend` flag (default `cpu`), session `SetAudioModalityEnabled`,
+    and `MessageHasContentType` guard that returns a clear JSONL error when
+    audio is sent but `--audio_backend=none`
 - macOS and Linux native builds have not yet been attempted.
-- Audio input is not yet wired through the bridge: the proxy forwards
-  `{ "type": "audio", "blob": "..." }`, but `delfin_litert_bridge.cc` only
-  decodes text + image parts today.
 
 ## JSONL protocol
 
@@ -40,7 +36,7 @@ Bridge startup output:
 Proxy → bridge:
 
 ```json
-{"type":"generate","requestId":"<uuid>","sessionId":"<uuid>","systemPrompt":"You are Delfin…","message":{"role":"user","content":[{"type":"image","blob":"<base64 JPEG>"},{"type":"text","text":"Explain this slide"}]}}
+{"type":"generate","requestId":"<uuid>","sessionId":"<uuid>","systemPrompt":"You are Delfin…","message":{"role":"user","content":[{"type":"image","blob":"<base64 JPEG>"},{"type":"audio","blob":"<base64 WAV>"},{"type":"text","text":"Explain this slide"}]}}
 {"type":"interrupt","requestId":"<uuid>"}
 {"type":"reset_session","sessionId":"<uuid>"}
 ```
@@ -76,6 +72,19 @@ bazelisk build //runtime/engine:litert_lm_main --config=windows
 ```powershell
 npm run build:litert-cpp-bridge -- -- --litert-lm-dir D:\path\to\LiteRT-LM
 ```
+
+> **Windows path-length workaround.** If the Bazel build fails inside
+> `rules_rust` with `LINK : fatal error LNK1181` on a long object-file path
+> (>260 chars), pass `--output_user_root` as a startup option to Bazelisk:
+>
+> ```powershell
+> cd D:\path\to\LiteRT-LM
+> bazelisk --output_user_root=D:\b build //runtime/engine:delfin_litert_bridge --config=windows
+> ```
+>
+> Then copy `bazel-bin/runtime/engine/delfin_litert_bridge.exe` into
+> `Delfin/bin/` manually. A shorter root (e.g. `D:\b`) keeps `rules_rust`
+> generated paths under the Windows MAX_PATH limit.
 
 Use `node scripts/build-litert-cpp-bridge.mjs --plan --litert-lm-dir <path>` for a dry-run plan without invoking Bazel.
 
