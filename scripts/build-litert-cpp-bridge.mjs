@@ -48,6 +48,8 @@ export function parseArgs(argv) {
       options.outputDir = argv[++index];
     } else if (arg === "--bazel") {
       options.bazel = argv[++index];
+    } else if (arg === "--bazel-config") {
+      options.bazelConfig = argv[++index];
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else if (!arg.startsWith("--") && options.litertLmDir === undefined) {
@@ -64,6 +66,7 @@ export function applyNpmConfig(options, env = process.env) {
   return {
     ...options,
     bazel: options.bazel ?? env.npm_config_bazel,
+    bazelConfig: options.bazelConfig ?? env.npm_config_bazel_config,
     dryRun:
       options.dryRun ||
       env.npm_config_dry_run === "true" ||
@@ -80,6 +83,7 @@ Options:
   --litert-lm-dir <path>  Local google-ai-edge/LiteRT-LM checkout
   --output-dir <path>     Directory for delfin_litert_bridge(.exe) (default: bin/)
   --bazel <command>       Bazelisk/Bazel command to run (default: bazelisk, then bazel)
+  --bazel-config <flag>   Bazel --config value (default: windows on Win32, none on macOS/Linux)
   --dry-run, --plan       Print planned actions without running Bazel
 `;
 }
@@ -102,10 +106,18 @@ export function resolvePlan(options, env = process.env) {
     options.bazel ??
     env.BAZELISK_BIN ??
     (commandExists("bazelisk") ? "bazelisk" : "bazel");
+  // --config=windows sets up the MSVC toolchain; macOS/Linux let Bazel
+  // auto-detect the local C++ toolchain (no platform config needed).
+  const platformConfig =
+    options.bazelConfig !== undefined
+      ? [options.bazelConfig]
+      : process.platform === "win32"
+        ? ["--config=windows"]
+        : [];
   const bazelArgs = [
     "build",
     "//runtime/engine:delfin_litert_bridge",
-    "--config=windows",
+    ...platformConfig,
   ];
   const builtBinary = join(
     litertLmDir,
