@@ -85,6 +85,8 @@ function bridgeExecutableName(platform = process.platform) {
 function bridgeRequiredFiles(platform = process.platform) {
   const files = [bridgeExecutableName(platform)]
   if (platform === 'win32') files.push('libGemmaModelConstraintProvider.dll')
+  else if (platform === 'darwin') files.push('libGemmaModelConstraintProvider.dylib')
+  else if (platform === 'linux') files.push('libGemmaModelConstraintProvider.so')
   return files
 }
 
@@ -347,22 +349,29 @@ async function stepBuild(litertLmDir, opts) {
     return
   }
   const plan = await buildBridge({ litertLmDir })
-  // On Windows, also copy the constraint-provider DLL next to the exe.
-  if (process.platform === 'win32') {
-    const dllName = 'libGemmaModelConstraintProvider.dll'
-    const srcDll = join(litertLmDir, 'bazel-bin', 'runtime', 'engine', dllName)
-    const destDll = join(plan.outputDir, dllName)
-    if (existsSync(srcDll)) {
-      if (!existsSync(destDll)) {
-        mkdirSync(plan.outputDir, { recursive: true })
-        copyFileSync(srcDll, destDll)
-        console.log('[setup-litert-cpp] ✅ DLL copied to:', destDll)
-      } else {
-        console.log('[setup-litert-cpp] ✅ DLL already in bin/ — skipping copy.')
-      }
+  // Copy the constraint-provider library next to the bridge binary for all platforms.
+  // The library is distributed as a prebuilt in LiteRT-LM, not built by Bazel.
+  const libName =
+    process.platform === 'win32' ? 'libGemmaModelConstraintProvider.dll' :
+    process.platform === 'darwin' ? 'libGemmaModelConstraintProvider.dylib' :
+    'libGemmaModelConstraintProvider.so'
+  const prebuiltArch =
+    process.platform === 'win32' ? 'windows_x86_64' :
+    process.platform === 'darwin' ? 'macos_arm64' :
+    'linux_x86_64'
+  const srcLib = join(litertLmDir, 'prebuilt', prebuiltArch, libName)
+  const destLib = join(plan.outputDir, libName)
+  if (existsSync(srcLib)) {
+    if (!existsSync(destLib)) {
+      mkdirSync(plan.outputDir, { recursive: true })
+      copyFileSync(srcLib, destLib)
+      chmodSync(destLib, 0o755)
+      console.log(`[setup-litert-cpp] ✅ Library copied to: ${destLib}`)
     } else {
-      console.warn(`[setup-litert-cpp] ⚠️  DLL not found at expected path: ${srcDll}`)
+      console.log(`[setup-litert-cpp] ✅ Library already in bin/ — skipping copy.`)
     }
+  } else {
+    console.warn(`[setup-litert-cpp] ⚠️  Library not found at expected path: ${srcLib}`)
   }
 }
 

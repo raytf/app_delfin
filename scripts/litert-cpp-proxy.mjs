@@ -435,9 +435,18 @@ function createStdioBridge() {
   }
 
   const { command, args } = resolveBridgeCommand(binPath);
+  const binDir = dirname(binPath);
+  // Set library path so the bridge can find libGemmaModelConstraintProvider.so/.dylib/.dll
+  const env = { ...process.env };
+  if (process.platform === "linux") {
+    env.LD_LIBRARY_PATH = [binDir, env.LD_LIBRARY_PATH ?? ""].filter(Boolean).join(":");
+  } else if (process.platform === "darwin") {
+    env.DYLD_LIBRARY_PATH = [binDir, env.DYLD_LIBRARY_PATH ?? ""].filter(Boolean).join(":");
+  }
   const child = spawn(command, [...args, "--model_path", modelPath], {
     cwd: rootDir,
     stdio: ["pipe", "pipe", "pipe"],
+    env,
   });
 
   let ready = false;
