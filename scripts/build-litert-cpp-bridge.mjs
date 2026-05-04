@@ -22,6 +22,7 @@ const bridgeBuildTargetSource = join(
   "litert-cpp-bridge",
   "BUILD.bazel",
 );
+const desktopBridgeRepoEnv = ["--repo_env=ANDROID_NDK_HOME="];
 
 function isDirectExecution() {
   return (
@@ -106,6 +107,9 @@ export function resolvePlan(options, env = process.env) {
     options.bazel ??
     env.BAZELISK_BIN ??
     (commandExists("bazelisk") ? "bazelisk" : "bazel");
+  // Desktop bridge builds do not need Android toolchains. Hosted Windows
+  // runners expose ANDROID_NDK_HOME by default, which makes LiteRT-LM register
+  // @androidndk and hit a rules_android_ndk symlink bug during analysis.
   // --config=windows sets up the MSVC toolchain; macOS/Linux let Bazel
   // auto-detect the local C++ toolchain (no platform config needed).
   const platformConfig =
@@ -116,6 +120,7 @@ export function resolvePlan(options, env = process.env) {
         : [];
   const bazelArgs = [
     "build",
+    ...desktopBridgeRepoEnv,
     "//runtime/engine:delfin_litert_bridge",
     ...platformConfig,
   ];

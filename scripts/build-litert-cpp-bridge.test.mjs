@@ -71,10 +71,12 @@ describe("build-litert-cpp-bridge helper", () => {
       litertLmDir,
       outputDir: join(litertLmDir, "out"),
       bazel: "bazelisk",
+      bazelConfig: "--config=windows",
     });
 
     expect(plan.bazelArgs).toEqual([
       "build",
+      "--repo_env=ANDROID_NDK_HOME=",
       "//runtime/engine:delfin_litert_bridge",
       "--config=windows",
     ]);
@@ -82,6 +84,13 @@ describe("build-litert-cpp-bridge helper", () => {
       join(litertLmDir, "runtime", "engine", "delfin_litert_bridge.cc"),
     );
     expect(plan.outputBinary).toContain("delfin_litert_bridge");
+  });
+
+  it("clears ambient Android NDK detection for desktop bridge builds", async () => {
+    const litertLmDir = await createLiteRtTree();
+    const plan = resolvePlan({ litertLmDir, bazel: "bazelisk" });
+
+    expect(plan.bazelArgs).toContain("--repo_env=ANDROID_NDK_HOME=");
   });
 
   it("allows dry-run validation without Bazel installed", async () => {
