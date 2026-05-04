@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseArgs, usage } from './setup-litert-cpp.mjs'
+import { bridgePlatformLabel, defaultBridgeArtifactName, parseArgs, resolveBridgePlan, usage } from './setup-litert-cpp.mjs'
 
 describe('setup-litert-cpp parseArgs', () => {
   it('defaults nativeWindows to false', () => {
@@ -22,6 +22,11 @@ describe('setup-litert-cpp parseArgs', () => {
       '--skip-build',
       '--no-piper',
       '--piper-voice', 'en/en_US/lessac/medium',
+      '--bridge-source', 'artifact',
+      '--source-build',
+      '--repo', 'owner/repo',
+      '--ci-run-id', '12345',
+      '--artifact-name', 'custom-artifact',
       '--no-model',
       '--dry-run',
     ])
@@ -33,6 +38,11 @@ describe('setup-litert-cpp parseArgs', () => {
       skipBuild: true,
       noPiper: true,
       piperVoice: 'en/en_US/lessac/medium',
+      bridgeSource: 'artifact',
+      sourceBuild: true,
+      repo: 'owner/repo',
+      ciRunId: '12345',
+      artifactName: 'custom-artifact',
       noModel: true,
       dryRun: true,
     })
@@ -41,12 +51,70 @@ describe('setup-litert-cpp parseArgs', () => {
   it('rejects unknown arguments', () => {
     expect(() => parseArgs(['--no-such-flag'])).toThrow(/Unknown argument/)
   })
+
+  it('rejects invalid bridge source values', () => {
+    expect(() => parseArgs(['--bridge-source', 'zip'])).toThrow(/Invalid --bridge-source/)
+  })
+})
+
+describe('setup-litert-cpp bridge planning', () => {
+  it('uses CI artifacts by default on Windows when bridge files are missing', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'win32', false, 'x64')).toMatchObject({ source: 'artifact' })
+  })
+
+  it('reuses existing bridge files before downloading or building', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true)).toMatchObject({ source: 'existing' })
+  })
+
+  it('uses CI artifacts by default on Linux and macOS when bridge files are missing', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'linux', false, 'x64')).toMatchObject({ source: 'artifact' })
+    expect(resolveBridgePlan(parseArgs([]), 'darwin', false, 'arm64')).toMatchObject({ source: 'artifact' })
+  })
+
+  it('uses source builds only when explicitly requested', () => {
+    expect(resolveBridgePlan(parseArgs(['--source-build']), 'linux', false, 'x64')).toMatchObject({
+      source: 'build',
+      needsLiteRtLm: true,
+    })
+    expect(resolveBridgePlan(parseArgs(['--bridge-source', 'build']), 'darwin', false, 'arm64')).toMatchObject({
+      source: 'build',
+      needsLiteRtLm: true,
+    })
+  })
+
+  it('reports unsupported platforms without falling back to source builds', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'darwin', false, 'x64')).toMatchObject({ source: 'unsupported' })
+  })
+
+  it('honors --skip-build without requiring LiteRT-LM checkout', () => {
+    expect(resolveBridgePlan(parseArgs(['--skip-build']), 'win32', false)).toMatchObject({
+      source: 'skip',
+      needsLiteRtLm: false,
+    })
+  })
+})
+
+describe('setup-litert-cpp artifact naming', () => {
+  it('maps supported platforms to CI artifact labels', () => {
+    expect(bridgePlatformLabel('win32', 'x64')).toBe('windows-x64')
+    expect(bridgePlatformLabel('darwin', 'arm64')).toBe('macos-arm64')
+    expect(bridgePlatformLabel('linux', 'x64')).toBe('linux-x64')
+  })
+
+  it('uses platform-labeled workflow artifact names', () => {
+    expect(defaultBridgeArtifactName('win32', 'x64')).toBe('delfin-litert-bridge-windows-x64')
+    expect(defaultBridgeArtifactName('darwin', 'arm64')).toBe('delfin-litert-bridge-macos-arm64')
+    expect(defaultBridgeArtifactName('linux', 'x64')).toBe('delfin-litert-bridge-linux-x64')
+  })
 })
 
 describe('setup-litert-cpp usage', () => {
-  it('documents --native-windows and the WSL2 default policy', () => {
+  it('documents the one-shot bridge and Piper setup flags', () => {
     const text = usage()
     expect(text).toMatch(/--native-windows/)
+    expect(text).toMatch(/--bridge-source/)
+    expect(text).toMatch(/--source-build/)
     expect(text).toMatch(/WSL2/)
+    expect(text).toMatch(/runtime \+ voice setup/)
   })
 })

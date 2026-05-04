@@ -28,6 +28,7 @@ describe('downloadFile', () => {
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   })
 
   afterEach(() => {
@@ -50,11 +51,11 @@ describe('downloadFile', () => {
     expect(existsSync(`${destPath}.part`)).toBe(false)
   })
 
-  it('removes the temp file and leaves the final path absent when the stream fails', async () => {
+  it('keeps the resumable temp file and leaves the final path absent when retries fail', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'download-models-'))
     const destPath = join(tempDir, 'model.bin')
 
-    global.fetch = vi.fn().mockResolvedValue({
+    global.fetch = vi.fn().mockImplementation(async () => ({
       body: (async function* body() {
         yield Buffer.from('partial data')
         throw new Error('stream failure')
@@ -63,13 +64,14 @@ describe('downloadFile', () => {
       ok: true,
       status: 200,
       statusText: 'OK',
-    })
+    }))
 
-    await expect(downloadFile('https://example.test/model.bin', destPath, 'test model')).rejects.toThrow(
-      'stream failure',
-    )
+    await expect(
+      downloadFile('https://example.test/model.bin', destPath, 'test model', { maxAttempts: 2 }),
+    ).rejects.toThrow('stream failure')
 
+    expect(global.fetch).toHaveBeenCalledTimes(2)
     expect(existsSync(destPath)).toBe(false)
-    expect(existsSync(`${destPath}.part`)).toBe(false)
+    expect(existsSync(`${destPath}.part`)).toBe(true)
   })
 })

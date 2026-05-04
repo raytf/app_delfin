@@ -11,6 +11,9 @@ $kokoroVoices = Resolve-DelfinEnvPath $config['KOKORO_VOICES_PATH'] './sidecar/v
 $bridgeBin = Resolve-DelfinEnvPath $config['LITERT_CPP_BIN'] './bin/delfin_litert_bridge.exe'
 $bridgeDll = Resolve-DelfinRepoPath 'bin/libGemmaModelConstraintProvider.dll'
 $bridgeModel = Resolve-DelfinEnvPath $config['LITERT_CPP_MODEL'] "./models/$modelFile"
+$piperBin = Resolve-DelfinEnvPath $config['PIPER_BIN'] './bin/piper/venv/Scripts/piper.exe'
+$piperModel = Resolve-DelfinEnvPath $config['PIPER_MODEL'] './models/piper/en_US-hfc_female-medium.onnx'
+$piperConfig = Resolve-DelfinEnvPath $config['PIPER_CONFIG'] './models/piper/en_US-hfc_female-medium.onnx.json'
 
 Push-Location $repoRoot
 try {
@@ -61,6 +64,15 @@ try {
 
   if (Test-Path $bridgeModel) { Write-Host "✅ LiteRT C++ model: present ($bridgeModel)" -ForegroundColor Green }
   else { Write-Host "⚠️  LiteRT C++ model: missing ($bridgeModel)" -ForegroundColor Yellow }
+
+  if (Test-Path $piperBin) { Write-Host "✅ Piper runtime: present ($piperBin)" -ForegroundColor Green }
+  else { Write-Host "⚠️  Piper runtime: missing ($piperBin)" -ForegroundColor Yellow }
+
+  if (Test-Path $piperModel) { Write-Host "✅ Piper voice model: present ($piperModel)" -ForegroundColor Green }
+  else { Write-Host "⚠️  Piper voice model: missing ($piperModel)" -ForegroundColor Yellow }
+
+  if (Test-Path $piperConfig) { Write-Host "✅ Piper voice config: present ($piperConfig)" -ForegroundColor Green }
+  else { Write-Host "⚠️  Piper voice config: missing ($piperConfig)" -ForegroundColor Yellow }
 
   $port = if ($env:SIDECAR_PORT) { $env:SIDECAR_PORT } else { '8321' }
   try {
