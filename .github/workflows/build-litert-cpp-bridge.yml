@@ -22,7 +22,7 @@ jobs:
             platform_label: windows-x64
             binary: delfin_litert_bridge.exe
             extra_files: libGemmaModelConstraintProvider.dll
-          - os: macos-14
+          - os: macos-15
             arch: arm64
             platform_label: macos-arm64
             binary: delfin_litert_bridge

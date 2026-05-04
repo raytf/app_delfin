@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-04 (LiteRT-LM C++ bridge build helper now clears ambient `ANDROID_NDK_HOME` for desktop Bazel builds so Windows CI does not register the hosted runner Android NDK and hit the `rules_android_ndk` symlink bug).
+> Last updated: 2026-05-04 (CI bridge workflow now uses `macos-15` for the `macos-arm64` matrix job because GitHub's `macos-14` / Xcode 15.4 toolchain fails the upstream `cxx` crate's C++20 `rust::Slice` contiguous-range check during Bazel builds.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 >
 > Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
@@ -248,8 +248,8 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 | Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
 | First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
 | NSIS / DMG / AppImage installers                      | ❌     | Not started                                                                                 |
-| GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64) on push / release / dispatch. Windows bridge builds rely on `scripts/build-litert-cpp-bridge.mjs` clearing ambient Android NDK detection. Full electron-builder packaging matrix (`dist.yml`) still pending — tracked in `distribution-cicd-spec.md`. |
-| `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases. |
+| GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64) on push / release / dispatch. The macOS arm64 lane now runs on `macos-15` so Bazel gets a newer Apple C++20 toolchain than the broken `macos-14` / Xcode 15.4 image. Windows bridge builds rely on `scripts/build-litert-cpp-bridge.mjs` clearing ambient Android NDK detection. Full electron-builder packaging matrix (`dist.yml`) still pending — tracked in `distribution-cicd-spec.md`. |
+| `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases; macOS arm64 now targets `macos-15` to avoid the `cxx` C++20 build failure seen on `macos-14`. |
 | Code signing (Windows Authenticode, macOS notarization) | ❌    | Not started                                                                                 |
 | TTS backend strategy for packaged builds              | ❌     | DM3 in `distribution-backend-migration-spec.md` (Piper vs frozen Kokoro investigation)      |
 
