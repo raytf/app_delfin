@@ -18,13 +18,16 @@
     "build:litert-cpp-bridge": "node scripts/build-litert-cpp-bridge.mjs",
     "init:env": "node scripts/init-env.mjs",
     "download:models": "node scripts/download-models.mjs",
+    "download:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\download-ci-bridge.ps1",
     "check:env": "node scripts/check-env.mjs",
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
+    "setup-check:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\setup-check.ps1",
     "voice:list": "node scripts/piper-voice.mjs list",
     "voice:use": "node scripts/piper-voice.mjs use",
     "voice:install": "node scripts/piper-voice.mjs install",
     "benchmark:litert": "node scripts/run-benchmark.mjs --backend litert --runs 5",
     "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
+    "test:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\test-ci-bridge.ps1",
     "test": "vitest run"
   },
   "devDependencies": {

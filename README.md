@@ -156,6 +156,18 @@ npm run setup:litert-cpp -- --native-windows   # builds the native Windows bridg
 
 The script is idempotent and accepts `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.
 
+If you already have a successful CI run for `.github/workflows/build-litert-cpp-bridge.yml`, you can skip the local Bazel/MSVC build and use the Windows artifact helpers instead:
+
+<augment_code_snippet mode="EXCERPT">
+````powershell
+gh auth login
+npm run download:ci-bridge:windows
+npm run test:ci-bridge:windows -- --SkipBenchmark
+````
+</augment_code_snippet>
+
+`npm run test:ci-bridge:windows` can also download a specific run for you via `-- --DownloadArtifact --RunId <id>`. Omit `-- --SkipBenchmark` to run the full `benchmark:litert-cpp` sweep after the `/health` smoke check.
+
 #### Troubleshooting Windows setup
 
 - **`createSymbolicLinkW failed (permission denied)` / `Cannot create symlink`** — enable Windows Developer Mode, then run setup from an Administrator VS Developer shell. Keep `startup --output_user_root=C:/b` (or `D:/b`) in `LiteRT-LM\.bazelrc`, run `bazelisk shutdown`, and retry.
@@ -242,7 +254,7 @@ curl http://localhost:8321/health    # LiteRT sidecar / LiteRT-LM C++ proxy
 
 ```bash
 bash scripts/setup-check.sh        # Linux / macOS / WSL2
-.\scripts\setup-check.ps1          # Windows PowerShell
+npm run setup-check:windows       # Windows PowerShell
 ```
 
 ---
@@ -309,6 +321,7 @@ Legacy / deprecated:
 ├── bin/               # built `delfin_litert_bridge.exe` + DLL (gitignored)
 ├── models/            # `.litertlm` model + Piper voices (gitignored)
 ├── scripts/           # setup, env checks, model downloads, benchmark runner
+│   └── windows/       # PowerShell helpers for setup checks and CI bridge artifact download/test
 ├── results/           # benchmark output JSON/CSV (gitignored except .gitkeep)
 ├── docs/              # SPEC, feature specs (backend/distribution/memory/ui), and design notes
 ├── .env.example
@@ -326,6 +339,9 @@ Legacy / deprecated:
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
 | `npm run setup`                | First-run setup for env, Python venv, and TTS assets (macOS / Linux / WSL2)                  |
 | `npm run setup:litert-cpp`     | One-shot setup for the native LiteRT-LM C++ backend on Windows (clone, build, Piper, model)  |
+| `npm run setup-check:windows`  | Windows environment + bridge/model sanity check                                               |
+| `npm run download:ci-bridge:windows` | Download the latest successful Windows bridge artifact into `bin/`                       |
+| `npm run test:ci-bridge:windows` | Start the downloaded bridge via `dev:litert-cpp`, wait for `/health`, and optionally benchmark |
 
 | `npm run dev:full`             | Run LiteRT sidecar + Electron together                                                       |
 | `npm run dev:mock`             | Run mock sidecar + Electron (no inference needed)                                            |
