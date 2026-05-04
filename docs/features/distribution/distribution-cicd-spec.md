@@ -8,9 +8,9 @@
 
 | Field          | Value                                                                                                            |
 | -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — awaiting approval                                                                                       |
+| **Status**     | Gate 1 — partially implemented: `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries for windows-x64 / macos-arm64 / linux-x64 (Spec B in this iteration). The full `dist.yml` electron-builder packaging matrix below is still awaiting approval. |
 | **Created**    | 2026-05-01                                                                                                       |
-| **Revised**    | **2026-05-03 (Windows CI: llamafile download → LiteRT-LM C++ bridge build/bundle; see Background revision)**    |
+| **Revised**    | **2026-05-04 (split out the LiteRT-LM C++ bridge build into a dedicated workflow consumed by the packaging matrix; `LITERT_LM_REF` pinned in `scripts/setup-litert-cpp.mjs`).** Previous: 2026-05-03 (Windows CI: llamafile download → LiteRT-LM C++ bridge build/bundle; see Background revision). |
 | **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally)                             |
 
 ## Goal
@@ -151,9 +151,18 @@ jobs:
 - **Windows LiteRT C++ Track A**: once validated, the Windows job must fetch or restore a pinned LiteRT-LM checkout before packaging, run `npm run build:litert-cpp-bridge`, and include the resulting `bin/delfin_litert_bridge.exe` in the Electron resources. The `.litertlm` model remains a first-run download and is not uploaded as a GitHub Actions artifact.
 - **Linux**: `ubuntu-latest` is x64. The AppImage produced here runs on any reasonably modern Linux distribution.
 
-### Track DC1a — LiteRT C++ bridge artifact handoff (conditional)
+### Track DC1a — LiteRT C++ bridge artifact handoff
 
-This track is activated only if `native-windows-backend-research-spec.md` Track A passes. The Windows runner performs developer/CI-only build work:
+> **2026-05-04 update.** This track is partially implemented as `.github/workflows/build-litert-cpp-bridge.yml`. That workflow:
+>
+> - Runs on `push` to `main`, `pull_request` to `main`, `release.published`, and `workflow_dispatch`.
+> - Builds `delfin_litert_bridge` for `windows-x64` (with `libGemmaModelConstraintProvider.dll`), `macos-arm64`, and `linux-x64` against the upstream ref pinned in `scripts/setup-litert-cpp.mjs` (`LITERT_LM_REF`, currently `v0.10.2`).
+> - Uploads each platform's binary as a workflow artifact `delfin-litert-bridge-<platform>`.
+> - On `release.published`, attaches the same archives to the GitHub Release.
+>
+> The full distribution matrix (`dist.yml`) below should consume those release assets / workflow artifacts rather than rebuilding the bridge inline.
+
+Original outline (still applies as the consumer-side handoff):
 
 1. Restore or clone the pinned `google-ai-edge/LiteRT-LM` source tree.
 2. Run `npm run build:litert-cpp-bridge -- --litert-lm-dir <checkout> --output-dir bin`.

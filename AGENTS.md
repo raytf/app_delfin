@@ -35,7 +35,12 @@ CLAUDE.md                            ← Claude Code shim; points back to AGENTS
 └── rules/
     └── delfin.md                    ← Augment/Auggie shim; points back to AGENTS.md and docs/SPEC.md.
 STATUS.md                            ← Live feature status tracker. Update after every implementation change.
+.github/
+└── workflows/
+    └── build-litert-cpp-bridge.yml  ← CI matrix (windows-2022 / macos-14 / ubuntu-24.04) that builds delfin_litert_bridge against the LITERT_LM_REF pin and uploads platform artifacts; attaches archives to GitHub Releases on release.published.
 scripts/
+├── setup-litert-cpp.mjs             ← Interactive setup script: clones LiteRT-LM at LITERT_LM_REF, builds the bridge, and writes .env. WSL2/Linux/macOS is the default; --native-windows enables the Bazel/MSVC path on Windows.
+├── setup-litert-cpp.test.mjs        ← Vitest test suite for setup-litert-cpp.mjs (parseArgs, --native-windows flag, usage() output).
 └── benchmark/                       ← Standalone inference benchmark harness (LiteRT vs llamafile/llama-server).
     ├── SETUP.md                     ← Benchmark setup/runbook for WSL2 LiteRT, LiteRT C++ proxy research, and native llamafile runs.
     ├── run.py                       ← Benchmark CLI entry point; writes JSON + CSV to results/.
@@ -61,7 +66,7 @@ docs/
 │   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-01); Gate 1 approved.
 │   │   ├── distribution-backend-migration-spec.md     ← 🚧 Wire chosen backend into Electron main; TTS strategy. Gate 1 — awaiting approval.
 │   │   ├── distribution-packaging-spec.md             ← 🚧 electron-builder, first-run download, NSIS/DMG/AppImage. Gate 1 — awaiting approval.
-│   │   └── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel. Gate 1 — awaiting approval.
+│   │   └── distribution-cicd-spec.md                  ← 🚧 GitHub Actions matrix + distribution channel. Track DC1a partially implemented 2026-05-04 (.github/workflows/build-litert-cpp-bridge.yml); full dist.yml electron-builder matrix awaiting approval.
 │   ├── memory/                      ← Persistent on-device knowledge that compounds across sessions
 │   │   └── memory-wiki-spec.md                        ← 🚧 On-device LLM wiki (Karpathy pattern). Internal sub-phases M0–M3. Migrated from former Phase 7.
 │   └── ui/                          ← Renderer-only UX work
@@ -272,6 +277,9 @@ These are confirmed facts — do not revisit without good reason:
 | **WSL2 espeak-ng fix**            | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`.                                                                                                                                                                                                      |
 | **Benchmark harness**             | `scripts/benchmark/run.py` compares the current LiteRT sidecar over WebSocket with llamafile/`llama-server` over OpenAI-compatible REST streaming. It measures TTFT, throughput, total turn time, approximate/exact output token count, peak RSS when a PID is available, and system metadata.                                                                                                                                                          |
 | **Benchmark outputs**             | Benchmark runs write JSON plus an append-friendly daily CSV under `results/`. Keep `results/.gitkeep`; generated result files are runtime artifacts and should stay gitignored.                                                                                                                                                                                                                                                                         |
+| **WSL2 default dev environment**  | WSL2 (or Linux / macOS) is the canonical developer environment for building the LiteRT-LM C++ bridge. Running `npm run setup:litert-cpp` on Windows without a flag **prints WSL2 instructions and exits 0** — it does not attempt a Bazel/MSVC build. Add `--native-windows` to opt in to the original Windows Bazel/MSVC path (requires VS 2022 Build Tools + Developer PowerShell). macOS is arm64 only (Intel Macs out of scope).                   |
+| **LITERT_LM_REF pin**             | The constant `LITERT_LM_REF` in `scripts/setup-litert-cpp.mjs` (default `v0.10.2`, overridable via the env var of the same name) is the single source of truth for which upstream LiteRT-LM commit both the local setup script and the CI matrix workflow clone and build against. Update it there; the CI workflow reads it at runtime via `node -e`.                                                                                                 |
+| **CI bridge binary workflow**     | `.github/workflows/build-litert-cpp-bridge.yml` owns native bridge binary production for all three platforms (windows-x64, macos-arm64, linux-x64). It triggers on push/PR to `main`, on `release.published`, and on `workflow_dispatch`. It uploads per-platform archives as workflow artifacts and attaches them to GitHub Releases. The full `dist.yml` electron-builder packaging matrix (Track DC1) should consume these artifacts rather than rebuilding the bridge inline. |
 
 ---
 

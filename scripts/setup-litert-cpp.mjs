@@ -13,7 +13,11 @@ import { buildBridge, commandExists, rootDir } from './build-litert-cpp-bridge.m
 import { installVoice, listInstalledVoices, useVoice } from './piper-voice.mjs'
 import { downloadFile, loadEnv } from './download-models.mjs'
 
-const LITERT_LM_REPO = 'https://github.com/google-ai-edge/LiteRT-LM.git'
+export const LITERT_LM_REPO = 'https://github.com/google-ai-edge/LiteRT-LM.git'
+// Pinned upstream LiteRT-LM ref. Both this script and the CI workflow at
+// .github/workflows/build-litert-cpp-bridge.yml consume this constant — keep
+// them in sync. Bump only after revalidating the bridge against the new ref.
+export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.10.2'
 const DEFAULT_PIPER_VOICE = 'en/en_US/hfc_female/medium'
 const HF_BASE = 'https://huggingface.co'
 
@@ -53,9 +57,16 @@ export function usage() {
   return `Usage: node scripts/setup-litert-cpp.mjs [options]
        npm run setup:litert-cpp
 
+Default developer environment is Linux / macOS (arm64) / WSL2. On a Windows
+host without --native-windows, this script prints WSL2 setup instructions
+and exits — the actual build runs inside WSL2.
+
 Options:
   --litert-lm-dir <path>   LiteRT-LM checkout path
                            (default: <parent folder of project>/LiteRT-LM)
+  --native-windows         Build natively on Windows using Bazel + MSVC
+                           (Developer PowerShell for VS 2022 required).
+                           Only valid on Windows.
   --install-prereqs        Auto-install Bazelisk via winget (Win) or brew (Mac)
   --skip-clone             Use existing checkout; skip git clone
   --skip-build             Skip Bazel build (env / Piper / model steps still run)
@@ -69,11 +80,13 @@ Options:
 export function parseArgs(argv) {
   const opts = {
     litertLmDir: undefined, installPrereqs: false, skipClone: false, skipBuild: false,
-    noPiper: false, piperVoice: DEFAULT_PIPER_VOICE, noModel: false, dryRun: false, help: false,
+    noPiper: false, piperVoice: DEFAULT_PIPER_VOICE, noModel: false, dryRun: false,
+    nativeWindows: false, help: false,
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--litert-lm-dir')         { opts.litertLmDir = argv[++i]; continue }
+    if (a === '--native-windows')        { opts.nativeWindows = true; continue }
     if (a === '--install-prereqs')       { opts.installPrereqs = true; continue }
     if (a === '--skip-clone')            { opts.skipClone = true; continue }
     if (a === '--skip-build')            { opts.skipBuild = true; continue }
@@ -90,11 +103,46 @@ export function parseArgs(argv) {
 
 // ─── steps ───────────────────────────────────────────────────────────────────
 
-function stepPlatformCheck() {
-  if (process.platform !== 'win32') {
-    console.warn(
-      `\n⚠️  Native LiteRT-LM C++ bridge has not been validated on ${process.platform} yet — proceeding experimentally.\n`,
-    )
+function printWsl2Instructions() {
+  console.log(`
+Recommended developer environment on Windows is WSL2 (Ubuntu).
+Native Windows local builds remain available via --native-windows.
+
+  1. wsl --install -d Ubuntu
+  2. Inside WSL2 (Ubuntu):
+       sudo apt update && sudo apt install -y git git-lfs build-essential \\
+         clang python3 python3-pip default-jdk
+       mkdir -p ~/.local/bin
+       curl -L -o ~/.local/bin/bazelisk \\
+         https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+       chmod +x ~/.local/bin/bazelisk
+       export PATH="$HOME/.local/bin:$PATH"
+       # Clone Delfin under your WSL2 home (NOT under /mnt/c — Bazel is
+       # unusably slow on the cross-filesystem boundary).
+       cd ~ && git clone <delfin repo> app_delfin
+       cd ~/app_delfin && npm install && npm run setup:litert-cpp
+  3. In a second terminal on the Windows host:
+       cd C:\\path\\to\\app_delfin && npm install && npm run dev
+       # Electron connects to ws://localhost:8321 forwarded by WSL2.
+
+To build a fully native Windows .exe locally instead, rerun this script
+with --native-windows from a Developer PowerShell for VS 2022:
+
+  npm run setup:litert-cpp -- --native-windows
+`)
+}
+
+function stepPlatformCheck(opts) {
+  if (opts.nativeWindows && process.platform !== 'win32') {
+    console.error('[setup-litert-cpp] ❌ --native-windows is only valid on Windows.')
+    process.exit(1)
+  }
+  if (process.platform === 'win32' && !opts.nativeWindows) {
+    printWsl2Instructions()
+    process.exit(0)
+  }
+  if (process.platform === 'win32' && opts.nativeWindows) {
+    console.log('[setup-litert-cpp] --native-windows: running native Windows Bazel + MSVC flow.')
   }
 }
 
@@ -150,11 +198,11 @@ async function stepClone(litertLmDir, opts) {
     process.exit(1)
   }
   if (opts.dryRun) {
-    console.log(`[setup-litert-cpp] [dry-run] Would clone ${LITERT_LM_REPO} → ${litertLmDir}`)
+    console.log(`[setup-litert-cpp] [dry-run] Would clone ${LITERT_LM_REPO} @ ${LITERT_LM_REF} → ${litertLmDir}`)
     return
   }
-  console.log(`[setup-litert-cpp] Cloning LiteRT-LM → ${litertLmDir}`)
-  await runCommand('git', ['clone', LITERT_LM_REPO, litertLmDir], rootDir)
+  console.log(`[setup-litert-cpp] Cloning LiteRT-LM @ ${LITERT_LM_REF} → ${litertLmDir}`)
+  await runCommand('git', ['clone', '--branch', LITERT_LM_REF, '--depth', '1', LITERT_LM_REPO, litertLmDir], rootDir)
   console.log('[setup-litert-cpp] ✅ Clone complete.')
 }
 
@@ -301,7 +349,7 @@ async function main() {
   if (opts.dryRun) console.log('  *** DRY RUN — no files will be changed ***')
   console.log()
 
-  stepPlatformCheck()
+  stepPlatformCheck(opts)
   await stepPrereqs(opts)
 
   const litertLmDir = resolveLitertLmDir(opts)
@@ -319,7 +367,13 @@ async function main() {
   printSummary(litertLmDir, opts)
 }
 
-main().catch((err) => {
-  console.error('\n[setup-litert-cpp] ❌ Setup failed:', err.message)
-  process.exit(1)
-})
+function isDirectExecution() {
+  return process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+}
+
+if (isDirectExecution()) {
+  main().catch((err) => {
+    console.error('\n[setup-litert-cpp] ❌ Setup failed:', err.message)
+    process.exit(1)
+  })
+}

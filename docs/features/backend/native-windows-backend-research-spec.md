@@ -44,6 +44,10 @@ Track A has a strict build/runtime split:
 - **End user only:** the packaged app receives a prebuilt `delfin_litert_bridge.exe` plus bundled Node proxy scripts. The user never needs the LiteRT-LM source tree, Bazel, or a compiler.
 - **First-run asset:** `gemma-4-E2B-it.litertlm` remains a model download/cache item, not a committed repo file or required compiler input.
 
+### Developer environment policy
+
+The default LiteRT-LM C++ developer environment is **Linux / macOS (arm64) / WSL2**. On a Windows host, `npm run setup:litert-cpp` prints WSL2 setup instructions and exits unless `--native-windows` is passed; with the flag, it runs the existing Bazel + MSVC flow. This decision moves the historic Windows toolchain pain (vswhere, `BAZEL_VS`/`BAZEL_VC`, `Hostx64\x64\cl.exe` ordering, `LongPathsEnabled`, `output_user_root=C:/b`, MSVC workload completeness) off the default developer path while preserving the ability to produce and test a native Windows `.exe` locally. End-user distribution still ships native Windows binaries — those are produced by CI per `docs/features/distribution/distribution-cicd-spec.md`.
+
 ### Current validation snapshot — 2026-05-03
 
 - ✅ Native Windows build succeeded after updating Visual Studio 2022 to 17.14.31 / MSVC 14.44 and using a short Bazel output root (`D:\b`).

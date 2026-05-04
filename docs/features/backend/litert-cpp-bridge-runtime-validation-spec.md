@@ -53,19 +53,23 @@ Per `native-windows-backend-research-spec.md` §A5, a passing Track A validation
 
 ### Phase 3 — macOS native bridge build + validation
 
+Per `native-windows-backend-research-spec.md` §Developer environment policy, macOS arm64 is the primary macOS target and the build runs natively (no `--config=windows`, no MSVC). `npm run setup:litert-cpp` performs the clone + build automatically.
+
 | Step | Action |
 | ---- | ------ |
-| 3a   | On macOS (arm64 first, then x64 if available), run `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path>` with the macOS Bazel target. |
+| 3a   | On macOS arm64, run `npm run setup:litert-cpp` (or the lower-level `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path>`). |
 | 3b   | Verify `bin/delfin_litert_bridge` is produced and executable. |
 | 3c   | Run `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'`. Record numbers alongside the Windows results. |
 | 3d   | Run manual checks 2a–2g on macOS. |
 
-### Phase 4 — Linux native bridge build + validation
+### Phase 4 — Linux / WSL2 native bridge build + validation
+
+Linux is the default developer environment for both native Linux hosts and WSL2 distros on Windows. Builds run with Bazel's auto-detected clang toolchain — no platform config, no env vars.
 
 | Step | Action |
 | ---- | ------ |
-| 4a   | On Linux x64 (or WSL2 Ubuntu as a proxy), build and verify `bin/delfin_litert_bridge` using the Linux Bazel target. |
-| 4b   | Run the same benchmark sweep and manual checks. |
+| 4a   | On Linux x64 (native or WSL2 Ubuntu), run `npm run setup:litert-cpp` and verify `bin/delfin_litert_bridge` is produced and executable. |
+| 4b   | Run the same benchmark sweep and manual checks. WSL2 reachability from the Windows host (Electron → `ws://localhost:8321`) is part of 2a. |
 
 ### Phase 5 — Distribution decision (conditional on Phases 1–4 passing)
 

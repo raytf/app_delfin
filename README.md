@@ -27,7 +27,7 @@ Delfin runs Gemma 4 locally using one of the following backends depending on you
 | Backend           | Platforms                                           | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **LiteRT-LM**     | macOS, Linux, Windows + WSL2                        | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. Used by the Python sidecar.                                                                                                                                                                                                                            |
-| **LiteRT-LM C++** | Native Windows (validated); macOS/Linux planned     | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Same KV-cache, vision, and audio-input parity as the Python sidecar, plus Piper-backed sentence-level TTS. **Recommended path for Windows users who do not want to set up WSL2.** Run `npm run setup:litert-cpp` to clone, build, and configure end-to-end.                                                                                            |
+| **LiteRT-LM C++** | Linux / macOS (arm64) / WSL2 default; Native Windows opt-in | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Same KV-cache, vision, and audio-input parity as the Python sidecar, plus Piper-backed sentence-level TTS. Default developer environment is Linux / macOS (arm64) / WSL2; `npm run setup:litert-cpp -- --native-windows` produces a native Windows `.exe`. End-user Windows distribution receives a CI-built native binary.                          |
 | ~~llamafile~~     | _Removed_                                           | Mozilla's single-file llama.cpp server. Previously the recommended Windows-without-WSL2 fallback. **Superseded by the LiteRT-LM C++ backend.** The `setup:llamafile`, `dev:llamafile`, and `benchmark:llamafile` npm scripts have been removed. The standalone Python benchmark adapter (`scripts/benchmark/backends/llamafile.py`) is retained for comparison runs only. |
 
 For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by developers or CI to build `delfin_litert_bridge.exe`. End users should receive a prebuilt bridge executable in the packaged app and download only the `.litertlm` model/TTS assets at first run.
@@ -107,9 +107,14 @@ npm run dev                  # starts Electron + Vite only (sidecar is already r
 
 ---
 
-### Windows without WSL2 (LiteRT-LM C++ native backend)
+### Windows native (LiteRT-LM C++ backend, opt-in)
 
-Uses the LiteRT-LM C++ backend — same inference engine as the Python sidecar but compiled natively on Windows, with no Python or WSL2 required. Replaces the previous llamafile fallback.
+The default LiteRT-LM C++ developer environment on Windows is **WSL2** — see
+the WSL2 section above and `native/litert-cpp-bridge/README.md` for the
+two-terminal workflow (bridge in WSL2, Electron on Windows). Use this section
+only when you need to produce or test a native Windows `.exe` locally without
+going through CI. Running `npm run setup:litert-cpp` on Windows without
+`--native-windows` prints the WSL2 instructions and exits.
 
 **Prerequisites:**
 
@@ -117,6 +122,7 @@ Uses the LiteRT-LM C++ backend — same inference engine as the Python sidecar b
 - [Git](https://git-scm.com/) on PATH
 - [Bazelisk](https://github.com/bazelbuild/bazelisk) — `winget install --id Bazel.Bazelisk -e` (or pass `--install-prereqs` to the setup script)
 - Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. Install the bootstrapper with `winget install --id Microsoft.VisualStudio.2022.BuildTools -e`, then open Visual Studio Installer → Modify and confirm **MSVC v143 x64/x86 build tools** plus a Windows 10/11 SDK are selected. MinGW is not supported.
+- Python 3.13 and Java with `JAVA_HOME` set, per upstream LiteRT-LM Windows prerequisites
 
 Recommended first build shell: open **Developer PowerShell for VS 2022** or **x64 Native Tools Command Prompt for VS 2022**. If Bazel reports symlink permission errors, reopen that shell with **Run as administrator**.
 
@@ -127,7 +133,7 @@ where.exe cl
 cl
 ```
 
-If `where.exe cl` cannot find `cl.exe`, finish installing the C++ workload or reopen a VS Developer shell before running setup.
+`where.exe cl` must resolve to `Hostx64\x64\cl.exe`. If it lists `Hostx86\x86\cl.exe` instead, your shell is initialized for x86; reopen the **x64 Native Tools** shell or run `Launch-VsDevShell.ps1 -Arch amd64 -HostArch amd64`.
 
 Clone Delfin, install Node dependencies, then give Bazel a short output root before the first build. The setup script looks for LiteRT-LM in the parent folder by default, so pre-clone/configure it like this:
 
@@ -145,7 +151,7 @@ if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
 }
 bazelisk shutdown
 cd ..\app_delfin
-npm run setup:litert-cpp   # uses LiteRT-LM, builds the bridge, configures Piper TTS, and resolves the .litertlm model
+npm run setup:litert-cpp -- --native-windows   # builds the native Windows bridge, configures Piper TTS, resolves the .litertlm model
 ```
 
 The script is idempotent and accepts `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.

@@ -1,0 +1,143 @@
+name: build-litert-cpp-bridge
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.platform_label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            arch: x64
+            platform_label: windows-x64
+            binary: delfin_litert_bridge.exe
+            extra_files: libGemmaModelConstraintProvider.dll
+          - os: macos-14
+            arch: arm64
+            platform_label: macos-arm64
+            binary: delfin_litert_bridge
+            extra_files: ''
+          - os: ubuntu-24.04
+            arch: x64
+            platform_label: linux-x64
+            binary: delfin_litert_bridge
+            extra_files: ''
+
+    steps:
+      - name: Checkout Delfin
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Resolve LITERT_LM_REF from setup-litert-cpp.mjs
+        id: ref
+        shell: bash
+        run: |
+          REF=$(node --input-type=module -e "import('./scripts/setup-litert-cpp.mjs').then(m => process.stdout.write(m.LITERT_LM_REF))")
+          echo "value=$REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved LITERT_LM_REF=$REF"
+
+      - name: Set up Bazelisk (uses LiteRT-LM/.bazelversion)
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ matrix.platform_label }}
+          repository-cache: true
+
+      - name: Linux prereqs (clang, JDK, Git LFS)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y git-lfs build-essential clang default-jdk python3 python3-pip
+          git lfs install
+
+      - name: macOS prereqs (Git LFS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install git-lfs
+          git lfs install
+
+      - name: Windows prereqs (vswhere, BAZEL_VS, long paths)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $vs) { throw "vswhere did not find a usable Visual Studio install." }
+          echo "BAZEL_VS=$vs" >> $env:GITHUB_ENV
+          echo "BAZEL_VC=$vs\VC" >> $env:GITHUB_ENV
+          # Honour Windows long paths during git/Bazel operations.
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force | Out-Null
+          git config --system core.longpaths true
+
+      - name: Clone LiteRT-LM @ ${{ steps.ref.outputs.value }}
+        shell: bash
+        run: |
+          git clone --branch "${{ steps.ref.outputs.value }}" --depth 1 \
+            https://github.com/google-ai-edge/LiteRT-LM.git ../LiteRT-LM
+
+      - name: Configure short Bazel output root (Windows only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\b | Out-Null
+          $bazelrc = "..\LiteRT-LM\.bazelrc"
+          if (-not (Select-String -Path $bazelrc -Pattern 'output_user_root' -Quiet)) {
+            Add-Content $bazelrc "`nstartup --output_user_root=C:/b"
+          }
+
+      - name: Build delfin_litert_bridge
+        shell: bash
+        run: |
+          node scripts/build-litert-cpp-bridge.mjs --litert-lm-dir ../LiteRT-LM
+
+      - name: Stage artifact directory
+        shell: bash
+        run: |
+          STAGE="dist/${{ matrix.platform_label }}"
+          mkdir -p "$STAGE"
+          cp "bin/${{ matrix.binary }}" "$STAGE/"
+          if [ -n "${{ matrix.extra_files }}" ]; then
+            for f in ${{ matrix.extra_files }}; do
+              SRC="../LiteRT-LM/bazel-bin/runtime/engine/$f"
+              if [ -f "$SRC" ]; then
+                cp "$SRC" "$STAGE/"
+              else
+                echo "::warning::Expected extra artifact not found: $SRC"
+              fi
+            done
+          fi
+          ls -la "$STAGE"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: delfin-litert-bridge-${{ matrix.platform_label }}
+          path: dist/${{ matrix.platform_label }}/**
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.platform_label }}/**
