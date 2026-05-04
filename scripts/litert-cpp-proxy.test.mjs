@@ -152,6 +152,31 @@ function createDelayedDoneBridge() {
   }
 }
 
+function createLongStreamingBridge() {
+  let activeHandlers
+  const longChunk = Array.from({ length: 42 }, (_, index) => `word${index}`).join(' ')
+  return {
+    getInfo() {
+      return { ready: true, backend: 'litert-cpp', model: 'mock-gemma-4' }
+    },
+    async ready() {},
+    async generate(request, handlers) {
+      activeHandlers = handlers
+      handlers.onToken(longChunk)
+    },
+    releaseDone() {
+      activeHandlers.onDone({
+        requestId: 'long-streaming-request',
+        text: longChunk,
+        message: { role: 'model', content: [{ type: 'text', text: longChunk }] },
+      })
+    },
+    interrupt() {},
+    resetSession() {},
+    async close() {},
+  }
+}
+
 function createMockBridge() {
   const inFlight = new Map()
   const sessionTurns = new Map()
@@ -322,6 +347,30 @@ describe('startLitertCppProxy', () => {
     ])
     expect(tts.state.segments).toEqual(['First sentence.', 'Second sentence'])
     expect(tts.state.finished).toBe(1)
+    socket.close()
+  })
+
+  it('starts streaming Piper audio from long partial text before bridge done', async () => {
+    const bridge = createLongStreamingBridge()
+    const tts = createMockStreamingTtsBackend()
+    proxy = await startLitertCppProxy({
+      host: '127.0.0.1',
+      port: 0,
+      createBridge: () => bridge,
+      createTtsBackend: () => tts,
+    })
+    const socket = await openSocket(`ws://127.0.0.1:${proxy.port}/ws`)
+
+    socket.send(JSON.stringify({ text: 'explain this slide', preset_id: 'lecture-slide' }))
+    const earlyMessages = await collectUntil(socket, 'audio_chunk')
+
+    expect(earlyMessages.map((message) => message.type)).toEqual(['token', 'audio_start', 'audio_chunk'])
+    expect(tts.state.segments[0].length).toBeGreaterThan(80)
+    expect(tts.state.finished).toBe(0)
+
+    bridge.releaseDone()
+    const remainingMessages = await collectUntil(socket, 'done')
+    expect(remainingMessages.at(-1)).toMatchObject({ type: 'done' })
     socket.close()
   })
 

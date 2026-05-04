@@ -14,6 +14,8 @@ import { resolvePreset } from "./litert-cpp-presets.mjs";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 dotenvConfig({ path: resolve(rootDir, ".env") });
 const bridgeReadyTimeoutMs = 120_000;
+const streamingTtsSoftMinChars = Number(process.env.LITERT_CPP_TTS_SOFT_MIN_CHARS ?? "80");
+const streamingTtsSoftMaxChars = Number(process.env.LITERT_CPP_TTS_SOFT_MAX_CHARS ?? "180");
 
 function sendJson(ws, payload) {
   if (ws.readyState !== 1) return false;
@@ -98,6 +100,18 @@ function splitCompleteSentences(buffer, options = {}) {
     return { segments, remaining: "" };
   }
 
+  const softMaxChars = Number(options.softMaxChars ?? 0);
+  const softMinChars = Number(options.softMinChars ?? Math.floor(softMaxChars / 2));
+  if (softMaxChars > 0 && remaining.length >= softMaxChars) {
+    let cut = remaining.lastIndexOf(" ", softMaxChars);
+    if (cut < softMinChars) cut = remaining.indexOf(" ", softMinChars);
+    if (cut >= softMinChars) {
+      const segment = normalizeTtsSegment(remaining.slice(0, cut));
+      if (segment) segments.push(segment);
+      return { segments, remaining: remaining.slice(cut).trimStart() };
+    }
+  }
+
   return { segments, remaining };
 }
 
@@ -161,7 +175,8 @@ function resolveLitertCppTtsConfig() {
     rootDir,
     "bin",
     "piper",
-    process.platform === "win32" ? "piper.exe" : "piper",
+    "venv",
+    process.platform === "win32" ? "Scripts/piper.exe" : "bin/piper",
   );
   const rawBinPath = process.env.PIPER_BIN ?? defaultBin;
   const binPath = resolve(rootDir, rawBinPath);
@@ -736,7 +751,10 @@ export async function startLitertCppProxy(options = {}) {
               sendJson(ws, { type: "token", text });
 
               if (text.trim()) ensureStreamingTtsRun();
-              enqueueStreamingTtsText(text);
+              enqueueStreamingTtsText(text, {
+                softMinChars: streamingTtsSoftMinChars,
+                softMaxChars: streamingTtsSoftMaxChars,
+              });
             },
             async onDone(doneEvent) {
               try {

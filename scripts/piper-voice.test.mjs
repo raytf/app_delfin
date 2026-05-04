@@ -1,15 +1,18 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { readPiperSampleRate } from "./litert-cpp-proxy.mjs";
 import {
+  ensurePiperRuntime,
   installVoice,
   listInstalledVoices,
   parseCliArgs,
   readSampleRateFromConfigText,
+  resolveDefaultPiperBinPath,
+  resolvePiperPythonPath,
   useVoice,
   voiceNameFromPath,
 } from "./piper-voice.mjs";
@@ -109,7 +112,86 @@ describe("piper voice helper", () => {
       "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json",
     ]);
     await expect(readFile(join(modelsDir, "en_US-hfc_female-medium.onnx"), "utf8")).resolves.toBe("onnx-bytes");
-    await expect(readFile(envPath, "utf8")).resolves.toContain("PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx");
+    const env = await readFile(envPath, "utf8");
+    expect(env).toContain("LITERT_CPP_TTS_BACKEND=piper");
+    expect(env).toContain("PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx");
+    expect(env).toContain("PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json");
+    expect(env).toContain("PIPER_SAMPLE_RATE=22050");
+  });
+
+  it("reuses an existing configured Piper runtime without reinstalling", async () => {
+    const { rootDir, envPath } = await createTempRoot();
+    const customDir = join(rootDir, "custom-piper");
+    const customBin = join(customDir, process.platform === "win32" ? "piper.exe" : "piper");
+    await mkdir(customDir, { recursive: true });
+    await writeFile(customBin, "piper-binary");
+    await writeFile(envPath, `PIPER_BIN=./${customBin.slice(rootDir.length + 1).replaceAll("\\", "/")}\n`);
+
+    const result = await ensurePiperRuntime({
+      rootDir,
+      envPath,
+      checkRuntimeHealthy: async () => true,
+      runCommand: async () => {
+        throw new Error("runtime install should not run");
+      },
+    });
+
+    expect(result).toMatchObject({ binPath: customBin, installed: false, source: "env" });
+  });
+
+  it("installs a repo-local Piper runtime and writes PIPER_BIN", async () => {
+    const { rootDir, envPath } = await createTempRoot();
+    const defaultBinPath = resolveDefaultPiperBinPath(rootDir);
+    const venvPython = resolvePiperPythonPath(rootDir);
+    const commands = [];
+
+    const result = await ensurePiperRuntime({
+      rootDir,
+      envPath,
+      pythonCommand: "python-test",
+      checkRuntimeHealthy: async () => true,
+      runCommand: async (command, args) => {
+        commands.push([command, args]);
+        if (args[0] === "-m" && args[1] === "venv") {
+          await mkdir(join(rootDir, "bin", "piper", "venv", process.platform === "win32" ? "Scripts" : "bin"), { recursive: true });
+          await writeFile(venvPython, "python-runtime");
+          return;
+        }
+        if (args[0] === "-m" && args[1] === "pip" && args[2] === "install") {
+          await mkdir(dirname(defaultBinPath), { recursive: true });
+          await writeFile(defaultBinPath, "piper-runtime");
+        }
+      },
+    });
+
+    expect(result.installed).toBe(true);
+    expect(result.binPath).toBe(defaultBinPath);
+    expect(commands).toHaveLength(3);
+    await expect(readFile(envPath, "utf8")).resolves.toContain(
+      `PIPER_BIN=./${defaultBinPath.slice(rootDir.length + 1).replaceAll("\\", "/")}`,
+    );
+  });
+
+  it("repairs missing Piper runtime companion packages in an existing venv", async () => {
+    const { rootDir, envPath } = await createTempRoot();
+    const defaultBinPath = resolveDefaultPiperBinPath(rootDir);
+    await mkdir(dirname(defaultBinPath), { recursive: true });
+    await writeFile(defaultBinPath, "piper-runtime");
+    const checks = [false, true];
+    const commands = [];
+
+    const result = await ensurePiperRuntime({
+      rootDir,
+      envPath,
+      checkRuntimeHealthy: async () => checks.shift(),
+      runCommand: async (command, args) => {
+        commands.push([command, args]);
+      },
+    });
+
+    expect(result).toMatchObject({ source: "existing", repaired: true });
+    expect(commands).toHaveLength(1);
+    expect(commands[0][1]).toEqual(expect.arrayContaining(["pathvalidate>=3,<4"]));
   });
 
   it("lets the proxy infer PIPER_SAMPLE_RATE from PIPER_CONFIG when env is unset", async () => {
