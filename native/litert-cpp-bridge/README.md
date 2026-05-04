@@ -16,6 +16,39 @@ npm run setup:litert-cpp
 
 Pass `--help` to see all options (`--litert-lm-dir`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, `--dry-run`, …).
 
+### Windows prerequisites and first-build checklist
+
+Run the first build from **Developer PowerShell for VS 2022** or **x64 Native Tools Command Prompt for VS 2022**. Install these first:
+
+- Git on PATH
+- Bazelisk: `winget install --id Bazel.Bazelisk -e`
+- Build Tools for Visual Studio 2022 (`winget install --id Microsoft.VisualStudio.2022.BuildTools -e`) with **Desktop development with C++**, including MSVC v143 and a Windows SDK
+
+Verify the compiler before invoking Bazel:
+
+```powershell
+where.exe cl
+cl
+```
+
+If `cl.exe` is missing, reopen the VS Developer shell or finish installing the C++ workload in Visual Studio Installer.
+
+Bazel also needs to extract upstream archives that contain symlinks. If Windows denies symlink creation, enable Developer Mode or use an Administrator VS Developer shell. A short Bazel output root avoids both path-length and stale-cache issues:
+
+```powershell
+cd C:\Users\<you>\projects\LiteRT-LM
+New-Item -ItemType Directory -Force C:\b | Out-Null
+if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
+  Add-Content .\.bazelrc "`nstartup --output_user_root=C:/b"
+}
+bazelisk shutdown
+```
+
+Common failures:
+
+- `createSymbolicLinkW failed (permission denied)`: use Developer Mode or an Administrator VS Developer shell, keep the short `C:/b` output root, then retry.
+- `SET INCLUDE=msvc_not_found` or `vc_installation_error_x64.bat`: Bazel cannot find MSVC; install **Desktop development with C++**, reopen a VS Developer shell, and confirm `where.exe cl` works. If needed, set `$env:BAZEL_VS = "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"` before rerunning setup.
+
 ---
 
 ## Current status — 2026-05-03
@@ -74,6 +107,10 @@ Bridge → proxy:
 ```powershell
 git clone https://github.com/google-ai-edge/LiteRT-LM.git
 cd LiteRT-LM
+New-Item -ItemType Directory -Force C:\b | Out-Null
+if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
+  Add-Content .\.bazelrc "`nstartup --output_user_root=C:/b"
+}
 bazelisk build //runtime/engine:litert_lm_main --config=windows
 ```
 
@@ -85,18 +122,21 @@ bazelisk build //runtime/engine:litert_lm_main --config=windows
 npm run build:litert-cpp-bridge -- -- --litert-lm-dir D:\path\to\LiteRT-LM
 ```
 
-> **Windows path-length workaround.** If the Bazel build fails inside
-> `rules_rust` with `LINK : fatal error LNK1181` on a long object-file path
-> (>260 chars), pass `--output_user_root` as a startup option to Bazelisk:
+> **Windows output-root workaround.** If Bazel still uses
+> `C:\Users\<you>\_bazel_<you>\...`, add the startup option to
+> `LiteRT-LM\.bazelrc` and restart Bazel:
 >
 > ```powershell
 > cd D:\path\to\LiteRT-LM
-> bazelisk --output_user_root=D:\b build //runtime/engine:delfin_litert_bridge --config=windows
+> New-Item -ItemType Directory -Force D:\b | Out-Null
+> if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
+>   Add-Content .\.bazelrc "`nstartup --output_user_root=D:/b"
+> }
+> bazelisk shutdown
 > ```
 >
-> Then copy `bazel-bin/runtime/engine/delfin_litert_bridge.exe` into
-> `Delfin/bin/` manually. A shorter root (e.g. `D:\b`) keeps `rules_rust`
-> generated paths under the Windows MAX_PATH limit.
+> A shorter root (for example `C:\b` or `D:\b`) keeps generated paths under
+> Windows path limits and avoids reusing old failed extraction state.
 
 Use `node scripts/build-litert-cpp-bridge.mjs --plan --litert-lm-dir <path>` for a dry-run plan without invoking Bazel.
 

@@ -115,17 +115,46 @@ Uses the LiteRT-LM C++ backend — same inference engine as the Python sidecar b
 
 - [Node.js 20+](https://nodejs.org/)
 - [Git](https://git-scm.com/) on PATH
-- [Bazelisk](https://github.com/bazelbuild/bazelisk) — `winget install Bazel.Bazelisk` (or pass `--install-prereqs` to the setup script)
-- Visual Studio 2022 with the **"Desktop development with C++"** workload (MSVC 14.44+). MinGW is not supported.
+- [Bazelisk](https://github.com/bazelbuild/bazelisk) — `winget install --id Bazel.Bazelisk -e` (or pass `--install-prereqs` to the setup script)
+- Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. Install the bootstrapper with `winget install --id Microsoft.VisualStudio.2022.BuildTools -e`, then open Visual Studio Installer → Modify and confirm **MSVC v143 x64/x86 build tools** plus a Windows 10/11 SDK are selected. MinGW is not supported.
+
+Recommended first build shell: open **Developer PowerShell for VS 2022** or **x64 Native Tools Command Prompt for VS 2022**. If Bazel reports symlink permission errors, reopen that shell with **Run as administrator**.
+
+Before the first build, verify MSVC is visible:
+
+```powershell
+where.exe cl
+cl
+```
+
+If `where.exe cl` cannot find `cl.exe`, finish installing the C++ workload or reopen a VS Developer shell before running setup.
+
+Clone Delfin, install Node dependencies, then give Bazel a short output root before the first build. The setup script looks for LiteRT-LM in the parent folder by default, so pre-clone/configure it like this:
 
 ```powershell
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
-npm run setup:litert-cpp   # clones LiteRT-LM, builds the bridge, configures Piper TTS, and resolves the .litertlm model
+
+cd ..
+git clone https://github.com/google-ai-edge/LiteRT-LM.git
+cd LiteRT-LM
+New-Item -ItemType Directory -Force C:\b | Out-Null
+if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
+  Add-Content .\.bazelrc "`nstartup --output_user_root=C:/b"
+}
+bazelisk shutdown
+cd ..\app_delfin
+npm run setup:litert-cpp   # uses LiteRT-LM, builds the bridge, configures Piper TTS, and resolves the .litertlm model
 ```
 
 The script is idempotent and accepts `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.
+
+#### Troubleshooting Windows setup
+
+- **`createSymbolicLinkW failed (permission denied)` / `Cannot create symlink`** — enable Windows Developer Mode, then run setup from an Administrator VS Developer shell. Keep `startup --output_user_root=C:/b` (or `D:/b`) in `LiteRT-LM\.bazelrc`, run `bazelisk shutdown`, and retry.
+- **`SET INCLUDE=msvc_not_found` / `vc_installation_error_x64.bat`** — Bazel cannot find Visual C++ Build Tools. Install or modify **Build Tools for Visual Studio 2022** in Visual Studio Installer, select **Desktop development with C++**, reopen a VS Developer shell, and confirm `where.exe cl` works.
+- **Bazel still cannot find Visual Studio** — in the same shell, set `BAZEL_VS` to your install path before retrying, for example: `$env:BAZEL_VS = "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"`.
 
 Then start the app in **two PowerShell terminals**:
 
