@@ -1,10 +1,10 @@
-# Testing the Native Backend — macOS
+# macOS Native Backend Setup & Validation Guide
 
-> **Who is this for?** A team member on a macOS machine (arm64 Apple Silicon or Intel x64) who wants to validate the LiteRT-LM C++ bridge on the `research/distribution-and-native-backend` branch.
+> **Who is this for?** A developer or tester on macOS (Apple Silicon or Intel) who wants the full setup + validation flow for the LiteRT-LM C++ bridge.
 
 ---
 
-## What you are testing
+## What this guide covers
 
 The LiteRT-LM C++ bridge (`delfin_litert_bridge`) replaces the Python sidecar with a single native binary. The acceptance criteria are in [`litert-cpp-bridge-runtime-validation-spec.md`](litert-cpp-bridge-runtime-validation-spec.md). You will build the binary, run the S1/S2/S3 benchmark sweep, and optionally launch the full Electron app.
 

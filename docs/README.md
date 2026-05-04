@@ -23,6 +23,18 @@ The hackathon MVP that established the current app (Electron shell, sidecar, scr
 
 ---
 
+## Setup & validation guides
+
+These are operator runbooks for getting the app or native backend running on a specific OS. They do not follow the Gate lifecycle used by feature specs.
+
+| File                                                                                               | Status    | Description                                                                                                      |
+| -------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`features/backend/testing-guide-macos.md`](features/backend/testing-guide-macos.md)               | 🟢 Active | Full macOS setup + validation guide for the native LiteRT-LM C++ backend.                                      |
+| [`features/backend/testing-guide-linux.md`](features/backend/testing-guide-linux.md)               | 🟢 Active | Full Linux x64 / WSL2 setup + validation guide for the native LiteRT-LM C++ backend.                           |
+| [`features/backend/testing-guide-windows.md`](features/backend/testing-guide-windows.md)           | 🟢 Active | Full Windows guide covering both the default WSL2 flow and native Windows CI-artifact / local-build validation. |
+
+---
+
 ## Backend (`features/backend/`)
 
 Inference engines, native bridges, and benchmarking. Goal: a future-proof, cross-platform inference backend that does not require WSL2 on Windows.

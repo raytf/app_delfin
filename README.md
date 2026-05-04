@@ -36,6 +36,12 @@ For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are nee
 
 ## Setup by platform
 
+Full per-OS setup & validation guides:
+
+- [macOS guide](docs/features/backend/testing-guide-macos.md)
+- [Linux / WSL2 guide](docs/features/backend/testing-guide-linux.md)
+- [Windows guide (WSL2 + native)](docs/features/backend/testing-guide-windows.md)
+
 ### macOS
 
 **Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/)
@@ -157,6 +163,9 @@ npm run setup:litert-cpp -- --native-windows   # builds the native Windows bridg
 The script is idempotent and accepts `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.
 
 If you already have a successful CI run for `.github/workflows/build-litert-cpp-bridge.yml`, you can skip the local Bazel/MSVC build and use the Windows artifact helpers instead:
+
+- Install GitHub CLI first if needed: `winget install --id GitHub.cli -e`
+- Restart PowerShell so `gh` is on PATH
 
 <augment_code_snippet mode="EXCERPT">
 ````powershell

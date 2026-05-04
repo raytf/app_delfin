@@ -20,7 +20,15 @@ function Get-GhArgs([string[]]$BaseArgs, [string]$RepoName) {
 Push-Location $repoRoot
 try {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw 'GitHub CLI (gh) is required. Install it from https://cli.github.com and run gh auth login.'
+    throw @'
+GitHub CLI (gh) is required for this helper.
+
+Install it in PowerShell:
+  winget install --id GitHub.cli -e
+
+Then restart PowerShell and authenticate:
+  gh auth login
+'@
   }
 
   if ([string]::IsNullOrWhiteSpace($RunId)) {
