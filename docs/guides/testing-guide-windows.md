@@ -50,27 +50,37 @@ If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` an
 
 ---
 
-## Option B — Native Windows using the CI-built bridge artifact
+## Option B — Native Windows one-shot setup
 
 ### Prerequisites
 
 - [Node.js 20+](https://nodejs.org/)
 - [Python 3.12+](https://www.python.org/downloads/)
-- GitHub CLI: `winget install --id GitHub.cli -e`
-- Restart PowerShell so `gh` is on `PATH`
+- GitHub CLI (`winget install --id GitHub.cli -e`) and `gh auth login` for CI artifact download
+- Optional, for backend source builds: Bazelisk + Visual Studio 2022 Build Tools
 
-### Authenticate GitHub CLI
-
-```powershell
-gh auth login
-```
-
-### Download and smoke-test the latest successful Windows artifact
+### Run setup
 
 ```powershell
 cd C:\path\to\app_delfin
 npm install
+npm run setup:litert-cpp
 npm run setup-check:windows
+```
+
+What this does:
+
+1. Creates/updates `.env` with `LITERT_CPP_*` and Piper values
+2. Reuses existing `bin\` bridge files, otherwise downloads `delfin-litert-bridge-windows-x64` from the latest successful GitHub Actions workflow run via `gh`
+3. Ensures the `.litertlm` model exists under `models\`
+4. Bootstraps the repo-local Piper runtime under `bin\piper\venv\`
+5. Downloads/activates the default Piper voice and writes `LITERT_CPP_TTS_BACKEND=piper`
+
+### Optional bridge-only smoke test
+
+```powershell
+cd C:\path\to\app_delfin
+npm install
 npm run download:ci-bridge:windows
 npm run test:ci-bridge:windows -- --SkipBenchmark
 ```
@@ -80,8 +90,10 @@ What this does:
 1. Downloads `delfin-litert-bridge-windows-x64` from the latest successful workflow run
 2. Stages `delfin_litert_bridge.exe` and `libGemmaModelConstraintProvider.dll` into `bin\`
 3. Ensures `.env` points `LITERT_CPP_BIN` and `LITERT_CPP_MODEL` at the expected paths
-4. Downloads the `.litertlm` model if missing, preferring `curl.exe` for repeated retry/resume/progress attempts and using a temporary `.part` file
+4. Downloads the `.litertlm` model if missing, defaulting to Python `huggingface_hub` and falling back to Windows BITS, then `curl.exe` retry/resume with a temporary `.part` file
 5. Starts `npm run dev:litert-cpp` and waits for `http://localhost:8321/health`
+
+> This CI-artifact smoke test still validates the bridge + model path only. Prefer `npm run setup:litert-cpp` for a fresh clone because it also provisions Piper runtime/voice and `.env` TTS values.
 
 ### Run the full benchmark
 
@@ -119,6 +131,10 @@ Manual checklist:
 
 ## Option C — Native Windows local bridge build
 
+This is the backend-developer path. Default setup does not silently fall back to
+Bazel/MSVC; pass `--source-build` when you intentionally want to rebuild the
+bridge locally.
+
 ### Additional prerequisites
 
 - Bazelisk: `winget install --id Bazel.Bazelisk -e`
@@ -149,8 +165,10 @@ bazelisk shutdown
 Then from the Delfin repo:
 
 ```powershell
-npm run setup:litert-cpp -- --native-windows
+npm run setup:litert-cpp -- --source-build
 ```
+
+This setup flow now also bootstraps a repo-local pinned `piper-tts` runtime under `bin\piper\venv\` and installs/activates the default Piper voice unless you pass `--no-piper`.
 
 After that, validate with the same two-terminal app check used above:
 
@@ -201,7 +219,7 @@ Get-Content $env:TEMP\delfin-litert-cpp-proxy.err.log
 
 **Model download was interrupted**
 
-The helper writes incomplete downloads to `models\<model>.part`, retries transient `curl.exe` failures, and only renames the file after the expected byte count is reached. Rerun the command to resume the `.part` file, or delete the `.part` file first if you want a clean retry.
+The helper defaults to Python `huggingface_hub` when it is available on Windows. If that path is unavailable or fails, it falls back to Windows BITS and then to `curl.exe`. The fallback chain writes incomplete downloads to `models\<model>.part`, retries transient failures, and only renames the file after the expected byte count is reached. Rerun the command to resume the `.part` file, or delete the `.part` file first if you want a clean retry.
 
 **`createSymbolicLinkW failed (permission denied)`**
 

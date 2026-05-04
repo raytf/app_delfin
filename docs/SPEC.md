@@ -133,10 +133,13 @@ MAX_IMAGE_WIDTH=512
 # === LiteRT-LM C++ research backend ===
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
+LITERT_CPP_BRIDGE_REPO=owner/repo
 LITERT_CPP_TTS_BACKEND=none
-PIPER_BIN=./bin/piper/piper.exe
-PIPER_MODEL=./models/piper/en_US-lessac-medium.onnx
-PIPER_CONFIG=./models/piper/en_US-lessac-medium.onnx.json
+LITERT_CPP_TTS_SOFT_MIN_CHARS=80
+LITERT_CPP_TTS_SOFT_MAX_CHARS=180
+PIPER_BIN=./bin/piper/venv/Scripts/piper.exe
+PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx
+PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json
 # Optional override; if omitted, the LiteRT C++ proxy reads audio.sample_rate
 # from PIPER_CONFIG. `npm run voice:use` writes this automatically.
 PIPER_SAMPLE_RATE=22050
@@ -157,7 +160,7 @@ KOKORO_VOICE=af_heart
 KOKORO_SPEED=1.1
 ```
 
-For `npm run dev:litert-cpp`, `TTS_BACKEND` does **not** control proxy speech output. Use `LITERT_CPP_TTS_BACKEND=piper` plus the `PIPER_*` paths to enable off-Python audio on the LiteRT C++ proxy; `npm run voice:list`, `npm run voice:use -- <voice-name>`, and `npm run voice:install -- <hf-path> --use` manage local Piper voice files and `.env`. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
+For `npm run dev:litert-cpp`, `TTS_BACKEND` does **not** control proxy speech output. Use `LITERT_CPP_TTS_BACKEND=piper` plus the `PIPER_*` paths to enable off-Python audio on the LiteRT C++ proxy. Piper audio is streamed as completed sentences arrive; for long text without punctuation, `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` allow conservative partial flushes before final `done`. `npm run setup:litert-cpp` is the one-shot setup path for Windows x64, macOS arm64, and Linux x64: it reuses existing `bin/` bridge files or downloads the matching CI workflow artifact (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, or `delfin-litert-bridge-linux-x64`) via `gh`, then provisions the model, repo-local Piper runtime, default voice, and `.env`. Source builds are reserved for backend developers via `--source-build` or `--bridge-source build`; default setup must not silently fall back to Bazel. `LITERT_CPP_BRIDGE_REPO` optionally overrides the GitHub repo used for artifact lookup when it cannot be inferred from `git remote origin`. The same setup command repairs missing runtime companion packages such as `pathvalidate`. `npm run voice:list`, `npm run voice:use -- <voice-name>`, and `npm run voice:install -- <hf-path> --use` remain available for voice management. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
 
 ## WebSocket Message Protocol
 

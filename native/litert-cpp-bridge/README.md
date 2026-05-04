@@ -8,36 +8,33 @@ stdio process that speaks a tiny JSONL protocol to `scripts/litert-cpp-proxy.mjs
 
 ## Developer environment policy
 
-The default developer environment is **Linux / macOS (arm64) / WSL2**. Native
-Windows local builds are still supported via the `--native-windows` opt-in flag
-on `npm run setup:litert-cpp`; CI also produces native Windows binaries (see
-`docs/features/distribution/distribution-cicd-spec.md`).
+`npm run setup:litert-cpp` is now artifact-first for supported runtime hosts:
+Windows x64, macOS arm64, and Linux x64. It reuses existing bridge files or
+downloads the matching CI workflow artifact via `gh`, then provisions the model,
+Piper runtime/voice, and `.env`. Local Bazel source builds are reserved for
+backend developers via `--source-build` or `--bridge-source build`.
 
-| Host                 | Default `npm run setup:litert-cpp`                                  | With `--native-windows`                          |
+| Host                 | Default `npm run setup:litert-cpp`                                  | Source build opt-in                              |
 | -------------------- | ------------------------------------------------------------------- | ------------------------------------------------ |
-| Linux                | Clone + Bazel build + env + Piper + model                           | Errors: flag not valid off Windows               |
-| macOS (arm64)        | Clone + Bazel build + env + Piper + model                           | Errors: flag not valid off Windows               |
-| Windows (PowerShell) | Prints WSL2 setup instructions and exits 0                          | Runs the native Bazel + MSVC flow                |
-| WSL2 (Linux)         | Same as Linux                                                       | (n/a — `process.platform` is `linux`)            |
+| Linux x64            | Existing bin → `delfin-litert-bridge-linux-x64` artifact → env + Piper + model | `--source-build`                                 |
+| macOS arm64          | Existing bin → `delfin-litert-bridge-macos-arm64` artifact → env + Piper + model | `--source-build`                                 |
+| Windows x64          | Existing bin → `delfin-litert-bridge-windows-x64` artifact → env + Piper + model | `--source-build` from VS Developer shell         |
+| WSL2 (Linux x64)     | Same as Linux                                                       | `--source-build` inside WSL2                     |
 
-## Default developer setup (Linux / macOS / WSL2)
+## Default setup (Linux / macOS / WSL2)
 
 On a clean Linux or macOS arm64 host (or a WSL2 Ubuntu distro on Windows),
-install the prereqs that match upstream LiteRT-LM:
+install the artifact-first setup prerequisites:
 
 ```bash
 # Ubuntu / WSL2
-sudo apt update && sudo apt install -y git git-lfs build-essential clang \
-  python3 python3-pip default-jdk
-mkdir -p ~/.local/bin
-curl -L -o ~/.local/bin/bazelisk \
-  https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
-chmod +x ~/.local/bin/bazelisk
-export PATH="$HOME/.local/bin:$PATH"
+sudo apt update && sudo apt install -y git curl python3 python3-pip python3-venv
+# Install GitHub CLI via https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+gh auth login
 
 # macOS (arm64)
-xcode-select --install                # provides clang
-brew install bazelisk git-lfs
+brew install node python@3.12 gh
+gh auth login
 ```
 
 Then from the Delfin checkout:
@@ -47,14 +44,15 @@ npm install
 npm run setup:litert-cpp
 ```
 
-The script clones `google-ai-edge/LiteRT-LM` into `<parent>/LiteRT-LM`, runs
-`bazelisk build //runtime/engine:delfin_litert_bridge`, copies the resulting
-`delfin_litert_bridge` binary into `bin/`, sets `LITERT_CPP_BIN` /
-`LITERT_CPP_MODEL` in `.env`, installs the default Piper voice, and downloads
-or copies the `.litertlm` model.
+The script downloads the matching CI-built bridge artifact into `bin/`, sets
+`LITERT_CPP_BIN` / `LITERT_CPP_MODEL` in `.env`, bootstraps a repo-local pinned
+`piper-tts` runtime under `bin/piper/venv`, installs/activates the default Piper
+voice, and downloads or copies the `.litertlm` model.
 
-Pass `--help` to see all options (`--litert-lm-dir`, `--skip-build`,
-`--no-piper`, `--no-model`, `--install-prereqs`, `--dry-run`, …).
+Backend developers who need to rebuild the bridge locally should pass
+`--source-build` and install the Bazel/toolchain prerequisites below. Pass
+`--help` to see all options (`--source-build`, `--litert-lm-dir`,
+`--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, `--dry-run`, …).
 
 ### Two-terminal workflow (WSL2 + Windows host)
 
@@ -80,11 +78,12 @@ Notes:
   fallback) stay on the Windows host. The bridge + proxy + Piper TTS run inside
   WSL2.
 
-## Native Windows opt-in (`--native-windows`)
+## Native Windows setup
 
-Use this path when you need to produce or test a native Windows `.exe` locally
-without going through CI. Run it from **Developer PowerShell for VS 2022** or
-**x64 Native Tools Command Prompt for VS 2022**.
+Use this path when you need to run the native Windows backend locally. A fresh
+clone can start with `npm run setup:litert-cpp`; only `--source-build` requires
+**Developer PowerShell for VS 2022** or **x64 Native Tools Command Prompt for
+VS 2022**.
 
 Install these first:
 
@@ -118,10 +117,10 @@ if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
 bazelisk shutdown
 ```
 
-Then run the setup script with the opt-in flag:
+Then run the setup script with the backend-developer source-build flag:
 
 ```powershell
-npm run setup:litert-cpp -- --native-windows
+npm run setup:litert-cpp -- --source-build
 ```
 
 Common failures:
@@ -182,8 +181,8 @@ Bridge → proxy:
 
 ## Build inside LiteRT-LM (manual)
 
-`npm run setup:litert-cpp` already does all of the steps below; this section
-is only useful when iterating on `delfin_litert_bridge.cc` against a
+`npm run setup:litert-cpp -- --source-build` does all of the steps below; this
+section is only useful when iterating on `delfin_litert_bridge.cc` against a
 pre-existing LiteRT-LM checkout.
 
 1. Clone and prepare the upstream tree.

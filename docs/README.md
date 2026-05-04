@@ -29,9 +29,9 @@ These are operator runbooks for getting the app or native backend running on a s
 
 | File                                                                                   | Status    | Description                                                                                                      |
 | -------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
-| [`guides/testing-guide-macos.md`](guides/testing-guide-macos.md)                       | 🟢 Active | Full macOS setup + validation guide for the native LiteRT-LM C++ backend.                                      |
-| [`guides/testing-guide-linux.md`](guides/testing-guide-linux.md)                       | 🟢 Active | Full Linux x64 / WSL2 setup + validation guide for the native LiteRT-LM C++ backend.                           |
-| [`guides/testing-guide-windows.md`](guides/testing-guide-windows.md)                   | 🟢 Active | Full Windows guide covering both the default WSL2 flow and native Windows CI-artifact / local-build validation. |
+| [`guides/testing-guide-macos.md`](guides/testing-guide-macos.md)                       | 🟢 Active | Full macOS arm64 setup + validation guide for artifact-first LiteRT-LM C++ backend setup plus source-build opt-in. |
+| [`guides/testing-guide-linux.md`](guides/testing-guide-linux.md)                       | 🟢 Active | Full Linux x64 / WSL2 setup + validation guide for artifact-first LiteRT-LM C++ backend setup plus source-build opt-in. |
+| [`guides/testing-guide-windows.md`](guides/testing-guide-windows.md)                   | 🟢 Active | Full Windows guide covering both the default WSL2 flow and native Windows artifact-first / source-build validation. |
 
 ---
 

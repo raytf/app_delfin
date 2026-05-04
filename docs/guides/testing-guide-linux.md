@@ -6,7 +6,7 @@
 
 ## What this guide covers
 
-The LiteRT-LM C++ bridge (`delfin_litert_bridge`) replaces the Python sidecar with a single native binary. The acceptance criteria are in [`litert-cpp-bridge-runtime-validation-spec.md`](litert-cpp-bridge-runtime-validation-spec.md). You will build the binary, run the S1/S2/S3 benchmark sweep, and optionally launch the full Electron app.
+The LiteRT-LM C++ bridge (`delfin_litert_bridge`) replaces the Python sidecar with a single native binary. The acceptance criteria are in [`litert-cpp-bridge-runtime-validation-spec.md`](../features/backend/litert-cpp-bridge-runtime-validation-spec.md). Default setup downloads the CI-built `delfin-litert-bridge-linux-x64` artifact; source builds are reserved for backend developers using `--source-build`.
 
 > **WSL2 note:** If you are on Windows with WSL2 Ubuntu, these instructions work as-is. The benchmark will run inside WSL2. The Electron app must still be started from the Windows side; connect it to the WSL2 proxy via `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws`.
 
@@ -15,25 +15,29 @@ The LiteRT-LM C++ bridge (`delfin_litert_bridge`) replaces the Python sidecar wi
 ## Step 0 — Install prerequisites
 
 ```bash
-# C++ compiler + build tools
-sudo apt update && sudo apt install -y build-essential git curl python3 python3-pip python3-venv
+# Runtime setup tools
+sudo apt update && sudo apt install -y git curl python3 python3-pip python3-venv
 
 # Node.js 20+ (via NodeSource)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# Bazelisk
-curl -Lo /usr/local/bin/bazelisk \
-  https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
-chmod +x /usr/local/bin/bazelisk
+# GitHub CLI (see official instructions for your distro if this changes)
+type -p curl >/dev/null || sudo apt install curl -y
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+  sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+  sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install gh -y
+gh auth login
 ```
 
 Verify:
 ```bash
-g++ --version       # or clang++ --version
-bazelisk version
 node -v             # need 20+
 python3 -V          # need 3.12+
+gh auth status
 ```
 
 > **Python 3.12 on Ubuntu 22.04**: if `python3 -V` shows 3.10, install 3.12 via the deadsnakes PPA:
@@ -44,9 +48,16 @@ python3 -V          # need 3.12+
 
 ---
 
-## Step 1 — Clone LiteRT-LM (outside the Delfin repo)
+## Step 1 — Optional source-build prep
 
-The build script injects the bridge source into Google's upstream tree to compile with Bazel. The LiteRT-LM clone must live **outside** the Delfin repository — placing it inside `app_delfin/` would pollute the project's working tree and confuse git.
+Skip this step for normal artifact-based setup. Backend developers who need to rebuild `delfin_litert_bridge` locally should install build tools and Bazelisk, then clone LiteRT-LM **outside** the Delfin repository.
+
+```bash
+sudo apt install -y build-essential clang default-jdk
+curl -Lo /usr/local/bin/bazelisk \
+  https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+chmod +x /usr/local/bin/bazelisk
+```
 
 Clone it somewhere like your home directory:
 
@@ -54,7 +65,7 @@ Clone it somewhere like your home directory:
 # ⚠️  Run this from your home directory (or any path outside app_delfin/)
 cd ~
 git clone https://github.com/google-ai-edge/LiteRT-LM.git
-# Result: ~/LiteRT-LM   ← this is the path you'll pass to the test script
+# Result: ~/LiteRT-LM   ← default location used by --source-build
 ```
 
 You can also use any other parent directory — just note the full path:
@@ -62,10 +73,10 @@ You can also use any other parent directory — just note the full path:
 ```bash
 # Alternative: a dedicated projects folder
 git clone https://github.com/google-ai-edge/LiteRT-LM.git ~/projects/LiteRT-LM
-# Then pass ~/projects/LiteRT-LM as the argument in Step 3
+# Then pass --litert-lm-dir ~/projects/LiteRT-LM when using --source-build
 ```
 
-> The clone is ~500 MB. Bazel downloads additional dependencies on the first build (~1 GB). Both are one-time costs.
+> The clone is ~500 MB. Bazel downloads additional dependencies on the first source build (~1 GB). Both are one-time costs.
 
 ---
 
@@ -78,30 +89,33 @@ cd /path/to/app_delfin   # wherever you cloned Delfin
 git pull
 git checkout research/distribution-and-native-backend
 npm install
-npm run setup:sidecar   # creates sidecar/.venv with benchmark Python deps
 ```
 
 ---
 
-## Step 3 — Run the automated test script
+## Step 3 — Run setup
 
-This single command checks prerequisites, builds the bridge, downloads the model, and configures voice/TTS (Piper). Pass the path to your **LiteRT-LM clone** (the one you created outside of `app_delfin/` in Step 1):
+This single command downloads the CI bridge artifact, downloads the model, and configures voice/TTS (Piper):
 
 ```bash
 # Run from inside app_delfin/
-./scripts/test-native-backend.sh ~/LiteRT-LM
+npm run setup:litert-cpp
 ```
 
-> **First run takes 10–20 minutes** — Bazel downloads dependencies and compiles ~200 C++ source files. Subsequent runs use the Bazel cache and take under 30 seconds.
+Backend developers can force a source build instead:
+
+```bash
+npm run setup:litert-cpp -- --source-build
+```
 
 **What the script does for you:**
-1. **Builds the C++ bridge** binary inside your LiteRT-LM tree.
+1. **Stages the C++ bridge** from `delfin-litert-bridge-linux-x64` into `bin/`.
 2. **Downloads the model** (`gemma-4-E2B-it.litertlm`) if missing.
 3. **Patches your `.env`** with `LITERT_CPP_BIN` and `LITERT_CPP_MODEL`.
 4. **Sets up Piper TTS**: it enables `VOICE_ENABLED=true`, sets `LITERT_CPP_TTS_BACKEND=piper`, and prompts to install the recommended `hfc_female` voice.
-5. **Starts the proxy** and runs the S1/S2/S3 benchmark sweep.
+5. Leaves the repo ready for `npm run dev:litert-cpp` and optional benchmarking.
 
-Watch for `✅ Built: .../bin/delfin_litert_bridge` to confirm the build succeeded, then wait for `ready` before the benchmark starts.
+Watch for `✅ Bridge staged from GitHub Actions artifact` to confirm the artifact was installed.
 
 ---
 

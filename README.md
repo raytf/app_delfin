@@ -27,10 +27,10 @@ Delfin runs Gemma 4 locally using one of the following backends depending on you
 | Backend           | Platforms                                           | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **LiteRT-LM**     | macOS, Linux, Windows + WSL2                        | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. Used by the Python sidecar.                                                                                                                                                                                                                            |
-| **LiteRT-LM C++** | Linux / macOS (arm64) / WSL2 default; Native Windows opt-in | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Same KV-cache, vision, and audio-input parity as the Python sidecar, plus Piper-backed sentence-level TTS. Default developer environment is Linux / macOS (arm64) / WSL2; `npm run setup:litert-cpp -- --native-windows` produces a native Windows `.exe`. End-user Windows distribution receives a CI-built native binary.                          |
+| **LiteRT-LM C++** | Windows x64 / macOS arm64 / Linux x64 | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Same KV-cache, vision, and audio-input parity as the Python sidecar, plus Piper-backed sentence-level TTS. `npm run setup:litert-cpp` consumes CI-built bridge artifacts by default; backend developers can pass `--source-build` to rebuild from source.                          |
 | ~~llamafile~~     | _Removed_                                           | Mozilla's single-file llama.cpp server. Previously the recommended Windows-without-WSL2 fallback. **Superseded by the LiteRT-LM C++ backend.** The `setup:llamafile`, `dev:llamafile`, and `benchmark:llamafile` npm scripts have been removed. The standalone Python benchmark adapter (`scripts/benchmark/backends/llamafile.py`) is retained for comparison runs only. |
 
-For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by developers or CI to build `delfin_litert_bridge.exe`. End users should receive a prebuilt bridge executable in the packaged app and download only the `.litertlm` model/TTS assets at first run.
+For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by backend developers or CI. Normal setup uses the prebuilt `delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, or `delfin-litert-bridge-linux-x64` workflow artifact and then downloads only the `.litertlm` model/TTS assets.
 
 ---
 
@@ -113,26 +113,30 @@ npm run dev                  # starts Electron + Vite only (sidecar is already r
 
 ---
 
-### Windows native (LiteRT-LM C++ backend, opt-in)
+### Windows native (LiteRT-LM C++ backend)
 
-The default LiteRT-LM C++ developer environment on Windows is **WSL2** — see
-the WSL2 section above and `native/litert-cpp-bridge/README.md` for the
-two-terminal workflow (bridge in WSL2, Electron on Windows). Use this section
-only when you need to produce or test a native Windows `.exe` locally without
-going through CI. Running `npm run setup:litert-cpp` on Windows without
-`--native-windows` prints the WSL2 instructions and exits.
+For a fresh native-Windows clone, `npm run setup:litert-cpp` is now the one-shot
+setup command. It initializes `.env`, stages the native bridge, ensures the
+Gemma 4 `.litertlm` model, bootstraps the repo-local Piper runtime,
+installs/activates the default Piper voice, and prints a step-by-step summary.
+
+Bridge provisioning is automatic: existing `bin\` files are reused first, then
+the script downloads the latest successful GitHub Actions artifact via `gh`.
+It does **not** fall back to local source builds unless you pass `--source-build`
+or `--bridge-source build`.
 
 **Prerequisites:**
 
 - [Node.js 20+](https://nodejs.org/)
-- [Git](https://git-scm.com/) on PATH
-- [Bazelisk](https://github.com/bazelbuild/bazelisk) — `winget install --id Bazel.Bazelisk -e` (or pass `--install-prereqs` to the setup script)
-- Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. Install the bootstrapper with `winget install --id Microsoft.VisualStudio.2022.BuildTools -e`, then open Visual Studio Installer → Modify and confirm **MSVC v143 x64/x86 build tools** plus a Windows 10/11 SDK are selected. MinGW is not supported.
-- Python 3.13 and Java with `JAVA_HOME` set, per upstream LiteRT-LM Windows prerequisites
+- Python 3.12+ for the repo-local Piper runtime
+- GitHub CLI (`winget install --id GitHub.cli -e`, then `gh auth login`) for CI artifact download
+- Optional for backend source builds: [Git](https://git-scm.com/) on PATH, Bazelisk, Visual Studio 2022 Build Tools with **Desktop development with C++**, Python 3.13, and Java with `JAVA_HOME` set, per upstream LiteRT-LM Windows prerequisites
 
-Recommended first build shell: open **Developer PowerShell for VS 2022** or **x64 Native Tools Command Prompt for VS 2022**. If Bazel reports symlink permission errors, reopen that shell with **Run as administrator**.
+If you are using the local source-build fallback, open **Developer PowerShell
+for VS 2022** or **x64 Native Tools Command Prompt for VS 2022**. If Bazel
+reports symlink permission errors, reopen that shell with **Run as administrator**.
 
-Before the first build, verify MSVC is visible:
+For the source-build fallback, verify MSVC is visible:
 
 ```powershell
 where.exe cl
@@ -141,13 +145,20 @@ cl
 
 `where.exe cl` must resolve to `Hostx64\x64\cl.exe`. If it lists `Hostx86\x86\cl.exe` instead, your shell is initialized for x86; reopen the **x64 Native Tools** shell or run `Launch-VsDevShell.ps1 -Arch amd64 -HostArch amd64`.
 
-Clone Delfin, install Node dependencies, then give Bazel a short output root before the first build. The setup script looks for LiteRT-LM in the parent folder by default, so pre-clone/configure it like this:
+Clone Delfin, install Node dependencies, then run the one-shot setup:
 
 ```powershell
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
+npm run setup:litert-cpp
+```
 
+For source-build-only validation, give Bazel a short output root before the
+first build. The setup script looks for LiteRT-LM in the parent folder by
+default, so pre-clone/configure it like this:
+
+```powershell
 cd ..
 git clone https://github.com/google-ai-edge/LiteRT-LM.git
 cd LiteRT-LM
@@ -157,10 +168,10 @@ if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
 }
 bazelisk shutdown
 cd ..\app_delfin
-npm run setup:litert-cpp -- --native-windows   # builds the native Windows bridge, configures Piper TTS, resolves the .litertlm model
+npm run setup:litert-cpp -- --source-build
 ```
 
-The script is idempotent and accepts `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.
+The script is idempotent and accepts `--source-build`, `--bridge-source auto|release|artifact|build|existing`, `--repo <owner/repo>`, `--ci-run-id <id>`, `--artifact-name <name>`, `--litert-lm-dir <path>`, `--skip-build`, `--no-piper`, `--no-model`, `--install-prereqs`, and `--dry-run`. Run with `--help` for the full list.
 
 If you already have a successful CI run for `.github/workflows/build-litert-cpp-bridge.yml`, you can skip the local Bazel/MSVC build and use the Windows artifact helpers instead:
 
@@ -195,7 +206,7 @@ npm run dev:litert-cpp
 npm run dev
 ```
 
-> **Note on TTS:** `npm run dev:litert-cpp` bypasses the Python sidecar's Kokoro TTS. To enable off-Python speech, set `LITERT_CPP_TTS_BACKEND=piper` in `.env` (the setup script already installs the default Piper voice). If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
+> **Note on TTS:** `npm run dev:litert-cpp` bypasses the Python sidecar's Kokoro TTS. `npm run setup:litert-cpp` now bootstraps a repo-local pinned `piper-tts` runtime plus a default Piper voice and writes the `PIPER_*` env vars automatically. If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
 
 ---
 
@@ -206,7 +217,7 @@ npm run dev
 3. **`npm run download:models`** — downloads Kokoro TTS assets into `sidecar/` (~340 MB)
 4. **`npm run check:env`** — warns about missing or suspicious environment values
 
-`npm run setup:litert-cpp` is separate and is the recommended path for native Windows. It clones LiteRT-LM (defaulting to the parent folder of this project), builds `delfin_litert_bridge.exe` via Bazel, installs a Piper voice, and copies or downloads the `.litertlm` model into `models/`.
+`npm run setup:litert-cpp` is separate and is the recommended one-shot path for the LiteRT-LM C++ backend. On Windows x64, macOS arm64, and Linux x64 it reuses existing `bin/` bridge files, otherwise downloads the matching CI artifact via `gh`; source builds are opt-in via `--source-build` for backend developers. It also bootstraps a repo-local pinned `piper-tts` runtime plus default Piper voice and copies or downloads the `.litertlm` model into `models/`.
 
 The `setup:llamafile`, `dev:llamafile`, and `benchmark:llamafile` npm scripts have been **removed**. For llamafile benchmark comparison, use the Python harness directly: `python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --runs 5 --scenarios s1,s2,s3`.
 
@@ -224,7 +235,9 @@ The defaults are sensible for most machines. Common settings you may want to cha
 | `VOICE_ENABLED`  | `true`                                      | Disable always-on voice input if you only want text prompts                                       |
 | `TTS_ENABLED`    | `true`                                      | Disable spoken playback entirely                                                                  |
 | `TTS_BACKEND`    | `kokoro`                                    | Use `web-speech` for browser-only speech, or `mlx` on Apple Silicon for GPU TTS                   |
+| `LITERT_CPP_BRIDGE_REPO` | unset                               | Optional `owner/repo` override for `setup:litert-cpp` bridge Release/artifact lookup               |
 | `LITERT_CPP_TTS_BACKEND` | `none`                               | Set to `piper` to enable off-Python speech on `npm run dev:litert-cpp`                            |
+| `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune partial Piper flushes for long text without punctuation; completed sentences always flush first |
 | `PIPER_MODEL`    | unset                                       | Usually managed by `npm run voice:use -- <voice-name>` for LiteRT C++ Piper voices               |
 
 See [`.env.example`](.env.example) for the full reference including LiteRT-LM C++ backend options. The `LLAMAFILE_*` variables are kept for the deprecated benchmark-comparison path only.
@@ -237,7 +250,7 @@ See [`.env.example`](.env.example) for the full reference including LiteRT-LM C+
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run dev:full`       | Starts the LiteRT sidecar + Electron together (macOS / Linux / WSL2)                                                                  |
 | `npm run dev:sidecar`    | Starts just the LiteRT sidecar (WSL2 terminal)                                                                                        |
-| `npm run dev:litert-cpp` | Starts the LiteRT-LM C++ backend WebSocket proxy on the Delfin sidecar port (native Windows); set `LITERT_CPP_TTS_BACKEND=piper` to enable Piper audio |
+| `npm run dev:litert-cpp` | Starts the LiteRT-LM C++ backend WebSocket proxy on the Delfin sidecar port; `setup:litert-cpp` prepares the optional Piper runtime/voice |
 
 | `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference)                                                                     |
 | `npm run dev`            | Starts Electron + Vite only (when sidecar is already running separately)                                                              |
@@ -250,7 +263,7 @@ See [`.env.example`](.env.example) for the full reference including LiteRT-LM C+
 | `npm run voice:use -- en_US-hfc_female-medium` | Updates `.env` to use an installed Piper voice |
 | `npm run voice:install -- en/en_US/hfc_female/medium --use` | Downloads a voice from `rhasspy/piper-voices`, reads its sample rate, and switches `.env` |
 
-Piper voice switching only affects `npm run dev:litert-cpp`. `PIPER_SAMPLE_RATE` is now optional when the selected `.onnx.json` config contains `audio.sample_rate`.
+`npm run setup:litert-cpp` bootstraps the repo-local `piper-tts` runtime, installs/activates the default voice, and writes `PIPER_BIN` plus the active `PIPER_MODEL` / `PIPER_CONFIG` / `PIPER_SAMPLE_RATE`; Piper voice switching only affects `npm run dev:litert-cpp`. `PIPER_SAMPLE_RATE` is optional when the selected `.onnx.json` config contains `audio.sample_rate`.
 
 ### Verify the sidecar is healthy
 
@@ -347,7 +360,7 @@ Legacy / deprecated:
 | Script                         | Description                                                                                  |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
 | `npm run setup`                | First-run setup for env, Python venv, and TTS assets (macOS / Linux / WSL2)                  |
-| `npm run setup:litert-cpp`     | One-shot setup for the native LiteRT-LM C++ backend on Windows (clone, build, Piper, model)  |
+| `npm run setup:litert-cpp`     | One-shot setup for the LiteRT-LM C++ backend (CI bridge artifact by default, repo-local Piper runtime + voice, model)  |
 | `npm run setup-check:windows`  | Windows environment + bridge/model sanity check                                               |
 | `npm run download:ci-bridge:windows` | Download the latest successful Windows bridge artifact into `bin/`                       |
 | `npm run test:ci-bridge:windows` | Start the downloaded bridge via `dev:litert-cpp`, wait for `/health`, and optionally benchmark |
@@ -356,7 +369,7 @@ Legacy / deprecated:
 | `npm run dev:mock`             | Run mock sidecar + Electron (no inference needed)                                            |
 | `npm run dev`                  | Run Electron + Vite only                                                                     |
 | `npm run dev:sidecar`          | Run the LiteRT sidecar only                                                                  |
-| `npm run dev:litert-cpp`       | Run the LiteRT-LM C++ backend WebSocket proxy (native Windows)                               |
+| `npm run dev:litert-cpp`       | Run the LiteRT-LM C++ backend WebSocket proxy with optional Piper TTS                         |
 
 | `npm run benchmark:litert`     | Benchmark the LiteRT sidecar (uses sidecar venv automatically)                               |
 | `npm run benchmark:litert-cpp` | Benchmark the LiteRT-LM C++ backend on the Delfin sidecar protocol                           |
