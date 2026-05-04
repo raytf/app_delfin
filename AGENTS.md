@@ -61,6 +61,7 @@ docs/
 │   │   ├── litert-cpp-bridge-runtime-validation-spec.md ← 🚧 Phase 1 (Windows S1/S2/S3 benchmark) ✅ 2026-05-03. Phase 2 partial. Phases 3–4 (macOS/Linux builds) pending. Gate 1 — awaiting approval.
 │   │   ├── litert-cpp-audio-input-spec.md             ← ✅ Complete (Windows, 2026-05-03) — AC1–AC7 validated; macOS/Linux audio pending M4 cross-platform builds.
 │   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. Gate 1 active.
+│   │   ├── litert-cpp-bridge-build-dx-spec.md         ← 🚧 Build DX: vendored prebuilt LiteRT-LM bundle + CI workflow split + optional Bazel remote cache. Gate 1 — awaiting approval.
 │   │   └── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
 │   ├── distribution/                ← Packaging, installers, code signing, CI/CD
 │   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-01); Gate 1 approved.

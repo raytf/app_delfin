@@ -80,7 +80,7 @@ What this does:
 1. Downloads `delfin-litert-bridge-windows-x64` from the latest successful workflow run
 2. Stages `delfin_litert_bridge.exe` and `libGemmaModelConstraintProvider.dll` into `bin\`
 3. Ensures `.env` points `LITERT_CPP_BIN` and `LITERT_CPP_MODEL` at the expected paths
-4. Downloads the `.litertlm` model if missing
+4. Downloads the `.litertlm` model if missing, preferring `curl.exe` for repeated retry/resume/progress attempts and using a temporary `.part` file
 5. Starts `npm run dev:litert-cpp` and waits for `http://localhost:8321/health`
 
 ### Run the full benchmark
@@ -198,6 +198,10 @@ Inspect:
 Get-Content $env:TEMP\delfin-litert-cpp-proxy.log
 Get-Content $env:TEMP\delfin-litert-cpp-proxy.err.log
 ```
+
+**Model download was interrupted**
+
+The helper writes incomplete downloads to `models\<model>.part`, retries transient `curl.exe` failures, and only renames the file after the expected byte count is reached. Rerun the command to resume the `.part` file, or delete the `.part` file first if you want a clean retry.
 
 **`createSymbolicLinkW failed (permission denied)`**
 

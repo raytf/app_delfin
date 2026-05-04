@@ -23,15 +23,15 @@ The hackathon MVP that established the current app (Electron shell, sidecar, scr
 
 ---
 
-## Setup & validation guides
+## Setup & validation guides (`guides/`)
 
 These are operator runbooks for getting the app or native backend running on a specific OS. They do not follow the Gate lifecycle used by feature specs.
 
-| File                                                                                               | Status    | Description                                                                                                      |
-| -------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
-| [`features/backend/testing-guide-macos.md`](features/backend/testing-guide-macos.md)               | 🟢 Active | Full macOS setup + validation guide for the native LiteRT-LM C++ backend.                                      |
-| [`features/backend/testing-guide-linux.md`](features/backend/testing-guide-linux.md)               | 🟢 Active | Full Linux x64 / WSL2 setup + validation guide for the native LiteRT-LM C++ backend.                           |
-| [`features/backend/testing-guide-windows.md`](features/backend/testing-guide-windows.md)           | 🟢 Active | Full Windows guide covering both the default WSL2 flow and native Windows CI-artifact / local-build validation. |
+| File                                                                                   | Status    | Description                                                                                                      |
+| -------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| [`guides/testing-guide-macos.md`](guides/testing-guide-macos.md)                       | 🟢 Active | Full macOS setup + validation guide for the native LiteRT-LM C++ backend.                                      |
+| [`guides/testing-guide-linux.md`](guides/testing-guide-linux.md)                       | 🟢 Active | Full Linux x64 / WSL2 setup + validation guide for the native LiteRT-LM C++ backend.                           |
+| [`guides/testing-guide-windows.md`](guides/testing-guide-windows.md)                   | 🟢 Active | Full Windows guide covering both the default WSL2 flow and native Windows CI-artifact / local-build validation. |
 
 ---
 
@@ -45,6 +45,7 @@ Inference engines, native bridges, and benchmarking. Goal: a future-proof, cross
 | [`features/backend/litert-cpp-bridge-runtime-validation-spec.md`](features/backend/litert-cpp-bridge-runtime-validation-spec.md) | 🚧 In Progress | Phase 1 (Windows S1/S2/S3 benchmark) complete; Phase 2 (manual app round) partial; Phases 3–4 (macOS / Linux / WSL2 builds via the new default Unix dev environment) pending. |
 | [`features/backend/litert-cpp-audio-input-spec.md`](features/backend/litert-cpp-audio-input-spec.md)                       | ✅ Complete    | Audio input parity for the C++ bridge. AC1–AC7 validated on Windows (2026-05-03). macOS/Linux audio pending cross-platform builds.                                           |
 | [`features/backend/litert-cpp-primary-backend-migration-spec.md`](features/backend/litert-cpp-primary-backend-migration-spec.md) | 🚧 In Progress | Umbrella for promoting the LiteRT C++ bridge to the default inference backend on all OSes. M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. |
+| [`features/backend/litert-cpp-bridge-build-dx-spec.md`](features/backend/litert-cpp-bridge-build-dx-spec.md)               | 🚧 In Progress | Build DX overhaul for the C++ bridge: split CI into a slow vendor-bundle producer + fast bridge compile, ship prebuilt LiteRT-LM bundles per `LITERT_LM_REF`, optional Bazel remote cache. Gate 1 — awaiting approval. |
 | [`features/backend/inference-benchmarking-spec.md`](features/backend/inference-benchmarking-spec.md)                       | ✅ Complete    | Standalone benchmark harness (`scripts/benchmark/`) comparing LiteRT-LM, LiteRT-CPP, and llamafile (TTFT, throughput, memory).                                               |
 
 ---
