@@ -7,13 +7,13 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Gate 1 — awaiting approval (**2026-05-06: DM0 proxy wiring extended to macOS arm64 + Linux x64 — see revision banner**) |
+| **Status** | ✅ Complete (DM0–DM3) |
 | **Created** | 2026-05-01 |
 | **Revised** | 2026-05-02 (hybrid Path 2 — additive, not replacement) |
 | **Revised** | 2026-05-02 (proxy approach — zero changes to Electron main IPC layer) |
 | **Revised** | 2026-05-03 (llamafile superseded; DM0 replaced by LiteRT-LM C++ proxy wiring for Windows) |
-| **Revised** | **2026-05-06 (DM0 proxy wiring extended to macOS arm64 and Linux x64; Python sidecar retained as developer fallback only — see revision banner below)** |
-| **Depends on** | Inference benchmark results (`inference-benchmarking-spec.md`) reviewed and accepted |
+| **Revised** | **2026-05-06 (DM0–DM3 implemented; unified LiteRT-LM C++ bridge across all 3 platforms; Python sidecar is developer-only fallback)** |
+| **Depends on** | Inference benchmark results reviewed and accepted |
 | **Blocks** | `distribution-packaging-spec.md` (packaging requires a working cross-platform backend) |
 
 ---

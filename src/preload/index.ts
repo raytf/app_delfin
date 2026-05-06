@@ -15,6 +15,9 @@ import type {
   SessionStartRequest,
   OverlayMode,
   SessionListItem,
+  ModelAssetId,
+  ModelStatus,
+  DownloadProgress,
 } from '../shared/types'
 
 const api: ElectronAPI = {
@@ -70,6 +73,12 @@ const api: ElectronAPI = {
   closeWindow: () =>
     ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.WINDOW_CLOSE),
 
+  getModelsStatus: () =>
+    ipcRenderer.invoke(RENDERER_TO_MAIN_CHANNELS.MODELS_GET_STATUS) as Promise<ModelStatus>,
+
+  downloadModels: (request: { assets?: ModelAssetId[] }) =>
+    ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.MODELS_DOWNLOAD, request),
+
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.FRAME_CAPTURED, (_event, frame) => cb(frame)),
 
@@ -98,6 +107,24 @@ const api: ElectronAPI = {
 
   onSidecarStatus: (cb: (data: SidecarStatus) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, (_event, data) => cb(data)),
+
+  onModelsStatus: (cb: (status: ModelStatus) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.MODELS_STATUS, (_event, status) => cb(status)),
+
+  onModelsDownloadProgress: (cb: (progress: DownloadProgress) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.MODELS_DOWNLOAD_PROGRESS, (_event, progress) =>
+      cb(progress),
+    ),
+
+  onModelsDownloadComplete: (cb: (data: { asset: ModelAssetId }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.MODELS_DOWNLOAD_COMPLETE, (_event, data) =>
+      cb(data),
+    ),
+
+  onModelsDownloadError: (cb: (data: { asset?: ModelAssetId; message: string }) => void) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.MODELS_DOWNLOAD_ERROR, (_event, data) =>
+      cb(data),
+    ),
 
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel),

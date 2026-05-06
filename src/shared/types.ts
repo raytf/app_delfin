@@ -106,6 +106,8 @@ export const RENDERER_TO_MAIN_CHANNELS = {
   SESSION_GET_DETAIL: 'session:get-detail',
   SESSION_DELETE: 'session:delete',
   SESSION_GET_MESSAGE_IMAGE: 'session:get-message-image',
+  MODELS_GET_STATUS: 'models:get-status',
+  MODELS_DOWNLOAD: 'models:download',
 } as const
 
 export const MAIN_TO_RENDERER_CHANNELS = {
@@ -118,6 +120,10 @@ export const MAIN_TO_RENDERER_CHANNELS = {
   SIDECAR_DONE: 'sidecar:done',
   SIDECAR_ERROR: 'sidecar:error',
   SIDECAR_STATUS: 'sidecar:status',
+  MODELS_STATUS: 'models:status',
+  MODELS_DOWNLOAD_PROGRESS: 'models:download-progress',
+  MODELS_DOWNLOAD_COMPLETE: 'models:download-complete',
+  MODELS_DOWNLOAD_ERROR: 'models:download-error',
 } as const
 
 // Presets
@@ -132,12 +138,28 @@ export interface Preset {
 // Sidecar status
 export interface SidecarStatus {
   connected: boolean
+  healthy?: boolean
   backend?: string
   model?: string
   visionTokens?: string
 }
 
 export type PersistedSessionStatus = 'active' | 'completed' | 'failed' | 'aborted'
+
+export type ModelAssetId = 'litert-cpp-model' | 'piper-voice'
+
+export interface ModelStatus {
+  ready: boolean
+  missing: ModelAssetId[]
+  downloadInProgress: boolean
+}
+
+export interface DownloadProgress {
+  asset: ModelAssetId
+  receivedBytes: number
+  totalBytes?: number
+  percent?: number
+}
 
 export interface SessionListItem {
   id: string
@@ -188,6 +210,8 @@ export interface ElectronAPI {
   minimizeWindow: () => Promise<void>
   toggleMaximizeWindow: () => Promise<void>
   closeWindow: () => Promise<void>
+  getModelsStatus: () => Promise<ModelStatus>
+  downloadModels: (request: { assets?: ModelAssetId[] }) => void
   onFrameCaptured: (cb: (frame: CaptureFrame) => void) => void
   onOverlayError: (cb: (data: { message: string }) => void) => void
   onSidecarToken: (cb: (data: { text: string }) => void) => void
@@ -197,5 +221,9 @@ export interface ElectronAPI {
   onSidecarDone: (cb: () => void) => void
   onSidecarError: (cb: (data: { message: string }) => void) => void
   onSidecarStatus: (cb: (data: SidecarStatus) => void) => void
+  onModelsStatus: (cb: (status: ModelStatus) => void) => void
+  onModelsDownloadProgress: (cb: (progress: DownloadProgress) => void) => void
+  onModelsDownloadComplete: (cb: (data: { asset: ModelAssetId }) => void) => void
+  onModelsDownloadError: (cb: (data: { asset?: ModelAssetId; message: string }) => void) => void
   removeAllListeners: (channel: string) => void
 }

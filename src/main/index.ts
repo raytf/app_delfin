@@ -16,6 +16,9 @@ import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
 import { SessionPersistenceService } from "./session/sessionPersistenceService";
 import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
+import { spawnBackend, killBackend } from "./sidecar/backendProcess";
+import { startHealthPolling, stopHealthPolling } from "./sidecar/healthCheck";
+import { getModelStatus } from "./sidecar/assetManager";
 import { validateEnv } from "./envValidation";
 import { FileSessionStorage } from "./storage/fileSessionStorage";
 import {
@@ -68,6 +71,12 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Delfin started");
+
+  const modelStatus = getModelStatus();
+  if (modelStatus.ready) {
+    spawnBackend();
+    startHealthPolling(() => mainWindow);
+  }
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
   const isDev = !!process.env["ELECTRON_RENDERER_URL"];
@@ -149,6 +158,8 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   mainWindow = null;
   disconnectFromSidecar();
+  stopHealthPolling();
+  killBackend();
 
   if (process.platform !== "darwin") {
     app.quit();

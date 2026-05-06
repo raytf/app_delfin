@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-04 (`npm run setup:litert-cpp` is now artifact-first on Windows x64 / macOS arm64 / Linux x64, using CI bridge artifacts by default and reserving source builds for backend developers via `--source-build`.)
+> Last updated: 2026-05-06 (`distribution-backend-migration-spec.md` (DM0–DM3) and `distribution-packaging-spec.md` (DP1) implemented; app checks for model assets at launch, shows first-run SetupScreen for downloads, and spawns the C++ backend proxy conditionally; electron-builder configured for all platforms.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 >
 > Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
@@ -73,7 +73,11 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | `src/preload/index.ts`                                             | ✅     | Full `contextBridge` API for capture, sidecar, overlay, and session actions          |
 | `src/main/index.ts`                                                | ✅     | App startup, env validation, COOP/COEP, microphone permissions, and window lifecycle |
 | `src/main/capture/autoRefresh.ts`                                  | ⚠️     | Placeholder — auto-refresh diffing not implemented yet                               |
-| `src/main/sidecar/healthCheck.ts`                                  | ⚠️     | Placeholder — dedicated `/health` polling not implemented                            |
+| `src/main/sidecar/healthCheck.ts`                                  | ✅     | `/health` polling implemented; forwards healthy status to renderer via `sidecar:status` |
+| `src/main/sidecar/backendProcess.ts`                                | ✅     | Logic to spawn `litert-cpp-proxy.mjs` in packaged or explicit dev mode                |
+| `src/main/sidecar/assetManager.ts`                                  | ✅     | Manages `manifest.json`, downloads model/voice assets from HF with progress reporting |
+| `src/main/ipc/modelHandlers.ts`                                     | ✅     | IPC handlers for model status and first-run asset downloads                            |
+| `src/renderer/features/setup/SetupScreen.tsx`                       | ✅     | First-run download progress UI and setup orchestration                               |
 
 ---
 
@@ -252,8 +256,8 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 | Item                                                  | Status | Notes                                                                                       |
 | ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
 | Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; **revised 2026-05-06** (LiteRT-LM C++ on Windows x64, macOS arm64, Linux x64; Python sidecar deprecated for distribution) |
-| Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md` (updated 2026-05-06)              |
-| First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md` (unified: `.litertlm` + Piper voice on all 3 platforms) |
+| Electron-builder config (`package.json`)             | ✅     | Configured for Windows (NSIS), macOS (DMG), and Linux (AppImage); includes bridge binaries as `extraResources` |
+| First-run download orchestration (binaries + models)  | ✅     | `assetManager.ts` + `SetupScreen.tsx` implemented; downloads `.litertlm` + Piper voice |
 | NSIS / DMG / AppImage installers                      | ❌     | Not started                                                                                 |
 | GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64). `dist.yml` spec updated 2026-05-06 to download prebuilt bridge artifacts for all 3 platforms. Full `dist.yml` packaging matrix still pending approval — tracked in `distribution-cicd-spec.md`. |
 | `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases. |

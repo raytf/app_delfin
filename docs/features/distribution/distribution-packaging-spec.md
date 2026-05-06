@@ -8,13 +8,13 @@
 
 | Field          | Value                                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — awaiting approval                                                                                      |
+| **Status**     | ✅ Complete (DP0–DP2)                                                                                          |
 | **Created**    | 2026-05-01                                                                                                      |
 | **Revised**    | 2026-05-02 (per-platform backend strategy; llamafile proxy for Windows)                                         |
 | **Revised**    | 2026-05-03 (Windows: llamafile → LiteRT-LM C++)                                                                 |
-| **Revised**    | **2026-05-06 (macOS arm64 + Linux x64: frozen Python sidecar → LiteRT-LM C++ bridge; DP3 superseded — see revision below)** |
-| **Depends on** | `distribution-backend-migration-spec.md` (DM0–DM3 complete; DM0 means LiteRT-LM C++ proxy wiring on all 3 OSes) |
-| **Blocks**     | `distribution-cicd-spec.md` (CI builds the output of this track)                                               |
+| **Revised**    | **2026-05-06 (DP0–DP2 implemented; unified LiteRT-LM C++ bridge across all 3 platforms; DP3 superseded)**      |
+| **Depends on** | `distribution-backend-migration-spec.md` (DM0–DM3 complete)                                                     |
+| **Blocks**     | `distribution-cicd-spec.md`                                                                                     |
 
 ## Goal
 

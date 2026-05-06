@@ -5,6 +5,7 @@ import HomeScreen from '../features/home/HomeScreen'
 import SessionEndedScreen from '../features/active-session/SessionEndedScreen'
 import SessionDetailScreen from '../features/sessions/SessionDetailScreen'
 import SessionsScreen from '../features/sessions/SessionsScreen'
+import SetupScreen from '../features/setup/SetupScreen'
 import { ROUTES } from './routes'
 
 export const router = createHashRouter([
@@ -30,6 +31,10 @@ export const router = createHashRouter([
       {
         path: ROUTES.sessionEnded,
         element: <SessionEndedScreen />,
+      },
+      {
+        path: ROUTES.setup,
+        element: <SetupScreen />,
       },
     ],
   },

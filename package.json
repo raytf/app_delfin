@@ -28,7 +28,101 @@
     "benchmark:litert": "node scripts/run-benchmark.mjs --backend litert --runs 5",
     "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
     "test:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\test-ci-bridge.ps1",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.delfin.desktop",
+    "productName": "Delfin",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts/litert-cpp-proxy.mjs",
+        "to": "litert-cpp-proxy.mjs"
+      },
+      {
+        "from": "scripts/litert-cpp-presets.mjs",
+        "to": "litert-cpp-presets.mjs"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge",
+          "to": "delfin_litert_bridge"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.dylib",
+          "to": "libGemmaModelConstraintProvider.dylib"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge.exe",
+          "to": "delfin_litert_bridge.exe"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.dll",
+          "to": "libGemmaModelConstraintProvider.dll"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Education",
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge",
+          "to": "delfin_litert_bridge"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.so",
+          "to": "libGemmaModelConstraintProvider.so"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowDirChange": true,
+      "installerIcon": "build/icon.ico"
+    }
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

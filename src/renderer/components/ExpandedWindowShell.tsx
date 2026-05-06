@@ -1,11 +1,21 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Minus, Square, X } from 'lucide-react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { useOverlayState } from '../hooks/useOverlayState'
+import { ROUTES } from '../navigation/routes'
 
 export default function ExpandedWindowShell() {
+  const navigate = useNavigate()
   const { overlayState } = useOverlayState()
   const showTitleBar = overlayState.mode === 'expanded'
+
+  useEffect(() => {
+    window.api.getModelsStatus().then((status) => {
+      if (!status.ready) {
+        navigate(ROUTES.setup)
+      }
+    })
+  }, [navigate])
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
