@@ -2,7 +2,7 @@
 
 A live, voice-first study assistant that understands your screen context — fully local, private, and with no API token costs. Delfin captures the foreground window, sends the screenshot plus optional voice input to **Gemma 4**, and streams explanations back inside an Electron sidebar.
 
-Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice or text, get plain-English explanations in real time, and optionally have the response read back with server-side Kokoro TTS or browser speech fallback.
+Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice or text, get plain-English explanations in real time, and optionally have the response read back with Piper TTS or browser speech fallback.
 
 **GitHub:** [github.com/raytf/app_delfin](https://github.com/raytf/app_delfin)
 
@@ -13,7 +13,7 @@ Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice
 - Capture the current foreground window for every study turn
 - Accept **voice-first** questions with always-on VAD, or typed prompts
 - Stream Gemma 4 answers token-by-token over WebSocket
-- Play back spoken responses with Kokoro TTS on the Python sidecar, Piper on the LiteRT C++ proxy path, and Web Speech fallback when server audio is unavailable
+- Play back spoken responses with Piper TTS (LiteRT C++ backend) and Web Speech fallback when Piper is unavailable
 - Persist named study sessions, saved screenshots, and conversation history
 - Browse, reopen, and delete past sessions from the home screen
 - Run against either the real sidecar or a mock sidecar for UI work
@@ -22,13 +22,13 @@ Point Delfin at lecture slides, textbook pages, diagrams, or notes. Ask by voice
 
 ## Inference backends
 
-Delfin runs Gemma 4 locally using one of the following backends depending on your platform:
+Delfin runs Gemma 4 locally using the **LiteRT-LM C++ bridge** on all supported platforms. The Python sidecar is deprecated and retained only for development reference.
 
-| Backend           | Platforms                                           | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **LiteRT-LM**     | macOS, Linux, Windows + WSL2                        | Google's inference engine purpose-built for Gemma 4. Significantly faster than generic GGUF inference, and maintains a KV cache across conversation turns so follow-up questions are near-instant. Used by the Python sidecar.                                                                                                                                                                                                                            |
-| **LiteRT-LM C++** | Windows x64 / macOS arm64 / Linux x64 | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Same KV-cache, vision, and audio-input parity as the Python sidecar, plus Piper-backed sentence-level TTS. `npm run setup:litert-cpp` consumes CI-built bridge artifacts by default; backend developers can pass `--source-build` to rebuild from source.                          |
-| ~~llamafile~~     | _Removed_                                           | Mozilla's single-file llama.cpp server. Previously the recommended Windows-without-WSL2 fallback. **Superseded by the LiteRT-LM C++ backend.** The `setup:llamafile`, `dev:llamafile`, and `benchmark:llamafile` npm scripts have been removed. The standalone Python benchmark adapter (`scripts/benchmark/backends/llamafile.py`) is retained for comparison runs only. |
+| Backend           | Platforms                   | Status      | Notes                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **LiteRT-LM C++** | Windows x64 / macOS arm64 / Linux x64 | **Primary** | Native LiteRT-LM via a JSONL bridge (`native/litert-cpp-bridge/`) wrapped by a Node WebSocket proxy. Full KV-cache, vision, audio-input, and Piper-backed sentence-level TTS. `npm run setup:litert-cpp` provisions the CI-built bridge by default; pass `--source-build` to rebuild from source. |
+| ~~LiteRT-LM (Python sidecar)~~ | macOS / Linux / WSL2 | **Deprecated** | Previously the primary path on non-Windows platforms. Superseded by the LiteRT-LM C++ bridge. The `setup`, `dev:full`, and `dev:sidecar` npm scripts remain available for development/fallback use only. |
+| ~~llamafile~~     | _Removed_                   | **Removed** | Mozilla's single-file llama.cpp server. Previously the Windows-without-WSL2 fallback. Superseded by the LiteRT-LM C++ backend. The standalone Python benchmark adapter (`scripts/benchmark/backends/llamafile.py`) is retained for comparison runs only. |
 
 For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are needed only by backend developers or CI. Normal setup uses the prebuilt `delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, or `delfin-litert-bridge-linux-x64` workflow artifact and then downloads only the `.litertlm` model/TTS assets.
 
@@ -42,43 +42,68 @@ Full per-OS setup & validation guides:
 - [Linux / WSL2 guide](docs/features/backend/testing-guide-linux.md)
 - [Windows guide (WSL2 + native)](docs/features/backend/testing-guide-windows.md)
 
-### macOS
+### macOS (arm64)
 
-**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/)
+**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (for Piper TTS runtime), [GitHub CLI](https://cli.github.com/) (`brew install gh`, then `gh auth login`) for CI artifact download
 
-Uses the LiteRT-LM backend — the fastest option on Apple Silicon and Intel Macs.
-
-```bash
-git clone https://github.com/raytf/app_delfin.git
-cd app_delfin
-npm install
-npm run setup          # creates .env, sets up Python venv, downloads TTS models (~340 MB)
-npm run dev:full       # starts sidecar + Electron app
-```
-
-On Apple Silicon, set `TTS_BACKEND=mlx` in `.env` for GPU-accelerated TTS. The default `kokoro` (ONNX/CPU) also works.
-
----
-
-### Linux
-
-**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/)
-
-Uses the LiteRT-LM backend.
+Uses the **LiteRT-LM C++ bridge** — the primary backend on all platforms.
 
 ```bash
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
-npm run setup          # creates .env, sets up Python venv, downloads TTS models (~340 MB)
-npm run dev:full       # starts sidecar + Electron app
+npm run setup:litert-cpp   # downloads bridge artifact, Gemma 4 model, bootstraps Piper TTS
+```
+
+Then start the app in two terminals:
+
+```bash
+# Terminal 1 — LiteRT-LM C++ backend WebSocket proxy
+npm run dev:litert-cpp
+```
+
+```bash
+# Terminal 2 — Electron + Vite
+npm run dev
+```
+
+> Intel Macs are out of scope; the prebuilt bridge targets arm64 only.
+
+---
+
+### Linux (x64)
+
+**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (for Piper TTS runtime), [GitHub CLI](https://cli.github.com/) (`sudo apt install gh`, then `gh auth login`) for CI artifact download
+
+Uses the **LiteRT-LM C++ bridge**.
+
+```bash
+git clone https://github.com/raytf/app_delfin.git
+cd app_delfin
+npm install
+npm run setup:litert-cpp   # downloads bridge artifact, Gemma 4 model, bootstraps Piper TTS
+```
+
+Then start the app in two terminals:
+
+```bash
+# Terminal 1 — LiteRT-LM C++ backend WebSocket proxy
+npm run dev:litert-cpp
+```
+
+```bash
+# Terminal 2 — Electron + Vite
+npm run dev
 ```
 
 ---
 
-### Windows with WSL2
+### Windows with WSL2 _(deprecated)_
 
-**Why WSL2?** The LiteRT-LM Python wheel is only published for Linux — there is no native Windows build. Running the inference sidecar inside WSL2 Ubuntu gives you the same fast LiteRT-LM backend while Electron runs natively on Windows for full window-capture support.
+> **This path is deprecated.** The Python sidecar that runs inside WSL2 has been superseded by the native LiteRT-LM C++ bridge on all platforms. Use the **Windows (x64)** section below for new setups. The WSL2 instructions are preserved here for existing users only.
+
+<details>
+<summary>WSL2 setup (deprecated — click to expand)</summary>
 
 **Prerequisites:**
 
@@ -109,16 +134,16 @@ npm install
 npm run dev                  # starts Electron + Vite only (sidecar is already running in WSL2)
 ```
 
-> **Why two terminals?** The Electron app needs to run on Windows to access native window enumeration for screen capture. The Python sidecar must run on Linux (WSL2) because LiteRT-LM has no Windows wheel. The two processes communicate over WebSocket — Electron on Windows connects to the sidecar listening in WSL2.
+</details>
 
 ---
 
-### Windows native (LiteRT-LM C++ backend)
+### Windows (x64)
 
-For a fresh native-Windows clone, `npm run setup:litert-cpp` is now the one-shot
-setup command. It initializes `.env`, stages the native bridge, ensures the
-Gemma 4 `.litertlm` model, bootstraps the repo-local Piper runtime,
-installs/activates the default Piper voice, and prints a step-by-step summary.
+`npm run setup:litert-cpp` is the one-shot setup command. It initializes `.env`,
+downloads the prebuilt bridge artifact, ensures the Gemma 4 `.litertlm` model,
+bootstraps the repo-local Piper runtime, installs/activates the default Piper
+voice, and prints a step-by-step summary.
 
 Bridge provisioning is automatic: existing `bin\` files are reused first, then
 the script downloads the latest successful GitHub Actions artifact via `gh`.
@@ -178,13 +203,11 @@ If you already have a successful CI run for `.github/workflows/build-litert-cpp-
 - Install GitHub CLI first if needed: `winget install --id GitHub.cli -e`
 - Restart PowerShell so `gh` is on PATH
 
-<augment_code_snippet mode="EXCERPT">
-````powershell
+```powershell
 gh auth login
 npm run download:ci-bridge:windows
 npm run test:ci-bridge:windows -- --SkipBenchmark
-````
-</augment_code_snippet>
+```
 
 `npm run test:ci-bridge:windows` can also download a specific run for you via `-- --DownloadArtifact --RunId <id>`. Omit `-- --SkipBenchmark` to run the full `benchmark:litert-cpp` sweep after the `/health` smoke check.
 
@@ -210,14 +233,26 @@ npm run dev
 
 ---
 
-## What `npm run setup` does
+## What `npm run setup:litert-cpp` does
+
+`npm run setup:litert-cpp` is the **recommended one-shot setup command** for all platforms (Windows x64 / macOS arm64 / Linux x64):
+
+1. Reuses existing `bin/` bridge files if present; otherwise downloads the matching CI workflow artifact via `gh`
+2. Copies or downloads the Gemma 4 `.litertlm` model into `models/`
+3. Bootstraps a repo-local pinned `piper-tts` runtime and installs/activates the default Piper voice
+4. Writes all required `PIPER_*` and bridge env vars into `.env`
+5. Initializes `.env` from `.env.example` if not already present
+
+Source builds are opt-in via `--source-build` for backend developers. The script does **not** silently fall back to source builds.
+
+### What `npm run setup` does _(deprecated Python sidecar path)_
+
+> **Deprecated.** `npm run setup` configures the Python sidecar, which is no longer the primary backend. Prefer `npm run setup:litert-cpp` for all new setups.
 
 1. **`npm run init:env`** — copies `.env.example` → `.env` if needed
 2. **`npm run setup:sidecar`** — creates `sidecar/.venv` and installs Python dependencies (including `httpx`, `psutil` for benchmarking)
 3. **`npm run download:models`** — downloads Kokoro TTS assets into `sidecar/` (~340 MB)
 4. **`npm run check:env`** — warns about missing or suspicious environment values
-
-`npm run setup:litert-cpp` is separate and is the recommended one-shot path for the LiteRT-LM C++ backend. On Windows x64, macOS arm64, and Linux x64 it reuses existing `bin/` bridge files, otherwise downloads the matching CI artifact via `gh`; source builds are opt-in via `--source-build` for backend developers. It also bootstraps a repo-local pinned `piper-tts` runtime plus default Piper voice and copies or downloads the `.litertlm` model into `models/`.
 
 The `setup:llamafile`, `dev:llamafile`, and `benchmark:llamafile` npm scripts have been **removed**. For llamafile benchmark comparison, use the Python harness directly: `python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --runs 5 --scenarios s1,s2,s3`.
 
@@ -229,18 +264,18 @@ The defaults are sensible for most machines. Common settings you may want to cha
 
 | Variable         | Default                                     | When to change                                                                                    |
 | ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `SIDECAR_WS_URL` | `ws://localhost:8321/ws`                    | On WSL2, replace `localhost` with your WSL2 IP (`hostname -I`) if the Electron app cannot connect |
 | `LITERT_BACKEND` | `CPU`                                       | Set to `GPU` on supported machines (OpenCL on Linux, Metal on macOS)                              |
 | `MODEL_REPO`     | `litert-community/gemma-4-E2B-it-litert-lm` | Switch to the E4B variant on 32 GB machines                                                       |
 | `VOICE_ENABLED`  | `true`                                      | Disable always-on voice input if you only want text prompts                                       |
 | `TTS_ENABLED`    | `true`                                      | Disable spoken playback entirely                                                                  |
-| `TTS_BACKEND`    | `kokoro`                                    | Use `web-speech` for browser-only speech, or `mlx` on Apple Silicon for GPU TTS                   |
 | `LITERT_CPP_BRIDGE_REPO` | unset                               | Optional `owner/repo` override for `setup:litert-cpp` bridge Release/artifact lookup               |
-| `LITERT_CPP_TTS_BACKEND` | `none`                               | Set to `piper` to enable off-Python speech on `npm run dev:litert-cpp`                            |
+| `LITERT_CPP_TTS_BACKEND` | `piper`                              | Set to `none` to disable Piper and fall back to browser Web Speech on `npm run dev:litert-cpp`    |
 | `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune partial Piper flushes for long text without punctuation; completed sentences always flush first |
-| `PIPER_MODEL`    | unset                                       | Usually managed by `npm run voice:use -- <voice-name>` for LiteRT C++ Piper voices               |
+| `PIPER_MODEL`    | unset                                       | Managed by `npm run voice:use -- <voice-name>`; written automatically by `setup:litert-cpp`       |
+| `SIDECAR_WS_URL` | `ws://localhost:8321/ws`                    | _Deprecated Python sidecar path only._ On WSL2, replace `localhost` with your WSL2 IP if needed   |
+| `TTS_BACKEND`    | `kokoro`                                    | _Deprecated Python sidecar path only._ Use `web-speech`, `mlx` (Apple Silicon), or `kokoro`       |
 
-See [`.env.example`](.env.example) for the full reference including LiteRT-LM C++ backend options. The `LLAMAFILE_*` variables are kept for the deprecated benchmark-comparison path only.
+See [`.env.example`](.env.example) for the full reference. The `LLAMAFILE_*` variables are kept for the deprecated benchmark-comparison path only.
 
 ---
 
@@ -248,12 +283,11 @@ See [`.env.example`](.env.example) for the full reference including LiteRT-LM C+
 
 | Command                  | What it does                                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev:full`       | Starts the LiteRT sidecar + Electron together (macOS / Linux / WSL2)                                                                  |
-| `npm run dev:sidecar`    | Starts just the LiteRT sidecar (WSL2 terminal)                                                                                        |
-| `npm run dev:litert-cpp` | Starts the LiteRT-LM C++ backend WebSocket proxy on the Delfin sidecar port; `setup:litert-cpp` prepares the optional Piper runtime/voice |
-
-| `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference)                                                                     |
-| `npm run dev`            | Starts Electron + Vite only (when sidecar is already running separately)                                                              |
+| `npm run dev:litert-cpp` | **Primary.** Starts the LiteRT-LM C++ backend WebSocket proxy (port 8321) with Piper TTS; run `setup:litert-cpp` first               |
+| `npm run dev`            | Starts Electron + Vite only — use after `dev:litert-cpp` is already running in another terminal                                       |
+| `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference needed)                                                              |
+| `npm run dev:full`       | _Deprecated Python sidecar._ Starts the Python sidecar + Electron together (macOS / Linux / WSL2)                                    |
+| `npm run dev:sidecar`    | _Deprecated Python sidecar._ Starts just the Python sidecar                                                                           |
 
 ### Piper voice helpers
 
@@ -299,26 +333,28 @@ npm run setup-check:windows       # Windows PowerShell
 Electron Renderer (React / Zustand)
         ↕  contextBridge (IPC)
 Electron Main (Node.js)  ←→  WebSocket  ←→  Inference backend
-                                               ├── LiteRT-LM + Gemma 4    (Python sidecar; macOS / Linux / WSL2)
-                                               └── LiteRT-LM C++ bridge   (Node proxy + native binary; Windows)
+                                               └── LiteRT-LM C++ bridge   (primary; Node proxy + native binary; all platforms)
 
-Legacy / deprecated:
-                                               └── llamafile + GGUF       (kept only for benchmark comparison)
+Deprecated:
+                                               └── LiteRT-LM (Python sidecar; macOS / Linux / WSL2)
+
+Removed (benchmark comparison only):
+                                               └── llamafile + GGUF
 ```
 
-| Layer                       | Technology                                                                           |
-| --------------------------- | ------------------------------------------------------------------------------------ |
-| Desktop framework           | Electron 41+ via electron-vite                                                       |
-| Renderer                    | React 19, TypeScript, Tailwind CSS 4                                                 |
-| State management            | Zustand 5                                                                            |
-| Validation                  | Zod 4                                                                                |
-| Inference — LiteRT path     | LiteRT-LM (Python sidecar; macOS / Linux / WSL2)                                     |
-| Inference — LiteRT C++ path | Node proxy + native LiteRT-LM C++ bridge (Windows; macOS/Linux planned)              |
-| Inference — llamafile path  | _Deprecated._ llamafile / llama-server (C++) — benchmark comparison only             |
-| Model                       | Gemma 4 E2B (default); E4B for 32 GB machines                                        |
-| API server                  | FastAPI + uvicorn (LiteRT sidecar) / Node WebSocket proxy (LiteRT C++)               |
-| Voice input                 | `@ricky0123/vad-web` (Silero VAD in the renderer)                                    |
-| TTS                         | kokoro-onnx / Piper / mlx-audio / Web Speech fallback                                |
+| Layer                       | Technology                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| Desktop framework           | Electron 41+ via electron-vite                                                                 |
+| Renderer                    | React 19, TypeScript, Tailwind CSS 4                                                           |
+| State management            | Zustand 5                                                                                      |
+| Validation                  | Zod 4                                                                                          |
+| Inference — primary         | Node proxy + native LiteRT-LM C++ bridge (Windows x64 / macOS arm64 / Linux x64)              |
+| Inference — deprecated      | _Deprecated._ LiteRT-LM Python sidecar (macOS / Linux / WSL2)                                 |
+| Inference — removed         | _Removed._ llamafile / llama-server — benchmark comparison only                                |
+| Model                       | Gemma 4 E2B (default); E4B for 32 GB machines                                                  |
+| API server                  | Node WebSocket proxy (LiteRT C++ bridge); FastAPI + uvicorn (deprecated Python sidecar)        |
+| Voice input                 | `@ricky0123/vad-web` (Silero VAD in the renderer)                                              |
+| TTS                         | Piper (LiteRT C++ path) / Web Speech fallback; kokoro-onnx / mlx-audio (deprecated sidecar)   |
 
 ---
 
@@ -331,15 +367,15 @@ Legacy / deprecated:
 │   ├── preload/       # contextBridge bindings
 │   ├── renderer/      # React UI, hooks, tests, stores, waveform/audio utilities
 │   └── shared/        # shared TypeScript types, schemas, constants
-├── sidecar/
+├── native/
+│   └── litert-cpp-bridge/ # LiteRT-LM C++ JSONL bridge source (primary backend; all platforms)
+├── sidecar/           # deprecated Python sidecar (development reference only)
 │   ├── inference/     # LiteRT-LM engine loader + image preprocessing
 │   ├── prompts/       # system prompt presets
 │   ├── tests/         # sidecar unit tests
 │   ├── server.py      # FastAPI app + WebSocket turn handling
 │   ├── tts.py         # Kokoro / MLX / fallback TTS pipeline
 │   └── requirements.txt
-├── native/
-│   └── litert-cpp-bridge/ # native LiteRT-LM C++ JSONL bridge source (Windows backend)
 ├── bin/               # built `delfin_litert_bridge.exe` + DLL (gitignored)
 ├── models/            # `.litertlm` model + Piper voices (gitignored)
 ├── scripts/           # setup, env checks, model downloads, benchmark runner
@@ -359,20 +395,20 @@ Legacy / deprecated:
 
 | Script                         | Description                                                                                  |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
-| `npm run setup`                | First-run setup for env, Python venv, and TTS assets (macOS / Linux / WSL2)                  |
-| `npm run setup:litert-cpp`     | One-shot setup for the LiteRT-LM C++ backend (CI bridge artifact by default, repo-local Piper runtime + voice, model)  |
+| `npm run setup:litert-cpp`     | **Recommended.** One-shot setup: CI bridge artifact, Gemma 4 model, repo-local Piper runtime + voice, `.env` |
 | `npm run setup-check:windows`  | Windows environment + bridge/model sanity check                                               |
 | `npm run download:ci-bridge:windows` | Download the latest successful Windows bridge artifact into `bin/`                       |
 | `npm run test:ci-bridge:windows` | Start the downloaded bridge via `dev:litert-cpp`, wait for `/health`, and optionally benchmark |
 
-| `npm run dev:full`             | Run LiteRT sidecar + Electron together                                                       |
+| `npm run dev:litert-cpp`       | **Primary.** Run the LiteRT-LM C++ backend WebSocket proxy with Piper TTS                     |
+| `npm run dev`                  | Run Electron + Vite only (use after `dev:litert-cpp` is running)                              |
 | `npm run dev:mock`             | Run mock sidecar + Electron (no inference needed)                                            |
-| `npm run dev`                  | Run Electron + Vite only                                                                     |
-| `npm run dev:sidecar`          | Run the LiteRT sidecar only                                                                  |
-| `npm run dev:litert-cpp`       | Run the LiteRT-LM C++ backend WebSocket proxy with optional Piper TTS                         |
+| `npm run dev:full`             | _Deprecated._ Run Python sidecar + Electron together (macOS / Linux / WSL2)                  |
+| `npm run dev:sidecar`          | _Deprecated._ Run the Python sidecar only                                                    |
+| `npm run setup`                | _Deprecated._ First-run setup for Python venv and Kokoro TTS assets                          |
 
-| `npm run benchmark:litert`     | Benchmark the LiteRT sidecar (uses sidecar venv automatically)                               |
 | `npm run benchmark:litert-cpp` | Benchmark the LiteRT-LM C++ backend on the Delfin sidecar protocol                           |
+| `npm run benchmark:litert`     | Benchmark the Python sidecar (deprecated path; uses sidecar venv automatically)              |
 
 | `npm run build`                | Build the Electron app and validate VAD runtime assets                                       |
 | `npm test`                     | Run Vitest unit tests                                                                        |
@@ -383,7 +419,6 @@ Legacy / deprecated:
 
 ```bash
 npm test
-cd sidecar && .venv/bin/python -m unittest tests/test_tts.py
 ```
 
 ### Manual WebSocket check
