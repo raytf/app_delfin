@@ -45,7 +45,7 @@ export const sidecarStatusSchema = z.object({
   visionTokens: z.string().optional(),
 })
 
-export const modelAssetIdSchema = z.enum(['litert-cpp-model', 'piper-voice'])
+export const modelAssetIdSchema = z.enum(['litert-cpp-model'])
 
 export const modelStatusSchema = z.object({
   ready: z.boolean(),

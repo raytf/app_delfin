@@ -9,7 +9,7 @@
     "dev:litert-cpp": "node scripts/litert-cpp-proxy.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
-    "build": "electron-vite build",
+    "build": "electron-vite build && npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=out/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
     "setup": "npm run init:env && npm run setup:sidecar && npm run download:models && npm run check:env",
@@ -43,12 +43,8 @@
     ],
     "extraResources": [
       {
-        "from": "scripts/litert-cpp-proxy.mjs",
+        "from": "out/main/litert-cpp-proxy.mjs",
         "to": "litert-cpp-proxy.mjs"
-      },
-      {
-        "from": "scripts/litert-cpp-presets.mjs",
-        "to": "litert-cpp-presets.mjs"
       }
     ],
     "mac": {
@@ -60,7 +56,7 @@
           ]
         }
       ],
-      "icon": "build/icon.icns",
+      "icon": "build/icon.png",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
@@ -72,6 +68,14 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.dylib",
           "to": "libGemmaModelConstraintProvider.dylib"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
         }
       ]
     },
@@ -84,7 +88,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
+      "icon": "build/icon.png",
       "extraResources": [
         {
           "from": "bin/delfin_litert_bridge.exe",
@@ -93,6 +97,14 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.dll",
           "to": "libGemmaModelConstraintProvider.dll"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
         }
       ]
     },
@@ -115,13 +127,21 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.so",
           "to": "libGemmaModelConstraintProvider.so"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
         }
       ]
     },
     "nsis": {
       "oneClick": false,
-      "allowDirChange": true,
-      "installerIcon": "build/icon.ico"
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.png"
     }
   },
   "devDependencies": {

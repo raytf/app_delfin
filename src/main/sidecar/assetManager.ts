@@ -15,18 +15,35 @@ interface AssetManifest {
   }>
 }
 
+// Pinned LiteRT-LM model revision. Must stay in sync with MODEL_REVISION in
+// scripts/setup-litert-cpp.mjs and LITERT_LM_REF in the same file. The bridge
+// binary's ABI is tied to this revision — bumping LITERT_LM_REF without
+// bumping this constant produces "Vision Encoder model must have exactly one
+// signature but got N" failures (the model schema changed but the bridge
+// expects the older shape, or vice-versa). See AGENTS.md "Bump procedure".
+const MODEL_REPO = 'litert-community/gemma-4-E2B-it-litert-lm'
+const MODEL_FILE = 'gemma-4-E2B-it.litertlm'
+const MODEL_REVISION = '84b6978eff6e4eea02825bc2ee4ea48579f13109'
+const MODEL_URL = `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_REVISION}/${MODEL_FILE}`
+
 const MANIFEST_PATH = join(app.getPath('userData'), 'manifest.json')
 const MODELS_DIR = join(app.getPath('userData'), 'models')
 
 let downloadInProgress = false
 
+function expectedAssetVersion(id: ModelAssetId): string | undefined {
+  return id === 'litert-cpp-model' ? MODEL_REVISION : undefined
+}
+
 export function getModelStatus(): ModelStatus {
   const manifest = loadManifest()
   const missing: ModelAssetId[] = []
-  
+
   for (const [id, asset] of Object.entries(manifest.assets) as [ModelAssetId, any][]) {
     const fullPath = join(app.getPath('userData'), asset.path)
-    if (!asset.downloaded || !existsSync(fullPath)) {
+    const expected = expectedAssetVersion(id)
+    const versionMatches = expected === undefined || asset.version === expected
+    if (!asset.downloaded || !existsSync(fullPath) || !versionMatches) {
       missing.push(id)
     }
   }
@@ -47,22 +64,21 @@ function loadManifest(): AssetManifest {
     }
   }
 
+  // The Piper voice + config are bundled via electron-builder extraResources
+  // (see package.json build.<platform>.extraResources). Only the LiteRT-LM
+  // model is downloaded at first run, because it is too large to ship in the
+  // installer.
   const defaultManifest: AssetManifest = {
     schema: 1,
     assets: {
       'litert-cpp-model': {
-        path: 'models/gemma-4-E2B-it.litertlm',
+        path: `models/${MODEL_FILE}`,
         downloaded: false,
-        url: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm'
-      },
-      'piper-voice': {
-        path: 'models/tts/en_US-hfc_female-medium.onnx',
-        downloaded: false,
-        url: 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx'
+        url: MODEL_URL
       }
     }
   }
-  
+
   saveManifest(defaultManifest)
   return defaultManifest
 }
@@ -81,18 +97,27 @@ export async function downloadAssets(
   downloadInProgress = true
 
   const manifest = loadManifest()
-  
+
   if (!existsSync(MODELS_DIR)) mkdirSync(MODELS_DIR, { recursive: true })
   if (!existsSync(join(MODELS_DIR, 'tts'))) mkdirSync(join(MODELS_DIR, 'tts'), { recursive: true })
 
   try {
     for (const id of assetsToDownload) {
       const asset = manifest.assets[id]
-      if (!asset || !asset.url) continue
+      if (!asset) continue
+
+      // Refresh the URL/path from the current pinned constants so a manifest
+      // that was created against an older revision still re-downloads from
+      // the right place when the version mismatch invalidates it.
+      if (id === 'litert-cpp-model') {
+        asset.url = MODEL_URL
+        asset.path = `models/${MODEL_FILE}`
+      }
+      if (!asset.url) continue
 
       const destPath = join(app.getPath('userData'), asset.path)
       console.log(`[assetManager] Downloading ${id} from ${asset.url} to ${destPath}`)
-      
+
       try {
         await downloadFile(asset.url, destPath, (received, total) => {
           onProgress({
@@ -102,8 +127,10 @@ export async function downloadAssets(
             percent: total ? Math.round((received / total) * 100) : undefined
           })
         })
-        
+
         asset.downloaded = true
+        const expected = expectedAssetVersion(id)
+        if (expected !== undefined) asset.version = expected
         saveManifest(manifest)
         onComplete(id)
       } catch (e: any) {
