@@ -6,18 +6,143 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:sidecar": "node scripts/run-sidecar.mjs",
+    "dev:litert-cpp": "node scripts/litert-cpp-proxy.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
-    "build": "electron-vite build",
+    "build": "electron-vite build && npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=out/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
     "setup": "npm run init:env && npm run setup:sidecar && npm run download:models && npm run check:env",
     "setup:sidecar": "node scripts/setup-sidecar.mjs",
+    "setup:litert-cpp": "node scripts/setup-litert-cpp.mjs",
+    "build:litert-cpp-bridge": "node scripts/build-litert-cpp-bridge.mjs",
     "init:env": "node scripts/init-env.mjs",
     "download:models": "node scripts/download-models.mjs",
+    "download:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\download-ci-bridge.ps1",
     "check:env": "node scripts/check-env.mjs",
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
-    "test": "vitest run"
+    "setup-check:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\setup-check.ps1",
+    "voice:list": "node scripts/piper-voice.mjs list",
+    "voice:use": "node scripts/piper-voice.mjs use",
+    "voice:install": "node scripts/piper-voice.mjs install",
+    "benchmark:litert": "node scripts/run-benchmark.mjs --backend litert --runs 5",
+    "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
+    "test:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\test-ci-bridge.ps1",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.delfin.desktop",
+    "productName": "Delfin",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "out/main/litert-cpp-proxy.mjs",
+        "to": "litert-cpp-proxy.mjs"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge",
+          "to": "delfin_litert_bridge"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.dylib",
+          "to": "libGemmaModelConstraintProvider.dylib"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge.exe",
+          "to": "delfin_litert_bridge.exe"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.dll",
+          "to": "libGemmaModelConstraintProvider.dll"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Education",
+      "extraResources": [
+        {
+          "from": "bin/delfin_litert_bridge",
+          "to": "delfin_litert_bridge"
+        },
+        {
+          "from": "bin/libGemmaModelConstraintProvider.so",
+          "to": "libGemmaModelConstraintProvider.so"
+        },
+        {
+          "from": "bin/piper",
+          "to": "bin/piper"
+        },
+        {
+          "from": "models/piper",
+          "to": "models/piper"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.png"
+    }
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

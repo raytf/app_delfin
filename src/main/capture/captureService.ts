@@ -1,6 +1,6 @@
-import type { NativeImage } from 'electron'
+import { desktopCapturer, type NativeImage } from 'electron'
 import type { CaptureFrame } from '../../shared/types'
-import { getActiveWindowSource, getPrimaryScreenSource } from './focusDetector'
+import { getPrimaryScreenSource, isCapturableSource, CAPTURE_THUMBNAIL_SIZE } from './focusDetector'
 
 /**
  * Sample a 4×4 grid of pixels across the image and return true if every
@@ -37,8 +37,22 @@ function isThumbnailBlank(image: NativeImage): boolean {
 }
 
 export async function captureForegroundWindow(): Promise<CaptureFrame> {
-  const source = await getActiveWindowSource()
-  return captureSource(source, true)
+  const windowSources = await desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: CAPTURE_THUMBNAIL_SIZE,
+  })
+
+  for (const source of windowSources) {
+    if (!isCapturableSource(source)) continue
+    if (!isThumbnailBlank(source.thumbnail)) {
+      return captureSource(source, true)
+    }
+  }
+
+  // Every window thumbnail was blank; fall back to the primary screen so the
+  // user still gets a capture rather than a hard failure.
+  const screenSource = await getPrimaryScreenSource()
+  return captureSource(screenSource, false)
 }
 
 export async function capturePrimaryScreen(): Promise<CaptureFrame> {

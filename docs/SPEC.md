@@ -1,6 +1,6 @@
 # Delfin — Implementation Spec
 
-> **Purpose**: This spec is the single source of truth for an AI coding agent building Delfin from an empty repo. Each phase is self-contained, builds on the previous, and ends with a verification checklist. Complete one phase at a time; wait for human review before starting the next.
+> **Purpose**: This spec is the single source of truth for the architecture, interface contracts, and cross-cutting code rules that every feature in Delfin must respect. Per-feature scope, acceptance criteria, and verification checklists live in the individual specs under [`docs/features/<area>/`](./features/) and are tracked in [`STATUS.md`](../STATUS.md). The original numbered hackathon phases (0–6) were consolidated into [`archive/hackathon-mvp.md`](./archive/hackathon-mvp.md) on 2026-05-03.
 
 ## What is Delfin?
 
@@ -46,35 +46,38 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Desktop framework | Electron 34+ via electron-vite |
-| Renderer | React 19, TypeScript 5, Tailwind CSS 4 |
-| State management | Zustand 5 |
-| Validation | Zod 3 |
-| Inference engine | LiteRT-LM ≥ 0.10.1 (Python API) |
-| Model | Gemma 4 E2B (default) or E4B (32 GB machines) |
-| API server | FastAPI + uvicorn |
-| TTS | kokoro-onnx (Linux/WSL2), mlx-audio (macOS), Web Speech API (fallback) |
-| WebSocket | ws (Node.js client), FastAPI built-in (server) |
+| Layer             | Technology                                                             |
+| ----------------- | ---------------------------------------------------------------------- |
+| Desktop framework | Electron 34+ via electron-vite                                         |
+| Renderer          | React 19, TypeScript 5, Tailwind CSS 4                                 |
+| State management  | Zustand 5                                                              |
+| Validation        | Zod 3                                                                  |
+| Inference engine  | LiteRT-LM ≥ 0.10.1 (Python API)                                        |
+| Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                          |
+| API server        | FastAPI + uvicorn                                                      |
+| TTS               | kokoro-onnx (Linux/WSL2), mlx-audio (macOS), Web Speech API (fallback) |
+| WebSocket         | ws (Node.js client), FastAPI built-in (server)                         |
 
-## Phase Map
+## Active Work Map
 
-| Phase | Name | What Gets Built | Depends On |
-|---|---|---|---|
-| 0 | [Project Scaffold](./phases/phase-0-scaffold.md) | Repo structure, configs, .env, dependencies, setup scripts | Nothing |
-| 1 | [Inference Sidecar](./phases/phase-1-sidecar.md) | FastAPI server, LiteRT-LM engine, tool calling, image preprocessing | Phase 0 |
-| 2 | [Electron Shell + Capture](./phases/phase-2-electron.md) | Overlay window, desktopCapturer, WebSocket client, IPC handlers | Phase 0 |
-| 3 | [React Sidebar UI](./phases/phase-3-ui.md) | All React components, Zustand stores, streaming display | Phase 2 |
-| 4 | [End-to-End Integration](./phases/phase-4-integration.md) | Wire all three layers together, error handling, status reporting | Phases 1–3 |
-| 5 | [Auto-Refresh + TTS](./phases/phase-5-autorefresh-tts.md) | Auto-refresh with debounce, TTS pipeline, audio playback | Phase 4 |
-| 6 | [Polish + Optimisation](./phases/phase-6-polish.md) | Styling, error states, perf optimisations, demo prep | Phase 5 |
+The hackathon-era numbered phase sequence (Phase 0 scaffold → Phase 6 polish) is complete and archived. New work is organised by feature area; each spec carries its own scope and verification checklist.
+
+| Area         | Folder                                                     | Headline                                                                                                                                                                |
+| ------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foundations  | n/a — shipping app                                         | Hackathon MVP (Electron shell + Python LiteRT sidecar + voice/TTS pipeline). See [`STATUS.md`](../STATUS.md#foundations-hackathon-mvp) and [`archive/hackathon-mvp.md`](./archive/hackathon-mvp.md). |
+| Backend      | [`features/backend/`](./features/backend/)                 | Native LiteRT-LM C++ bridge (text/vision/audio/KV-cache validated on Windows; macOS/Linux pending) and the inference benchmark harness.                                |
+| Distribution | [`features/distribution/`](./features/distribution/)       | Desktop packaging (electron-builder, signed installers), backend selection for distribution, GitHub Actions CI/CD.                                                       |
+| Memory       | [`features/memory/`](./features/memory/)                   | On-device LLM wiki with internal sub-phases M0–M3.                                                                                                                       |
+| UI / UX      | [`features/ui/`](./features/ui/)                           | Waveform / overlay polish — all specs ✅ Complete; area is in maintenance.                                                                                              |
+
+See [`docs/README.md`](./README.md) for the full per-spec index with lifecycle status.
 
 ## Cross-Cutting Rules
 
-These rules apply to every phase. The agent must follow them throughout.
+These rules apply to every feature. The agent must follow them throughout.
 
 ### Code Style
+
 - TypeScript for all Electron code (strict mode)
 - Python 3.12+ for all sidecar code
 - Use ES modules in TypeScript, standard Python imports
@@ -82,22 +85,26 @@ These rules apply to every phase. The agent must follow them throughout.
 - All WebSocket message types defined in `src/shared/types.ts` and validated with Zod schemas in `src/shared/schemas.ts`
 
 ### File Naming
+
 - TypeScript: camelCase files (e.g., `captureService.ts`)
 - React components: PascalCase files (e.g., `ChatPanel.tsx`)
 - Python: snake_case files (e.g., `server.py`)
 - CSS: `globals.css` only (Tailwind utility classes, no component CSS files)
 
 ### Configuration
+
 - All machine-specific values come from `.env` (never hardcoded)
 - `.env.example` is committed; `.env` is gitignored
 - Python reads `.env` via `python-dotenv`; Electron reads via `dotenv` package
 
 ### Error Handling
+
 - Never let an unhandled exception crash the sidecar — catch and return `{type: 'error', message: '...'}` over WebSocket
 - Electron main process: catch errors in IPC handlers, log and forward to renderer
 - Renderer: display errors inline in the chat panel, not in alert dialogs
 
 ### Git
+
 - `.gitignore` must include: `node_modules/`, `dist/`, `.env`, `__pycache__/`, `*.pyc`, `.venv/`
 - Each phase should result in a working (if incomplete) application
 
@@ -123,12 +130,37 @@ LITERT_CACHE_DIR=/tmp/litert-cache
 VISION_TOKEN_BUDGET=280
 MAX_IMAGE_WIDTH=512
 
+# === LiteRT-LM C++ research backend ===
+LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
+LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
+LITERT_CPP_BRIDGE_REPO=owner/repo
+LITERT_CPP_TTS_BACKEND=none
+LITERT_CPP_TTS_SOFT_MIN_CHARS=80
+LITERT_CPP_TTS_SOFT_MAX_CHARS=180
+PIPER_BIN=./bin/piper/venv/Scripts/piper.exe
+PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx
+PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json
+# Optional override; if omitted, the LiteRT C++ proxy reads audio.sample_rate
+# from PIPER_CONFIG. `npm run voice:use` writes this automatically.
+PIPER_SAMPLE_RATE=22050
+
+# LITERT_CPP_BIN must point at the Delfin JSONL/stdio bridge built from
+# native/litert-cpp-bridge/ (delfin_litert_bridge[.exe]). The upstream
+# litert_lm_main demo CLI is not a drop-in replacement — it does not speak
+# the Delfin JSONL protocol.
+#
+# For packaged Windows builds, LITERT_CPP_BIN points at the bundled prebuilt
+# delfin_litert_bridge.exe resource and LITERT_CPP_MODEL points at the user's
+# first-run-downloaded .litertlm model under app.getPath('userData').
+
 # === TTS ===
 TTS_ENABLED=false
 TTS_BACKEND=web-speech
 KOKORO_VOICE=af_heart
 KOKORO_SPEED=1.1
 ```
+
+For `npm run dev:litert-cpp`, `TTS_BACKEND` does **not** control proxy speech output. Use `LITERT_CPP_TTS_BACKEND=piper` plus the `PIPER_*` paths to enable off-Python audio on the LiteRT C++ proxy. Piper audio is streamed as completed sentences arrive; for long text without punctuation, `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` allow conservative partial flushes before final `done`. `npm run setup:litert-cpp` is the one-shot setup path for Windows x64, macOS arm64, and Linux x64: it reuses existing `bin/` bridge files or downloads the matching CI workflow artifact (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, or `delfin-litert-bridge-linux-x64`) via `gh`, then provisions the model, repo-local Piper runtime, default voice, and `.env`. Source builds are reserved for backend developers via `--source-build` or `--bridge-source build`; default setup must not silently fall back to Bazel. `LITERT_CPP_BRIDGE_REPO` optionally overrides the GitHub repo used for artifact lookup when it cannot be inferred from `git remote origin`. The same setup command repairs missing runtime companion packages such as `pathvalidate`. `npm run voice:list`, `npm run voice:use -- <voice-name>`, and `npm run voice:install -- <hf-path> --use` remain available for voice management. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
 
 ## WebSocket Message Protocol
 
@@ -139,14 +171,14 @@ All messages between Electron and the sidecar are JSON. These types are the cont
 ```typescript
 // Inference request
 interface WsOutboundMessage {
-  image?: string;      // base64 JPEG
-  text: string;        // user question
-  preset_id: string;   // 'lecture-slide' | 'generic-screen'
+  image?: string; // base64 JPEG
+  text: string; // user question
+  preset_id: string; // 'lecture-slide' | 'generic-screen'
 }
 
 // Interrupt
 interface WsInterruptMessage {
-  type: 'interrupt';
+  type: "interrupt";
 }
 ```
 
@@ -154,23 +186,31 @@ interface WsInterruptMessage {
 
 ```typescript
 interface WsInboundMessage {
-  type: 'token' | 'structured' | 'audio_start' | 'audio_chunk' | 'audio_end' | 'done' | 'error';
-  text?: string;       // for 'token'
-  data?: {             // for 'structured'
+  type:
+    | "token"
+    | "structured"
+    | "audio_start"
+    | "audio_chunk"
+    | "audio_end"
+    | "done"
+    | "error";
+  text?: string; // for 'token'
+  data?: {
+    // for 'structured'
     summary: string;
     answer: string;
     key_points: string[];
   };
-  audio?: string;      // for 'audio_chunk' — base64 int16 PCM
-  sample_rate?: number;    // for 'audio_start' — PCM sample rate
-  sentence_count?: number; // for 'audio_start' — number of sentence chunks
-  index?: number;          // for 'audio_chunk' — sentence index
-  tts_time?: number;       // for 'audio_end' — synthesis time in seconds
-  message?: string;    // for 'error'
+  audio?: string; // for 'audio_chunk' — base64 int16 PCM
+  sample_rate?: number; // for 'audio_start' — PCM sample rate
+  sentence_count?: number; // for 'audio_start' — optional sentence metadata (proxy may send 0 when unknown)
+  index?: number; // for 'audio_chunk' — sentence index
+  tts_time?: number; // for 'audio_end' — synthesis time in seconds
+  message?: string; // for 'error'
 }
 ```
 
-For turns with server-side TTS, message ordering is:
+For turns with server-side TTS (Python sidecar or Piper-backed LiteRT C++ proxy), message ordering is:
 
 ```text
 token* → audio_start → audio_chunk* → audio_end → done
@@ -180,26 +220,26 @@ This means `done` represents the end of the full turn, not just the end of token
 
 ### IPC Channels (Electron Main ↔ Renderer)
 
-| Direction | Channel | Payload |
-|---|---|---|
-| Renderer → Main | `capture:now` | — |
-| Renderer → Main | `capture:auto-refresh` | `{ enabled: boolean, intervalMs: number }` |
-| Renderer → Main | `sidecar:send` | `WsOutboundMessage` |
-| Renderer → Main | `sidecar:interrupt` | — |
-| Renderer → Main | `session:start` | — |
-| Renderer → Main | `session:stop` | — |
-| Renderer → Main | `session:submit-prompt` | `SessionPromptRequest` |
-| Renderer → Main | `session:list` | — |
-| Renderer → Main | `session:get-detail` | `{ sessionId: string }` |
-| Renderer → Main | `session:delete` | `{ sessionId: string }` |
-| Renderer → Main | `session:get-message-image` | `{ imagePath: string }` |
-| Main → Renderer | `frame:captured` | `CaptureFrame` |
-| Main → Renderer | `sidecar:token` | `{ text: string }` |
-| Main → Renderer | `sidecar:structured` | `{ summary, answer, key_points }` |
-| Main → Renderer | `sidecar:audio_start` | `{ sampleRate: number, sentenceCount: number }` |
-| Main → Renderer | `sidecar:audio_chunk` | `{ audio: string, index?: number }` |
-| Main → Renderer | `sidecar:audio_end` | `{ ttsTime: number }` |
-| Main → Renderer | `sidecar:done` | — |
-| Main → Renderer | `overlay:error` | `{ message: string }` |
-| Main → Renderer | `sidecar:error` | `{ message: string }` |
-| Main → Renderer | `sidecar:status` | `{ connected: boolean, backend?: string, model?: string }` |
+| Direction       | Channel                     | Payload                                                    |
+| --------------- | --------------------------- | ---------------------------------------------------------- |
+| Renderer → Main | `capture:now`               | —                                                          |
+| Renderer → Main | `capture:auto-refresh`      | `{ enabled: boolean, intervalMs: number }`                 |
+| Renderer → Main | `sidecar:send`              | `WsOutboundMessage`                                        |
+| Renderer → Main | `sidecar:interrupt`         | —                                                          |
+| Renderer → Main | `session:start`             | —                                                          |
+| Renderer → Main | `session:stop`              | —                                                          |
+| Renderer → Main | `session:submit-prompt`     | `SessionPromptRequest`                                     |
+| Renderer → Main | `session:list`              | —                                                          |
+| Renderer → Main | `session:get-detail`        | `{ sessionId: string }`                                    |
+| Renderer → Main | `session:delete`            | `{ sessionId: string }`                                    |
+| Renderer → Main | `session:get-message-image` | `{ imagePath: string }`                                    |
+| Main → Renderer | `frame:captured`            | `CaptureFrame`                                             |
+| Main → Renderer | `sidecar:token`             | `{ text: string }`                                         |
+| Main → Renderer | `sidecar:structured`        | `{ summary, answer, key_points }`                          |
+| Main → Renderer | `sidecar:audio_start`       | `{ sampleRate: number, sentenceCount: number }`            |
+| Main → Renderer | `sidecar:audio_chunk`       | `{ audio: string, index?: number }`                        |
+| Main → Renderer | `sidecar:audio_end`         | `{ ttsTime: number }`                                      |
+| Main → Renderer | `sidecar:done`              | —                                                          |
+| Main → Renderer | `overlay:error`             | `{ message: string }`                                      |
+| Main → Renderer | `sidecar:error`             | `{ message: string }`                                      |
+| Main → Renderer | `sidecar:status`            | `{ connected: boolean, backend?: string, model?: string }` |

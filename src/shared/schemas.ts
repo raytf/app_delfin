@@ -39,7 +39,23 @@ export const captureFrameSchema = z.object({
 
 export const sidecarStatusSchema = z.object({
   connected: z.boolean(),
+  healthy: z.boolean().optional(),
   backend: z.string().optional(),
   model: z.string().optional(),
   visionTokens: z.string().optional(),
+})
+
+export const modelAssetIdSchema = z.enum(['litert-cpp-model'])
+
+export const modelStatusSchema = z.object({
+  ready: z.boolean(),
+  missing: z.array(modelAssetIdSchema),
+  downloadInProgress: z.boolean(),
+})
+
+export const downloadProgressSchema = z.object({
+  asset: modelAssetIdSchema,
+  receivedBytes: z.number(),
+  totalBytes: z.number().optional(),
+  percent: z.number().optional(),
 })

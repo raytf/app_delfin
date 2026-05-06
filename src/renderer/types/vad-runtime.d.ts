@@ -8,6 +8,8 @@ declare global {
     model?: 'v5' | 'legacy'
     baseAssetPath?: string
     getStream?: () => Promise<MediaStream>
+    pauseStream?: (stream: MediaStream) => Promise<void>
+    resumeStream?: (stream?: MediaStream) => Promise<MediaStream>
     onnxWASMBasePath?: string
     preSpeechPadMs?: number
     minSpeechMs?: number

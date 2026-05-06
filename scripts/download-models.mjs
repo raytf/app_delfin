@@ -9,7 +9,8 @@
  */
 
 import { createWriteStream, existsSync, readFileSync } from 'node:fs'
-import { rename, rm } from 'node:fs/promises'
+import { once } from 'node:events'
+import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -54,57 +55,109 @@ async function removeIfExists(filePath) {
   await rm(filePath, { force: true })
 }
 
-/** Stream a URL to disk, printing progress every 10 %. */
-export async function downloadFile(url, destPath, label) {
+async function getFileSize(filePath) {
+  try {
+    return (await stat(filePath)).size
+  } catch {
+    return 0
+  }
+}
+
+function parseTotalBytes(response, downloadedBytes) {
+  const range = response.headers.get('content-range')
+  const match = range?.match(/\/([0-9]+)$/)
+  if (match) return Number(match[1])
+
+  const contentLength = Number(response.headers.get('content-length') ?? '0')
+  if (!Number.isFinite(contentLength) || contentLength <= 0) return 0
+  return downloadedBytes + contentLength
+}
+
+/** Stream a URL to disk with retry/resume support, printing progress every 10 %. */
+export async function downloadFile(url, destPath, label, options = {}) {
   console.log(`\n[download-models] Downloading ${label}`)
   console.log(`  from: ${url}`)
   console.log(`  to:   ${destPath}`)
 
+  await mkdir(dirname(destPath), { recursive: true })
   const tempPath = `${destPath}.part`
-  await removeIfExists(tempPath)
+  const maxAttempts = options.maxAttempts ?? 5
+  const fetchImpl = options.fetchImpl ?? fetch
 
-  const response = await fetch(url, { redirect: 'follow' })
-  if (!response.ok || response.body === null) {
-    throw new Error(`HTTP ${response.status} ${response.statusText} — ${url}`)
-  }
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let existingBytes = await getFileSize(tempPath)
+    const headers = { ...(options.headers ?? {}) }
+    if (existingBytes > 0) headers.Range = `bytes=${existingBytes}-`
 
-  const totalBytes = parseInt(response.headers.get('content-length') ?? '0', 10)
-  const totalMB = totalBytes > 0 ? (totalBytes / 1048576).toFixed(0) : '?'
-
-  const writer = createWriteStream(tempPath)
-  let downloaded = 0
-  let lastPercent = -1
-
-  try {
-    for await (const chunk of response.body) {
-      writer.write(chunk)
-      downloaded += chunk.length
-      if (totalBytes > 0) {
-        const pct = Math.floor((downloaded / totalBytes) * 100)
-        if (pct >= lastPercent + 10) {
-          process.stdout.write(
-            `\r  ${String(pct).padStart(3)}%  (${(downloaded / 1048576).toFixed(0)} / ${totalMB} MB)   `,
-          )
-          lastPercent = pct
-        }
-      }
+    if (attempt > 1) {
+      console.log(`[download-models] Retry ${attempt}/${maxAttempts} for ${label}`)
     }
 
-    await new Promise((res, rej) => {
-      writer.end()
-      writer.on('finish', res)
-      writer.on('error', rej)
-    })
+    let response
+    try {
+      response = await fetchImpl(url, { redirect: 'follow', headers })
+    } catch (error) {
+      if (attempt === maxAttempts) throw error
+      console.warn(`[download-models] ⚠️  ${label} request failed: ${error.message}`)
+      continue
+    }
+    if (response.status === 416) {
+      await removeIfExists(tempPath)
+      existingBytes = 0
+      continue
+    }
+    if (!response.ok || response.body === null) {
+      throw new Error(`HTTP ${response.status} ${response.statusText} — ${url}`)
+    }
 
-    await rename(tempPath, destPath)
-  } catch (error) {
-    writer.destroy()
-    await removeIfExists(tempPath)
-    throw error
+    const canAppend = existingBytes > 0 && response.status === 206
+    if (existingBytes > 0 && !canAppend) {
+      console.log('[download-models] Server did not resume partial file; restarting download.')
+      await removeIfExists(tempPath)
+      existingBytes = 0
+    }
+
+    const totalBytes = parseTotalBytes(response, existingBytes)
+    const totalMB = totalBytes > 0 ? (totalBytes / 1048576).toFixed(0) : '?'
+    const writer = createWriteStream(tempPath, { flags: existingBytes > 0 ? 'a' : 'w' })
+    let downloaded = existingBytes
+    let lastPercent = totalBytes > 0 ? Math.floor((downloaded / totalBytes) * 100) - 10 : -1
+
+    try {
+      for await (const chunk of response.body) {
+        if (!writer.write(chunk)) await once(writer, 'drain')
+        downloaded += chunk.length
+        if (totalBytes > 0) {
+          const pct = Math.floor((downloaded / totalBytes) * 100)
+          if (pct >= lastPercent + 10 || pct === 100) {
+            process.stdout.write(
+              `\r  ${String(pct).padStart(3)}%  (${(downloaded / 1048576).toFixed(0)} / ${totalMB} MB)   `,
+            )
+            lastPercent = pct
+          }
+        }
+      }
+
+      await new Promise((res, rej) => {
+        writer.end()
+        writer.on('finish', res)
+        writer.on('error', rej)
+      })
+
+      if (totalBytes > 0 && downloaded !== totalBytes) {
+        throw new Error(`Downloaded ${(downloaded / 1048576).toFixed(1)} MB, expected ${(totalBytes / 1048576).toFixed(1)} MB.`)
+      }
+
+      await rename(tempPath, destPath)
+      process.stdout.write('\n')
+      console.log(`[download-models] ✅ ${label} saved.\n`)
+      return
+    } catch (error) {
+      writer.destroy()
+      if (attempt === maxAttempts) throw error
+      console.warn(`[download-models] ⚠️  ${label} download interrupted: ${error.message}`)
+    }
   }
-
-  process.stdout.write('\n')
-  console.log(`[download-models] ✅ ${label} saved.\n`)
 }
 
 export async function main() {

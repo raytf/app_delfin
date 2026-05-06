@@ -8,3 +8,5 @@ huggingface-hub
 python-dotenv
 requests
 kokoro-onnx
+httpx
+psutil

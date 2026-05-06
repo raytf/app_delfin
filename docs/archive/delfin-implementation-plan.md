@@ -3,7 +3,7 @@
 > **A local, privacy-first study assistant that helps you understand what's on your screen.**
 > 1.5-day hackathon · 5 people · 3 streams · Phase-gated milestones
 
-> ⚠️ **This plan reflects the team/parallel-stream view of the work. The authoritative API contract, file structure, and pseudocode live in [`docs/SPEC.md`](docs/SPEC.md) and the phase docs (`docs/phases/phase-*.md`). Where this document conflicts with those, the SPEC wins.**
+> 📦 **Archived.** This plan reflects the team/parallel-stream view of the original 1.5-day hackathon. The numbered phase docs it references (`docs/phases/phase-*.md`) were consolidated into [`hackathon-mvp.md`](hackathon-mvp.md) on 2026-05-03. The authoritative architecture and contracts live in [`../SPEC.md`](../SPEC.md); current per-feature work is tracked under [`../features/`](../features/) and [`../README.md`](../README.md). Kept here for historical context only.
 
 ---
 
