@@ -19,6 +19,10 @@ export const LITERT_LM_REPO = 'https://github.com/google-ai-edge/LiteRT-LM.git'
 // .github/workflows/build-litert-cpp-bridge.yml consume this constant — keep
 // them in sync. Bump only after revalidating the bridge against the new ref.
 export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.10.2'
+// Pinned HuggingFace model revision that matches LITERT_LM_REF above.
+// Must be bumped together with LITERT_LM_REF whenever the bridge is updated.
+// Use the exact commit SHA from huggingface.co/<repo>/commits/main.
+export const MODEL_REVISION = process.env.MODEL_REVISION ?? '84b6978eff6e4eea02825bc2ee4ea48579f13109'
 const DEFAULT_PIPER_VOICE = 'en/en_US/hfc_female/medium'
 const HF_BASE = 'https://huggingface.co'
 const BRIDGE_WORKFLOW_NAME = 'build-litert-cpp-bridge.yml'
@@ -617,7 +621,9 @@ async function stepModel(opts, env) {
   }
 
   // Fall back to downloading from HuggingFace.
-  const url = `${HF_BASE}/${modelRepo}/resolve/main/${modelFile}`
+  const modelRevision = process.env.MODEL_REVISION ?? MODEL_REVISION
+  const url = `${HF_BASE}/${modelRepo}/resolve/${modelRevision}/${modelFile}`
+  console.log(`[setup-litert-cpp] Model revision: ${modelRevision}`)
   if (opts.dryRun) {
     console.log(`[setup-litert-cpp] [dry-run] Would download model:\n   ${url}\n   → ${destPath}`)
     return

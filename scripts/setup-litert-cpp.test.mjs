@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bridgePlatformLabel, defaultBridgeArtifactName, parseArgs, resolveBridgePlan, usage } from './setup-litert-cpp.mjs'
+import { MODEL_REVISION, bridgePlatformLabel, defaultBridgeArtifactName, parseArgs, resolveBridgePlan, usage } from './setup-litert-cpp.mjs'
 
 describe('setup-litert-cpp parseArgs', () => {
   it('defaults nativeWindows to false', () => {
@@ -54,6 +54,13 @@ describe('setup-litert-cpp parseArgs', () => {
 
   it('rejects invalid bridge source values', () => {
     expect(() => parseArgs(['--bridge-source', 'zip'])).toThrow(/Invalid --bridge-source/)
+  })
+})
+
+describe('setup-litert-cpp version pins', () => {
+  it('exports a non-empty MODEL_REVISION string', () => {
+    expect(typeof MODEL_REVISION).toBe('string')
+    expect(MODEL_REVISION.length).toBeGreaterThan(0)
   })
 })
 
