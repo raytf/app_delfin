@@ -251,14 +251,14 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 
 | Item                                                  | Status | Notes                                                                                       |
 | ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
-| Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; revised 2026-05-03 (LiteRT-LM C++ on Windows; llamafile removed) |
-| Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
-| First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md`                                    |
+| Distribution architecture decision                    | ✅     | `desktop-distribution-mvp-spec.md` Gate 1 approved; **revised 2026-05-06** (LiteRT-LM C++ on Windows x64, macOS arm64, Linux x64; Python sidecar deprecated for distribution) |
+| Electron-builder config (`electron-builder.yml`)      | ❌     | Not started; tracked in `distribution-packaging-spec.md` (updated 2026-05-06)              |
+| First-run download orchestration (binaries + models)  | ❌     | Not started; tracked in `distribution-packaging-spec.md` (unified: `.litertlm` + Piper voice on all 3 platforms) |
 | NSIS / DMG / AppImage installers                      | ❌     | Not started                                                                                 |
-| GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64) on push / release / dispatch. The macOS arm64 lane now runs on `macos-15` so Bazel gets a newer Apple C++20 toolchain than the broken `macos-14` / Xcode 15.4 image. Windows bridge builds rely on `scripts/build-litert-cpp-bridge.mjs` clearing ambient Android NDK detection. Full electron-builder packaging matrix (`dist.yml`) still pending — tracked in `distribution-cicd-spec.md`. |
-| `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases; macOS arm64 now targets `macos-15` to avoid the `cxx` C++20 build failure seen on `macos-14`. |
+| GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64). `dist.yml` spec updated 2026-05-06 to download prebuilt bridge artifacts for all 3 platforms. Full `dist.yml` packaging matrix still pending approval — tracked in `distribution-cicd-spec.md`. |
+| `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases. |
 | Code signing (Windows Authenticode, macOS notarization) | ❌    | Not started                                                                                 |
-| TTS backend strategy for packaged builds              | ❌     | DM3 in `distribution-backend-migration-spec.md` (Piper vs frozen Kokoro investigation)      |
+| TTS backend strategy for packaged builds              | ✅     | **Resolved 2026-05-06**: Piper on all three packaged platforms via `LITERT_CPP_TTS_BACKEND=piper`. Kokoro TTS removed from packaged-build scope (dev sidecar only). |
 
 ---
 

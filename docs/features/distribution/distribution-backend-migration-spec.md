@@ -7,13 +7,46 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Gate 1 — awaiting approval (**2026-05-03: DM0 llamafile proxy superseded — see revision banner**) |
+| **Status** | Gate 1 — awaiting approval (**2026-05-06: DM0 proxy wiring extended to macOS arm64 + Linux x64 — see revision banner**) |
 | **Created** | 2026-05-01 |
 | **Revised** | 2026-05-02 (hybrid Path 2 — additive, not replacement) |
 | **Revised** | 2026-05-02 (proxy approach — zero changes to Electron main IPC layer) |
-| **Revised** | **2026-05-03 (llamafile superseded; DM0 replaced by LiteRT-LM C++ proxy wiring — see revision banner below)** |
+| **Revised** | 2026-05-03 (llamafile superseded; DM0 replaced by LiteRT-LM C++ proxy wiring for Windows) |
+| **Revised** | **2026-05-06 (DM0 proxy wiring extended to macOS arm64 and Linux x64; Python sidecar retained as developer fallback only — see revision banner below)** |
 | **Depends on** | Inference benchmark results (`inference-benchmarking-spec.md`) reviewed and accepted |
 | **Blocks** | `distribution-packaging-spec.md` (packaging requires a working cross-platform backend) |
+
+---
+
+## Revision — 2026-05-06
+
+### What changed and why
+
+The 2026-05-03 revision wired `scripts/litert-cpp-proxy.mjs` into the **packaged Windows** runtime only. The CI workflow `build-litert-cpp-bridge.yml` now produces validated native bridge binaries for **macOS arm64** and **Linux x64** as well. The unified C++ backend is now the packaged backend on all three OSes.
+
+The PyInstaller frozen Python sidecar (DP3 in `distribution-packaging-spec.md`) is **removed from the distribution MVP scope**. The Python sidecar (`sidecar/`) remains in the repository and continues to function as a **developer fallback** via `npm run dev:sidecar` (or `npm run dev:full`) — it is not present in any packaged installer.
+
+| Track | 2026-05-03 scope | 2026-05-06 scope |
+|---|---|---|
+| **DM0** | Wire `litert-cpp-proxy.mjs` into packaged **Windows** startup | **Wire `litert-cpp-proxy.mjs` into packaged Windows x64, macOS arm64, and Linux x64 startup** |
+| **DM1** | `INFERENCE_BACKEND=litert-cpp` build-time value for Windows | **`INFERENCE_BACKEND=litert-cpp` for all three packaged builds** |
+| **DM2** | `npm run dev:litert-cpp` already exists for Windows | **Unchanged** — dev mode uses Python sidecar on macOS/Linux; `dev:litert-cpp` on Windows |
+| **DM3** | Piper selected for Windows packaged TTS | **Piper on all three packaged platforms** via `LITERT_CPP_TTS_BACKEND=piper` |
+
+### Updated architecture (2026-05-06)
+
+```
+Renderer ──IPC──► Electron Main ──WebSocket──► litert-cpp-proxy.mjs     [all packaged builds]
+                  (wsClient.ts                 port 8321
+                   UNCHANGED)                      │
+                                               JSONL stdio
+                                                   │
+                                               delfin_litert_bridge       (exe / binary)
+                                               + libGemmaModelConstraintProvider (.dll / .dylib / .so)
+
+               └──WebSocket──► Python FastAPI (LiteRT-LM)                [dev mode: macOS / Linux / WSL2]
+                               port 8321
+```
 
 ---
 
@@ -249,13 +282,15 @@ Outbound (proxy → Electron, same as `wsInboundMessageSchema`):
 
 ## Acceptance criteria
 
-- [ ] `INFERENCE_BACKEND=llamafile npm run dev` on native Windows connects to the proxy and completes a text prompt end-to-end
-- [ ] Vision prompt (screenshot attached) produces a valid multimodal response via llamafile (requires mmproj downloaded)
+- [ ] `INFERENCE_BACKEND=litert-cpp npm run dev:litert-cpp` on Windows connects to the proxy and completes a text prompt end-to-end
+- [ ] `INFERENCE_BACKEND=litert-cpp` packaged app on macOS arm64 connects to the proxy and completes a text prompt end-to-end
+- [ ] `INFERENCE_BACKEND=litert-cpp` packaged app on Linux x64 connects to the proxy and completes a text prompt end-to-end
+- [ ] Vision prompt (screenshot attached) produces a valid multimodal response on all three platforms
 - [ ] Multi-turn conversation: follow-up turns receive context from prior turns in the session
 - [ ] `interrupt` cancels in-progress generation within 500 ms
-- [ ] Web Speech TTS fires on proxy paths that emit no `audio_*` events (for example the current llamafile path)
-- [ ] `INFERENCE_BACKEND=litert npm run dev:full` continues to work unchanged on macOS/Linux/WSL2
-- [ ] Status indicator correctly reflects connected/disconnected for both paths
+- [ ] Piper TTS emits `audio_start` / `audio_chunk` / `audio_end` on all three platforms; Web Speech fallback fires if Piper is unavailable
+- [ ] `npm run dev:sidecar` continues to work unchanged on macOS/Linux/WSL2 (Python sidecar dev fallback)
+- [ ] Status indicator correctly reflects connected/disconnected for all paths
 - [ ] `wsClient.ts`, `sidecarBridge.ts`, and all renderer files have zero diffs
 
 ---

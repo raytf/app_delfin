@@ -8,10 +8,25 @@
 
 | Field          | Value                                                                                                            |
 | -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — partially implemented: `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries for windows-x64 / macos-arm64 / linux-x64 (Spec B in this iteration). The full `dist.yml` electron-builder packaging matrix below is still awaiting approval. |
+| **Status**     | Gate 1 — partially implemented: `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries for windows-x64 / macos-arm64 / linux-x64. The full `dist.yml` electron-builder packaging matrix below is still awaiting approval. |
 | **Created**    | 2026-05-01                                                                                                       |
-| **Revised**    | **2026-05-04 (split out the LiteRT-LM C++ bridge build into a dedicated workflow consumed by the packaging matrix; `LITERT_LM_REF` pinned in `scripts/setup-litert-cpp.mjs`).** Previous: 2026-05-03 (Windows CI: llamafile download → LiteRT-LM C++ bridge build/bundle; see Background revision). |
+| **Revised**    | 2026-05-04 (split out the LiteRT-LM C++ bridge build into a dedicated workflow consumed by the packaging matrix; `LITERT_LM_REF` pinned). |
+| **Revised**    | **2026-05-06 (`dist.yml` matrix downloads bridge artifact for all three platforms; PyInstaller step removed — see revision below).**        |
 | **Depends on** | `distribution-packaging-spec.md` (DP0–DP2 complete; `npm run dist` working locally)                             |
+
+## Revision — 2026-05-06
+
+### What changed and why
+
+The 2026-05-03 revision already established that CI **must not** rebuild the bridge inline in `dist.yml` — the dedicated `build-litert-cpp-bridge.yml` workflow owns that step. The 2026-05-06 revision extends the bridge artifact handoff from Windows-only to **all three platforms**:
+
+- **macOS arm64**: download `delfin-litert-bridge-macos-arm64` artifact from `build-litert-cpp-bridge.yml` before packaging.
+- **Linux x64**: download `delfin-litert-bridge-linux-x64` artifact before packaging.
+- **PyInstaller step removed**: macOS and Linux runners no longer run PyInstaller to freeze the Python sidecar. The Python sidecar is a developer-only fallback and is not present in any packaged build.
+
+The `dist.yml` `Build LiteRT C++ bridge (Windows Track A only)` step is replaced with a per-platform bridge artifact download step that runs on **all three runners**.
+
+---
 
 ## Goal
 
@@ -78,12 +93,15 @@ jobs:
           - os: windows-latest
             platform: win
             artifact: "dist/*.exe"
+            bridge_artifact: "delfin-litert-bridge-windows-x64"
           - os: macos-latest # arm64 runner
             platform: mac
             artifact: "dist/*.dmg"
+            bridge_artifact: "delfin-litert-bridge-macos-arm64"
           - os: ubuntu-latest
             platform: linux
             artifact: "dist/*.AppImage"
+            bridge_artifact: "delfin-litert-bridge-linux-x64"
 
     runs-on: ${{ matrix.os }}
 
@@ -101,10 +119,13 @@ jobs:
       - name: Build Electron app
         run: npm run build
 
-      - name: Build LiteRT C++ bridge (Windows Track A only)
-        if: matrix.platform == 'win'
-        run: npm run build:litert-cpp-bridge -- --litert-lm-dir "$env:LITERT_LM_DIR" --output-dir bin
-        shell: pwsh
+      - name: Download LiteRT C++ bridge artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: build-litert-cpp-bridge.yml
+          branch: main
+          name: ${{ matrix.bridge_artifact }}
+          path: bin/
 
       - name: Package (${{ matrix.platform }})
         run: npm run dist
@@ -146,10 +167,11 @@ jobs:
 
 #### Notes on the matrix
 
-- **`macos-latest`** as of 2026 defaults to an arm64 (Apple Silicon) runner on GitHub. If you need x64 macOS builds, add a second matrix entry with `runs-on: macos-13` (Intel). electron-builder can produce universal binaries (`arch: universal`) on arm64 runners but this doubles build time.
+- **`macos-latest`** as of 2026 defaults to an arm64 (Apple Silicon) runner on GitHub. macOS arm64 is the only macOS target for MVP (Intel Macs are out of scope per `AGENTS.md`).
 - **Windows**: `windows-latest` is x64. arm64 is not a target for MVP.
-- **Windows LiteRT C++ Track A**: once validated, the Windows job must fetch or restore a pinned LiteRT-LM checkout before packaging, run `npm run build:litert-cpp-bridge`, and include the resulting `bin/delfin_litert_bridge.exe` in the Electron resources. The `.litertlm` model remains a first-run download and is not uploaded as a GitHub Actions artifact.
+- **Bridge artifact download**: each platform runner downloads its prebuilt `delfin-litert-bridge-<platform>` archive from the most recent successful `build-litert-cpp-bridge.yml` run on `main` before packaging. No source build or compiler toolchain is required on the distribution runner.
 - **Linux**: `ubuntu-latest` is x64. The AppImage produced here runs on any reasonably modern Linux distribution.
+- **PyInstaller removed**: macOS and Linux runners no longer need Python or PyInstaller. The packaged app bundles the C++ bridge binary instead of a frozen Python sidecar.
 
 ### Track DC1a — LiteRT C++ bridge artifact handoff
 
@@ -250,7 +272,7 @@ Mac App Store and Microsoft Store require sandboxing and additional entitlements
 - [ ] `.github/workflows/dist.yml` exists and is valid YAML (passes `actionlint` or similar)
 - [ ] Pushing to `release/*` triggers the matrix build on all three runners
 - [ ] All three platform artifacts are produced and uploaded to GitHub Actions as workflow artifacts
-- [ ] If LiteRT C++ Track A is active, the Windows workflow builds `delfin_litert_bridge.exe` before packaging and the installer includes the prebuilt bridge
+- [ ] Each runner downloads its `delfin-litert-bridge-<platform>` artifact and the packaged installer includes the prebuilt bridge binary (no inline bridge compilation)
 - [ ] A draft GitHub Release is created automatically with all three artifacts attached
 - [ ] Workflow completes without error when signing secrets are absent (signing is skipped gracefully, not a hard failure)
 - [ ] Manual release checklist is followed at least once end-to-end before calling DC1 complete
@@ -258,7 +280,7 @@ Mac App Store and Microsoft Store require sandboxing and additional entitlements
 ## Risks / open questions
 
 1. **macOS runner architecture**: `macos-latest` on GitHub Actions moved to arm64 (M1) in 2024. Verify this is the correct runner for arm64 builds. For x64 macOS support, `macos-13` is the last Intel runner available. Producing a universal binary (`arch: universal`) on the arm64 runner is possible but builds take longer.
-2. **Windows runner and `llama-server` build**: the CI downloads a pre-built `llama-server` binary from GitHub releases. Ensure the pinned build number is available for all three platforms and that the download URL pattern is stable.
+2. **Bridge artifact staleness**: `dawidd6/action-download-artifact` downloads from the most recent successful `build-litert-cpp-bridge.yml` run on `main`. If the bridge workflow has not run for the current `LITERT_LM_REF`, a stale artifact could be used. Pin the artifact lookup to the same `LITERT_LM_REF` by matching the workflow run SHA when possible.
 3. **GitHub Actions minutes**: the matrix build uses ~3 OS runners × ~10–15 min each per run. GitHub Free provides 2000 minutes/month (Linux) with macOS and Windows runners costing 5× and 2× respectively. Monitor usage and consider self-hosted runners if limits are hit.
 4. **Artifact size**: if the total installer + artifact size approaches GitHub Release's 2 GB per-file limit in future (e.g. bundled TTS model), move to R2/S3 early.
 

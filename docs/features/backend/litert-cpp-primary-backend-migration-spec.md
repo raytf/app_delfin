@@ -1,16 +1,18 @@
 # LiteRT-LM C++ Bridge — Primary Backend Migration
 
-> Gate 1 — spec active. M1 (audio input) ✅ and M3 (TTS off-Python / Piper) ✅ complete. Remaining blockers: M2 (tool-calling parity) and M4 (macOS/Linux cross-platform validation).
+> Gate 1 — spec active. M1 (audio input) ✅ and M3 (TTS off-Python / Piper) ✅ complete. Remaining blockers: M2 (tool-calling parity) and M4 (macOS/Linux cross-platform runtime validation).
 > Umbrella spec covering the transition from the Python FastAPI sidecar (with `litert-lm` Python) to the native C++ bridge (with `litert-lm` C++) as the **primary** inference backend for all developers and end users.
+> **2026-05-06**: The four distribution specs now adopt the unified C++ backend for all three packaged OSes. The Python sidecar is retained only as a developer fallback. See §Documentation impact.
 
 ## Gate Resolution
 
 | Field          | Value                                                                                                                                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec active. M1 ✅ (audio input, 2026-05-03), M3 ✅ (Piper TTS off-Python, 2026-05-03). Remaining: M2 (tool-calling parity) and M4 (macOS/Linux builds). M5 default-flip and M6 deprecation not yet started. |
+| **Status**     | Gate 1 — spec active. M1 ✅ (audio input, 2026-05-03), M3 ✅ (Piper TTS off-Python, 2026-05-03). **2026-05-06: distribution specs updated to unified C++ for all 3 packaged OSes.** Remaining: M2 (tool-calling parity) and M4 (macOS/Linux runtime validation). M5 default-flip and M6 deprecation not yet started. |
 | **Created**    | 2026-05-03                                                                                                                                                                                                             |
+| **Revised**    | **2026-05-06** (distribution specs adopt unified C++ backend; Python sidecar retained as developer fallback only — see §Documentation impact)                                                                          |
 | **Depends on** | `litert-cpp-bridge-runtime-validation-spec.md` (Phase 1 ✅, Phases 3–4 pending), `litert-cpp-audio-input-spec.md` (AC1–AC7 ✅ Windows), `litert-cpp-proxy-piper-tts-spec.md` (✅ complete, archived)                  |
-| **Blocks**     | `distribution-backend-migration-spec.md` final cutover, `distribution-packaging-spec.md` (bridge as `extraResource`), `distribution-cicd-spec.md` (per-platform bridge build matrix + binary distribution decision)   |
+| **Blocks**     | `distribution-backend-migration-spec.md` final cutover, `distribution-packaging-spec.md` (bridge as `extraResource` on all 3 platforms), `distribution-cicd-spec.md` (bridge artifact download on all 3 runners)      |
 
 ---
 
@@ -75,13 +77,21 @@ If Piper is disabled, misconfigured, or fails mid-turn, the proxy still complete
 
 The interim "spawn Python sidecar for TTS only" bridge described in the original spec was never needed; Piper landed before the default flip. See the archived `litert-cpp-proxy-piper-tts-spec.md` for implementation details.
 
-### M4 — Cross-platform validation (Windows x64, macOS universal, Linux x64)
+### M4 — Cross-platform validation (Windows x64 ✅, macOS arm64 pending, Linux x64 pending)
 
-Defer the technical work to `litert-cpp-bridge-runtime-validation-spec.md`. This spec extends that scope:
+**Windows x64**: runtime validation complete (text, vision, audio, KV-cache) as of 2026-05-03.
 
-- macOS coverage must produce a **universal2** binary (arm64 + x64). If electron-builder's `arch: universal` doubles CI time beyond budget, fall back to two architecture-specific binaries selected at install time.
-- Linux coverage stays x64 only for now (Linux arm64 deferred, consistent with `distribution-cicd-spec.md` matrix).
+**CI binaries now available** (2026-05-06): `build-litert-cpp-bridge.yml` produces `delfin_litert_bridge` + shared library archives for all three platforms (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, `delfin-litert-bridge-linux-x64`). The distribution specs have been updated to bundle these artifacts in packaged installers. **Runtime validation** on macOS arm64 and Linux x64 is still pending.
+
+Defer the remaining runtime-validation technical work to `litert-cpp-bridge-runtime-validation-spec.md`. This spec extends that scope:
+
+- macOS target is **arm64 only** (Intel Macs are out of scope for MVP per `AGENTS.md` / `distribution-packaging-spec.md`).
+- Linux coverage stays x64 only for now (Linux arm64 deferred).
 - macOS validation must include a manual voice round in addition to the lecture-slide round (since M1 introduces audio input on the C++ path).
+
+### M6 — Python sidecar deprecation policy (updated 2026-05-06)
+
+The distribution specs (updated 2026-05-06) already treat the Python sidecar as a **developer-only fallback**: it is not present in any packaged installer on any platform. This represents a partial completion of M6's goal — the deprecation of the Python sidecar in production distributions is now in effect. The remaining M6 documentation-pass items (deprecation banners in `sidecar-flow.md`, `SPEC.md` arch section, `README.md`) are deferred until M5 default-flip lands in dev mode as well.
 
 ### M5 — Default backend switch (phased)
 
@@ -185,10 +195,10 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 - `AGENTS.md` §Validated Technical Decisions — record the migration's per-platform default-flip thresholds and the audio pass-through approach (after M1 lands).
 - `docs/SPEC.md` §Architecture — make the C++ bridge the primary path; demote Python sidecar to fallback. §Environment Variables — note the platform-conditional default for `INFERENCE_BACKEND` and the platform-aware `LITERT_CPP_BIN` value.
 - `README.md` — update install / first-run sections per platform; mark `npm run dev:sidecar` deprecated where applicable.
-- `docs/features/desktop-distribution-mvp-spec.md` — backend track now reads "C++ bridge on all platforms" instead of "Python sidecar on macOS/Linux + llamafile on Windows".
-- `docs/features/distribution-backend-migration-spec.md` — final state of the diagram (C++ bridge end-to-end); remove llamafile from the active plan.
-- `docs/features/distribution-cicd-spec.md` — add a new task: **decide and implement the developer-facing prebuilt bridge binary fetch mechanism** (open question 1 above). Extend the matrix to build `delfin_litert_bridge` on macOS and Linux runners (currently only the Windows runner has the build step).
-- `docs/features/distribution-packaging-spec.md` — bundle `delfin_litert_bridge[.exe]` as an `extraResource` for all three platforms.
+- `docs/features/distribution/desktop-distribution-mvp-spec.md` — **Updated 2026-05-06**: C++ bridge on all three packaged OSes; Python sidecar deprecated for distribution (developer fallback only). ✅
+- `docs/features/distribution/distribution-backend-migration-spec.md` — **Updated 2026-05-06**: DM0 proxy wiring extended to macOS arm64 and Linux x64; architecture diagram updated; acceptance criteria updated. ✅
+- `docs/features/distribution/distribution-cicd-spec.md` — **Updated 2026-05-06**: `dist.yml` matrix downloads prebuilt bridge artifact on all three runners; PyInstaller step removed. ✅
+- `docs/features/distribution/distribution-packaging-spec.md` — **Updated 2026-05-06**: macOS and Linux `extraResources` bundle bridge binary + shared library; DP3 (PyInstaller) superseded; `ModelAssetId` and first-run asset table unified across all platforms. ✅
 - `docs/explanations/sidecar-flow.md` — add deprecation banner; preserve the content as fallback documentation.
 - `docs/explanations/voice-audio-pipeline.md` — update once M1 lands.
 - `.env.example` — staged updates per Phase 5a/5b/5c.

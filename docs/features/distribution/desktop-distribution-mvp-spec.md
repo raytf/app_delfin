@@ -8,14 +8,57 @@
 |---|---|
 | **Status** | Gate 1 approved — ready for implementation |
 | **Approval date** | 2026-04-22 |
-| **Revised on** | 2026-05-01 (hybrid llamafile-on-Windows decision); **2026-05-03 (LiteRT-LM C++ replaces llamafile on Windows — see revision section below)** |
+| **Revised on** | 2026-05-01 (hybrid llamafile-on-Windows decision); 2026-05-03 (LiteRT-LM C++ replaces llamafile on Windows); **2026-05-06 (LiteRT-LM C++ bridge on all three packaged OSes; Python sidecar deprecated for distribution — see revision section below)** |
 | **Approver** | Human reviewer |
 | **Bundle identifier** | `com.delfin.desktop` |
-| **Target platforms** | Windows x64, macOS x64, macOS arm64, Linux x64 |
-| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → ~~llamafile binary on Windows (first-run download); frozen Python sidecar on macOS/Linux~~ → **LiteRT-LM C++ bridge bundled on Windows; frozen Python sidecar on macOS/Linux**; see 2026-05-03 revision |
-| **Model delivery** | First-run download (`.litertlm` model + Piper voice on Windows; `.litertlm` + Kokoro assets on macOS/Linux) |
+| **Target platforms** | Windows x64, macOS arm64, Linux x64 |
+| **Packaging decision** | ~~Native Electron installers with a bundled frozen Python sidecar~~ → ~~llamafile binary on Windows (first-run download); frozen Python sidecar on macOS/Linux~~ → ~~LiteRT-LM C++ bridge bundled on Windows; frozen Python sidecar on macOS/Linux~~ → **LiteRT-LM C++ bridge bundled on Windows x64, macOS arm64, and Linux x64; Python sidecar retained as developer fallback only**; see 2026-05-06 revision |
+| **Model delivery** | First-run download (`.litertlm` model + Piper voice on all three packaged platforms) |
 | **Inference scope** | CPU-only for MVP; CUDA/Metal as stretch goal |
 | **Deferred by approval** | Docker, full CI/CD publishing, auto-update implementation |
+
+## Revision — 2026-05-06
+
+### What changed and why
+
+The 2026-05-03 decision (LiteRT-LM C++ on Windows, frozen Python sidecar on macOS/Linux) is **superseded**. The CI workflow `build-litert-cpp-bridge.yml` now produces validated native bridge binaries for all three target platforms: **Windows x64**, **macOS arm64**, and **Linux x64**. There is no longer any reason to ship a PyInstaller-frozen Python sidecar in any packaged installer.
+
+### Decision: LiteRT-LM C++ bridge on all three packaged OSes; Python sidecar as developer fallback only
+
+| Axis | 2026-05-03 decision | 2026-05-06 decision |
+| ------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Inference — packaged Windows x64 | LiteRT-LM C++ bridge | **Unchanged** — LiteRT-LM C++ bridge |
+| Inference — packaged macOS arm64 | LiteRT-LM frozen Python sidecar (PyInstaller) | **LiteRT-LM C++ bridge** (`delfin_litert_bridge` + `.dylib`) + `litert-cpp-proxy.mjs` |
+| Inference — packaged Linux x64 | LiteRT-LM frozen Python sidecar (PyInstaller) | **LiteRT-LM C++ bridge** (`delfin_litert_bridge` + `.so`) + `litert-cpp-proxy.mjs` |
+| Inference — dev mode | LiteRT-LM via `.venv` (macOS/Linux/WSL2); `dev:litert-cpp` (Windows) | **Unchanged** — Python sidecar kept as a developer fallback (`npm run dev:sidecar`) |
+| TTS — packaged | Windows: Piper; macOS/Linux: Kokoro (frozen) | **Piper on all three packaged platforms** via `LITERT_CPP_TTS_BACKEND=piper` |
+| PyInstaller frozen sidecar | Required for macOS/Linux packaging | **Removed from MVP scope** — DP3 track is superseded |
+| `INFERENCE_BACKEND` build-time value | `litert-cpp` (Windows), `litert` (macOS/Linux) | **`litert-cpp` for all three packaged builds** |
+
+| User type | Packaged app backend | Dev workflow backend |
+| ------------------- | -------------------- | ---------------------- |
+| Windows x64 | LiteRT-LM C++ bridge | Python sidecar or `dev:litert-cpp` |
+| macOS arm64 | LiteRT-LM C++ bridge | Python sidecar (`npm run dev:sidecar`) |
+| Linux x64 | LiteRT-LM C++ bridge | Python sidecar (`npm run dev:sidecar`) |
+
+### Sub-spec impact (2026-05-06)
+
+| Sub-spec | Effect of this revision |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `distribution-backend-migration-spec.md` | DM0 proxy wiring now applies to macOS arm64 and Linux x64 in addition to Windows. Architecture diagram updated to show unified C++ path. See that spec's 2026-05-06 revision banner. |
+| `distribution-packaging-spec.md` | macOS and Linux rows in the per-platform backend table flip to LiteRT-LM C++. DP3 (PyInstaller frozen sidecar) is superseded — removed from MVP scope. `electron-builder` `extraResources` gain macOS and Linux bridge entries. |
+| `distribution-cicd-spec.md` | `dist.yml` matrix now downloads the prebuilt `delfin-litert-bridge-<platform>` artifact for all three runners instead of running PyInstaller for macOS/Linux. |
+| `litert-cpp-primary-backend-migration-spec.md` | M4 cross-platform note updated: bridge binaries CI-produced for all three platforms; runtime validation on macOS/Linux pending. Python sidecar explicitly documented as developer-only fallback. |
+
+### What is preserved from the 2026-05-03 revision
+
+- The decision to **never bundle the Gemma model** inside installers (first-run download).
+- The Model Bootstrap IPC contract and the writable-path policy.
+- CPU-only for MVP; GPU as a stretch goal.
+- `scripts/litert-cpp-proxy.mjs` is the packaged WebSocket proxy on all three platforms (unchanged).
+- The Python sidecar (`sidecar/`) and `npm run dev:sidecar` script remain in the repo; developers can still use them from source.
+
+---
 
 ## Revision — 2026-05-03
 
@@ -198,9 +241,9 @@ The implementation is split across three sub-specs. This file remains the overar
 
 | Track | Spec | Goal |
 |---|---|---|
-| **DM0–DM3** — backend migration | [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Add llamafile as an additive fallback backend for Windows (no WSL2); LiteRT-LM remains primary on macOS/Linux/WSL2 |
-| **DP0–DP3** — packaging | [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers |
-| **DC0–DC2** — CI/CD | [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds and distribution channel |
+| **DM0–DM3** — backend migration | [`distribution-backend-migration-spec.md`](distribution-backend-migration-spec.md) | Wire `scripts/litert-cpp-proxy.mjs` into the packaged Electron runtime on Windows x64, macOS arm64, and Linux x64 (2026-05-06: extended from Windows-only) |
+| **DP0–DP2** — packaging | [`distribution-packaging-spec.md`](distribution-packaging-spec.md) | electron-builder config, first-run download, installers; **DP3 (PyInstaller frozen sidecar) superseded 2026-05-06** |
+| **DC0–DC2** — CI/CD | [`distribution-cicd-spec.md`](distribution-cicd-spec.md) | GitHub Actions matrix builds consuming prebuilt bridge artifacts on all three OSes |
 
 ## Interface contract
 

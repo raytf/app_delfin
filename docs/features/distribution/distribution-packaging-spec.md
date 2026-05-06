@@ -11,8 +11,9 @@
 | **Status**     | Gate 1 — awaiting approval                                                                                      |
 | **Created**    | 2026-05-01                                                                                                      |
 | **Revised**    | 2026-05-02 (per-platform backend strategy; llamafile proxy for Windows)                                         |
-| **Revised**    | **2026-05-03 (Windows: llamafile → LiteRT-LM C++ — see Per-platform backend strategy revision below)**         |
-| **Depends on** | `distribution-backend-migration-spec.md` (DM0–DM3 complete; DM0 now means LiteRT-LM C++ proxy wiring)          |
+| **Revised**    | 2026-05-03 (Windows: llamafile → LiteRT-LM C++)                                                                 |
+| **Revised**    | **2026-05-06 (macOS arm64 + Linux x64: frozen Python sidecar → LiteRT-LM C++ bridge; DP3 superseded — see revision below)** |
+| **Depends on** | `distribution-backend-migration-spec.md` (DM0–DM3 complete; DM0 means LiteRT-LM C++ proxy wiring on all 3 OSes) |
 | **Blocks**     | `distribution-cicd-spec.md` (CI builds the output of this track)                                               |
 
 ## Goal
@@ -23,30 +24,35 @@ Package Delfin as a native installable desktop application for Windows x64, macO
 
 ## Per-platform backend strategy
 
-> **Revised 2026-05-03:** The Windows backend has changed from llamafile to LiteRT-LM C++. The LiteRT-LM C++ bridge passed runtime validation on Windows (text, vision, audio, KV-cache) as of 2026-05-03. The "future state" conditional from the 2026-05-02 revision is now the current state.
+> **Revised 2026-05-06:** macOS arm64 and Linux x64 now use the LiteRT-LM C++ bridge in packaged builds, matching the Windows approach established in 2026-05-03. The frozen Python sidecar (PyInstaller) is **removed from the distribution MVP scope** (see DP3 below). The Python sidecar remains available as a developer fallback via `npm run dev:sidecar`.
 
-### Current strategy (2026-05-03)
+### Current strategy (2026-05-06)
 
-| Platform              | Packaged inference backend                    | Sidecar delivery                                                                             |
-| --------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Windows x64**       | LiteRT-LM C++ + `litert-cpp-proxy.mjs`        | `delfin_litert_bridge.exe` + `libGemmaModelConstraintProvider.dll` bundled as app resources; `.litertlm` model downloaded at first run; Piper voice downloaded at first run |
-| **macOS arm64 / x64** | LiteRT-LM (frozen Python sidecar)             | Frozen Python sidecar bundled in installer (PyInstaller)                                     |
-| **Linux x64**         | LiteRT-LM (frozen Python sidecar)             | Frozen Python sidecar bundled in installer (PyInstaller)                                     |
+| Platform        | Packaged inference backend              | Sidecar delivery |
+| --------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| **Windows x64** | LiteRT-LM C++ + `litert-cpp-proxy.mjs` | `delfin_litert_bridge.exe` + `libGemmaModelConstraintProvider.dll` bundled as app resources |
+| **macOS arm64** | LiteRT-LM C++ + `litert-cpp-proxy.mjs` | `delfin_litert_bridge` + `libGemmaModelConstraintProvider.dylib` bundled as app resources |
+| **Linux x64**   | LiteRT-LM C++ + `litert-cpp-proxy.mjs` | `delfin_litert_bridge` + `libGemmaModelConstraintProvider.so` bundled as app resources |
 
-The LiteRT-LM C++ source tree, Bazelisk/Bazel, and Visual Studio C++ toolchain are **CI/developer-only** build inputs. End users receive the prebuilt bridge executable and DLL and never need compiler tooling.
+On all three platforms: `.litertlm` model and Piper voice downloaded at first run. No Python runtime on the user's machine is required.
+
+The LiteRT-LM C++ source tree, Bazelisk/Bazel, and compiler toolchain are **CI/developer-only** build inputs — end users receive only prebuilt bridge binaries.
 
 `INFERENCE_BACKEND` is set at **build time** by electron-builder (not a user-facing setting):
 
-- Windows builds: `INFERENCE_BACKEND=litert-cpp`
-- macOS/Linux builds: `INFERENCE_BACKEND=litert`
+- All packaged builds: `INFERENCE_BACKEND=litert-cpp`
 
-**Windows note:** Both WSL2 and non-WSL2 Windows users get the LiteRT-LM C++ backend in the packaged app — no WSL2 requirement. WSL2 users who want the Python sidecar dev path can run from source with `npm run dev:full`.
+**Developer note:** `npm run dev:sidecar` and `npm run dev:full` continue to use the Python sidecar for contributors who prefer the Python-backed dev workflow on macOS/Linux/WSL2.
 
 ---
 
+### Previous strategy (2026-05-03, superseded)
+
+~~macOS arm64 / x64 and Linux x64 used LiteRT-LM (frozen Python sidecar via PyInstaller); `INFERENCE_BACKEND=litert` for macOS/Linux builds.~~ Superseded by the 2026-05-06 revision above.
+
 ### Previous strategy (2026-05-02, superseded)
 
-~~llamafile + `llamafile-proxy.mjs` on Windows; LiteRT-LM frozen Python sidecar on macOS/Linux. `INFERENCE_BACKEND=llamafile` for Windows builds.~~ Superseded by the 2026-05-03 revision above.
+~~llamafile + `llamafile-proxy.mjs` on Windows; LiteRT-LM frozen Python sidecar on macOS/Linux. `INFERENCE_BACKEND=llamafile` for Windows builds.~~ Superseded by the 2026-05-03 revision.
 
 ---
 
@@ -77,14 +83,16 @@ The LiteRT-LM C++ source tree, Bazelisk/Bazel, and Visual Studio C++ toolchain a
       { "from": "scripts/litert-cpp-presets.mjs", "to": "litert-cpp-presets.mjs" }
     ],
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [{ "target": "dmg", "arch": ["arm64"] }],
       "icon": "build/icon.icns",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "extraResources": [
-        { "from": "sidecar-bin/mac/delfin-sidecar", "to": "delfin-sidecar" }
-      ]
+        { "from": "bin/delfin_litert_bridge", "to": "delfin_litert_bridge" },
+        { "from": "bin/libGemmaModelConstraintProvider.dylib", "to": "libGemmaModelConstraintProvider.dylib" }
+      ],
+      "env": { "INFERENCE_BACKEND": "litert-cpp" }
     },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
@@ -100,8 +108,10 @@ The LiteRT-LM C++ source tree, Bazelisk/Bazel, and Visual Studio C++ toolchain a
       "icon": "build/icon.png",
       "category": "Education",
       "extraResources": [
-        { "from": "sidecar-bin/linux/delfin-sidecar", "to": "delfin-sidecar" }
-      ]
+        { "from": "bin/delfin_litert_bridge", "to": "delfin_litert_bridge" },
+        { "from": "bin/libGemmaModelConstraintProvider.so", "to": "libGemmaModelConstraintProvider.so" }
+      ],
+      "env": { "INFERENCE_BACKEND": "litert-cpp" }
     },
     "nsis": {
       "oneClick": false,
@@ -118,16 +128,15 @@ On first launch the app checks for required assets and downloads anything missin
 
 #### Assets by platform
 
-> **Revised 2026-05-03:** Windows assets are now `.litertlm` model + Piper voice. The bridge executable and proxy script are bundled inside the installer as `extraResources` (not downloaded at first run).
+> **Revised 2026-05-06:** All three packaged platforms now download `.litertlm` model + Piper voice at first run. Kokoro TTS is no longer a packaged-build first-run asset (it remains in the dev sidecar). Bridge binaries and the proxy script are bundled inside the installer as `extraResources` on all three platforms.
 
-| Platform      | First-run downloaded assets                                           | Approx size |
-| ------------- | --------------------------------------------------------------------- | ----------- |
-| Windows       | `gemma-4-E2B-it.litertlm` model + Piper voice (`.onnx` + `tokens.txt`) | ~2 GB     |
-| macOS / Linux | `gemma-4-E2B-it.litertlm` model + Kokoro TTS model                   | ~3.5 GB     |
+| Platform      | First-run downloaded assets                                             | Approx size |
+| ------------- | ----------------------------------------------------------------------- | ----------- |
+| Windows x64   | `gemma-4-E2B-it.litertlm` model + Piper voice (`.onnx` + `tokens.txt`) | ~2 GB       |
+| macOS arm64   | `gemma-4-E2B-it.litertlm` model + Piper voice (`.onnx` + `tokens.txt`) | ~2 GB       |
+| Linux x64     | `gemma-4-E2B-it.litertlm` model + Piper voice (`.onnx` + `tokens.txt`) | ~2 GB       |
 
-`delfin_litert_bridge.exe`, `libGemmaModelConstraintProvider.dll`, `litert-cpp-proxy.mjs`, and `litert-cpp-presets.mjs` are bundled inside the installer as `extraResources` — not downloaded by the user.
-
-On macOS/Linux the frozen sidecar binary is also bundled inside the installer (no first-run binary download), but the Gemma model is still downloaded at first run to keep installer size small.
+The bridge binary (`delfin_litert_bridge[.exe]`), shared library (`libGemmaModelConstraintProvider[.dll/.dylib/.so]`), `litert-cpp-proxy.mjs`, and `litert-cpp-presets.mjs` are bundled inside the installer as `extraResources` — not downloaded by the user.
 
 #### Download manifest
 
@@ -155,11 +164,10 @@ A JSON manifest is stored at `<userData>/manifest.json`:
 
 #### Download sources
 
-| Asset                          | Source                                                                    | Platforms     |
-| ------------------------------ | ------------------------------------------------------------------------- | ------------- |
-| `gemma-4-E2B-it.litertlm`      | HuggingFace: `google/gemma-4-E2B-it-litert-lm` (or mirrored release)     | All           |
-| Piper voice `.onnx` + tokens   | HuggingFace: `rhasspy/piper-voices`                                       | Windows       |
-| Kokoro TTS model               | HuggingFace: kokoro model repo                                            | macOS / Linux |
+| Asset                        | Source                                                                | Platforms |
+| ---------------------------- | --------------------------------------------------------------------- | --------- |
+| `gemma-4-E2B-it.litertlm`   | HuggingFace: `litert-community/gemma-4-E2B-it-litert-lm` (pinned revision via `MODEL_REVISION`) | All |
+| Piper voice `.onnx` + tokens | HuggingFace: `rhasspy/piper-voices`                                   | All       |
 
 #### IPC flow during first run
 
@@ -174,7 +182,7 @@ App launch
                            ├─ Main → Renderer: models:download-progress { asset, percent, receivedBytes, totalBytes }
                            ├─ Main → Renderer: models:download-complete { asset }
                            └─ All done → Main → Renderer: models:status { ready: true }
-                                └─ Main: spawn backend (llamafile or frozen sidecar)
+                                └─ Main: spawn litert-cpp-proxy.mjs (all platforms)
                                      └─ Renderer: navigate to HomeScreen
 ```
 
@@ -190,53 +198,39 @@ App launch
 | `src/shared/types.ts`                         | Add `ModelAssetId`, `ModelStatus`, `DownloadProgress` types               |
 | `src/shared/schemas.ts`                       | Add Zod schemas for new IPC payloads                                      |
 
-### Track DP2 — packaged backend launch
+### Track DP2 — packaged backend launch _(revised 2026-05-06)_
 
-When `app.isPackaged`, Electron spawns the appropriate backend from user data / bundled resources rather than the dev-mode scripts.
-
-#### Windows (LiteRT-LM C++ path) _(revised 2026-05-03)_
+When `app.isPackaged`, Electron spawns `scripts/litert-cpp-proxy.mjs` on **all three platforms** from the app's resources directory. The proxy then launches the platform-appropriate bridge binary.
 
 ```ts
-// dev:   node scripts/litert-cpp-proxy.mjs  (npm run dev:litert-cpp)
-// prod:  spawn litert-cpp-proxy.mjs from app resources (process.resourcesPath)
-//        pass LITERT_CPP_BIN=<process.resourcesPath>/delfin_litert_bridge.exe
-//        pass LITERT_CPP_MODEL=<userData>/models/gemma-4-E2B-it.litertlm
-//        pass LITERT_CPP_TTS_BACKEND=piper  (voice in userData/models/tts/)
+// All packaged builds (Windows / macOS / Linux):
+// prod:  spawn litert-cpp-proxy.mjs from process.resourcesPath
+//        LITERT_CPP_BIN=<process.resourcesPath>/delfin_litert_bridge[.exe]
+//        LITERT_CPP_MODEL=<userData>/models/gemma-4-E2B-it.litertlm
+//        LITERT_CPP_TTS_BACKEND=piper  (voice in userData/models/tts/)
+
+// Dev mode (macOS / Linux / WSL2):
+//   npm run dev:sidecar  → spawns Python uvicorn via sidecar/.venv
+
+// Dev mode (Windows native):
+//   npm run dev:litert-cpp  → spawns scripts/litert-cpp-proxy.mjs directly
 ```
 
-`scripts/litert-cpp-proxy.mjs` and `scripts/litert-cpp-presets.mjs` are bundled as `extraResources` (available at `process.resourcesPath/`). `delfin_litert_bridge.exe` and `libGemmaModelConstraintProvider.dll` are also `extraResources`. Node.js is embedded in Electron, so the proxy can be spawned with Electron's own runtime via `process.execPath` or as a forked process. The LiteRT-LM C++ source tree and compiler toolchain are CI-only — never present on the user's machine.
+`scripts/litert-cpp-proxy.mjs`, `scripts/litert-cpp-presets.mjs`, and the platform bridge binary + shared library are all bundled as `extraResources`. Node.js is embedded in Electron, so the proxy is spawned via Electron's own runtime. The LiteRT-LM C++ source tree and compiler toolchain are CI-only — never present on the user's machine.
 
-#### macOS / Linux (LiteRT-LM path)
-
-```ts
-// dev:   node scripts/run-sidecar.mjs  (spawns Python uvicorn via .venv)
-// prod:  spawn bundled delfin-sidecar binary from process.resourcesPath
-```
-
-The frozen sidecar binary (`delfin-sidecar`) is produced by PyInstaller in CI and bundled as an `extraResource`. It embeds Python, LiteRT-LM, kokoro-onnx, and FastAPI — no Python installation required on the user's machine.
-
-**Runtime mode detection:**
+**Runtime mode detection (2026-05-06):**
 
 ```ts
 const isPackaged = app.isPackaged;
-const platform = process.platform;
-// 'win32' + isPackaged  → LiteRT-LM C++ path (bridge exe + proxy from resources; model from userData)
-// 'win32' + !isPackaged → LiteRT-LM C++ path (dev: npm run dev:litert-cpp)
-// other   + isPackaged  → LiteRT path (frozen sidecar from resources)
-// other   + !isPackaged → LiteRT path (dev: npm run dev:sidecar via .venv)
+// isPackaged  → LiteRT-LM C++ path (bridge + proxy from resources; model from userData) — all platforms
+// !isPackaged → dev:litert-cpp (Windows) or dev:sidecar / dev:full (macOS / Linux / WSL2)
 ```
 
-### Track DP3 — frozen Python sidecar (macOS / Linux)
+### Track DP3 — frozen Python sidecar _(superseded 2026-05-06)_
 
-PyInstaller build producing `delfin-sidecar` for macOS arm64, macOS x64, and Linux x64. This is a CI-only step; no local build script is needed for development.
+> **Superseded.** The PyInstaller frozen Python sidecar is no longer part of the distribution MVP. The LiteRT-LM C++ bridge (`delfin_litert_bridge`) is now the packaged backend on macOS arm64 and Linux x64, produced by `build-litert-cpp-bridge.yml` CI workflow. The Python sidecar (`sidecar/`) remains in the repository as a **developer fallback** only — it is not included in any packaged installer.
 
-| File                          | Change                                                                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `sidecar/delfin-sidecar.spec` | New: PyInstaller spec file targeting `server.py` as entrypoint                                                                |
-| `sidecar/server.py`           | Ensure model/cache paths use env vars (`LITERT_CACHE_DIR`, `HF_HOME`, etc.) so the frozen binary writes to writable locations |
-| `sidecar/tts.py`              | Ensure espeak-ng and kokoro asset paths are resolved relative to the frozen bundle                                            |
-
-The frozen binary receives configuration via env vars passed from Electron main at spawn time (same pattern as current dev-mode sidecar).
+~~PyInstaller build producing `delfin-sidecar` for macOS arm64, macOS x64, and Linux x64.~~ No longer in scope.
 
 ### Track DP4 — GPU stretch goal
 
@@ -278,10 +272,10 @@ Explicitly conditional — defer if GPU detection adds stability risk.
 ### ModelAssetId
 
 ```ts
+// Revised 2026-05-06: unified across all three packaged platforms
 type ModelAssetId =
-  | "litert-cpp-model" // Windows: gemma-4-E2B-it.litertlm (downloaded at first run)
-  | "gemma-model"      // macOS/Linux: .litertlm model (downloaded at first run)
-  | "tts-model";       // All platforms: Piper voice (Windows) or Kokoro model (macOS/Linux)
+  | "litert-cpp-model" // All platforms: gemma-4-E2B-it.litertlm (downloaded at first run)
+  | "piper-voice";     // All platforms: Piper voice .onnx + tokens (downloaded at first run)
 ```
 
 ### Writable path layout
@@ -290,17 +284,15 @@ type ModelAssetId =
 app.getPath('userData')/           e.g. %APPDATA%\Delfin\  or  ~/Library/Application Support/Delfin/
   manifest.json
   models/
-    gemma-4-E2B-it.litertlm        (Windows + macOS/Linux — downloaded at first run)
+    gemma-4-E2B-it.litertlm        (all platforms — downloaded at first run)
     tts/
-      <voice>.onnx                 (Windows — Piper)
+      <voice>.onnx                 (all platforms — Piper voice)
       <voice>.onnx.json
-      kokoro-v1.0.onnx             (macOS/Linux — Kokoro)
   cache/
     litert/                        (all — LiteRT model cache)
-    hf/                            (macOS/Linux — HuggingFace hub cache)
 ```
 
-On Windows, `delfin_litert_bridge.exe`, `libGemmaModelConstraintProvider.dll`, `litert-cpp-proxy.mjs`, and `litert-cpp-presets.mjs` live at `process.resourcesPath/` (bundled in installer) — not in `userData`.
+Bridge binary, shared library, `litert-cpp-proxy.mjs`, and `litert-cpp-presets.mjs` live at `process.resourcesPath/` (bundled in installer on all three platforms) — not in `userData`.
 
 ---
 
@@ -308,12 +300,13 @@ On Windows, `delfin_litert_bridge.exe`, `libGemmaModelConstraintProvider.dll`, `
 
 - [ ] `npm run dist` produces platform installer(s) for the current OS without error
 - [ ] Installing the Windows `.exe` on a clean machine shows SetupScreen; model + Piper voice downloads complete; app runs a prompt end-to-end via LiteRT-LM C++ bridge
-- [ ] Installing the macOS DMG on a clean machine shows SetupScreen (model only); app runs a prompt end-to-end via LiteRT-LM frozen sidecar
-- [ ] Installing the Linux AppImage on a clean machine completes and runs a prompt via LiteRT-LM frozen sidecar
-- [ ] Vision prompt (screenshot) works on Windows packaged build (LiteRT-LM C++ bridge + vision input)
-- [ ] `npm run dev:full` still works for contributors on macOS/Linux/WSL2
+- [ ] Installing the macOS arm64 DMG on a clean machine shows SetupScreen; model + Piper voice downloads complete; app runs a prompt end-to-end via LiteRT-LM C++ bridge
+- [ ] Installing the Linux AppImage on a clean machine shows SetupScreen; model + Piper voice downloads complete; app runs a prompt end-to-end via LiteRT-LM C++ bridge
+- [ ] Vision prompt (screenshot) works on all three packaged builds (LiteRT-LM C++ bridge + vision input)
+- [ ] Piper TTS produces audio on all three packaged builds
+- [ ] `npm run dev:sidecar` and `npm run dev:full` still work for contributors on macOS/Linux/WSL2 (Python sidecar dev fallback)
 - [ ] Manifest checksum verification passes; tampered files are re-downloaded
-- [ ] `INFERENCE_BACKEND` is not user-visible in packaged builds; correct backend is auto-selected per platform
+- [ ] `INFERENCE_BACKEND=litert-cpp` is baked into all three packaged builds; it is not user-visible
 
 ---
 
@@ -321,10 +314,11 @@ On Windows, `delfin_litert_bridge.exe`, `libGemmaModelConstraintProvider.dll`, `
 
 1. **Code signing — macOS**: without notarization, Gatekeeper blocks the app on first launch. For student testers, right-click → Open works with instructions. For public distribution, an Apple Developer account ($99/yr) and notarization CI step are required.
 2. **Code signing — Windows**: unsigned NSIS installers trigger Windows Defender SmartScreen ("More info → Run anyway"). Defer EV signing to post-MVP.
-3. **PyInstaller frozen sidecar size**: the frozen Python bundle (Python + LiteRT-LM + kokoro-onnx + FastAPI + onnxruntime) will likely be 300–500 MB. This is bundled inside the macOS/Linux installer. Consider splitting TTS into a separately downloaded binary to reduce installer size.
-4. **`.litertlm` model download size**: Gemma 4 E2B `.litertlm` is ~2 GB. `assetManager` must implement HTTP range request resumption or retry-from-zero with a `.part` temp file for interrupted downloads.
-5. **HuggingFace rate limits**: large downloads from HF may be rate-limited. Use direct HTTPS; support `HF_TOKEN` env var for authenticated downloads if needed.
-6. **espeak-ng in frozen kokoro**: the existing `sidecar/tts.py` patches the espeak-ng data path at runtime. In the frozen bundle, this path must resolve relative to the bundle directory, not the source tree.
+3. **macOS runtime validation**: the C++ bridge binaries for macOS arm64 are produced by CI but have not yet been runtime-validated on a packaged macOS build. Validation is a prerequisite for calling DP2 complete on macOS.
+4. **Linux runtime validation**: same as above for Linux x64.
+5. **`.litertlm` model download size**: Gemma 4 E2B `.litertlm` is ~2 GB. `assetManager` must implement HTTP range request resumption or retry-from-zero with a `.part` temp file for interrupted downloads.
+6. **HuggingFace rate limits**: large downloads from HF may be rate-limited. Use direct HTTPS; support `HF_TOKEN` env var for authenticated downloads if needed.
+7. **Piper binary availability on macOS/Linux**: Piper publishes prebuilt binaries for `darwin-arm64` and `linux-x64`. Confirm that the Piper version pinned by `npm run voice:install` has arm64 macOS and Linux x64 releases before finalising the first-run download manifest.
 
 ## Future todos (post-MVP)
 
