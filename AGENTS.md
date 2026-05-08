@@ -199,6 +199,37 @@ Keep this table in sync with [`docs/README.md`](docs/README.md) and [`STATUS.md`
 
 ---
 
+## Versioning
+
+**Source of truth:** `"version"` in `package.json`. Electron-builder stamps this into the installer filename (`Delfin Setup 0.0.1.exe`, `Delfin-0.0.1.dmg`, etc.) and `app.getVersion()` returns it at runtime.
+
+**Convention:** [semver](https://semver.org/) — `MAJOR.MINOR.PATCH`.
+- `PATCH` — bug fixes, internal changes, asset/dependency bumps with no new user-visible behaviour.
+- `MINOR` — new user-visible features, new IPC channels, new env vars.
+- `MAJOR` — breaking changes to the IPC contract, installer flow, or minimum OS requirements.
+
+**How to cut a release:**
+
+```bash
+# Bump version, commit, and tag in one step (choose one):
+npm version patch   # 0.0.1 → 0.0.2
+npm version minor   # 0.0.1 → 0.1.0
+npm version major   # 0.0.1 → 1.0.0
+
+# Then push the commit and the tag:
+git push && git push --tags
+```
+
+`npm version` updates `package.json`, creates a commit with message `vX.Y.Z`, and creates a git tag `vX.Y.Z`. The tag is what ties a given installer artifact to a specific commit.
+
+**Rules for agents:**
+- Never manually edit `"version"` in `package.json` — always use `npm version <level>`.
+- Never bump the version as part of a feature or bug-fix commit — version bumps are their own isolated commit produced by `npm version`.
+- Never push a version tag without explicit human instruction.
+- When asked to bump the version, state what the new version will be and confirm with the user before running `npm version`.
+
+---
+
 ## Development Commands
 
 ```bash

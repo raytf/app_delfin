@@ -1,6 +1,6 @@
 {
   "name": "delfin",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Delfin — a live voice-based study assistant that understands your screen context. Fully local, private, no API costs.",
   "main": "out/main/index.js",
   "scripts": {
@@ -68,14 +68,6 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.dylib",
           "to": "libGemmaModelConstraintProvider.dylib"
-        },
-        {
-          "from": "bin/piper",
-          "to": "bin/piper"
-        },
-        {
-          "from": "models/piper",
-          "to": "models/piper"
         }
       ]
     },
@@ -97,14 +89,6 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.dll",
           "to": "libGemmaModelConstraintProvider.dll"
-        },
-        {
-          "from": "bin/piper",
-          "to": "bin/piper"
-        },
-        {
-          "from": "models/piper",
-          "to": "models/piper"
         }
       ]
     },
@@ -127,14 +111,6 @@
         {
           "from": "bin/libGemmaModelConstraintProvider.so",
           "to": "libGemmaModelConstraintProvider.so"
-        },
-        {
-          "from": "bin/piper",
-          "to": "bin/piper"
-        },
-        {
-          "from": "models/piper",
-          "to": "models/piper"
         }
       ]
     },
