@@ -517,7 +517,9 @@ export function useActiveSession({
 
     clearMinimizedVoiceCollapseTimer()
 
-    if (nextMode === null) {
+    // Only auto-collapse after audio has played and stopped. When TTS is
+    // disabled the response text should stay visible until the user acts.
+    if (nextMode === null || !audioStartedForTurnRef.current) {
       return
     }
 

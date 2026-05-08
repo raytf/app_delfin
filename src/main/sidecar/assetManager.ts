@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { join, dirname } from 'node:path'
 import https from 'node:https'
+import http from 'node:http'
 import { spawnSync } from 'node:child_process'
 import { IncomingMessage } from 'node:http'
 import { ModelAssetId, ModelStatus, DownloadProgress } from '../../shared/types'
@@ -94,6 +95,10 @@ function loadManifest(): AssetManifest {
         parsed.assets['piper-bin'] = { path: piperBinRelPath(), downloaded: false, url: piperBinUrl() }
       }
       if (!parsed.assets['piper-voice']) {
+        parsed.assets['piper-voice'] = { path: `models/piper/${PIPER_VOICE_ID}.onnx`, downloaded: false }
+      }
+      // Fix stale voice path from early builds that used models/tts/ instead of models/piper/
+      if (parsed.assets['piper-voice']?.path.startsWith('models/tts/')) {
         parsed.assets['piper-voice'] = { path: `models/piper/${PIPER_VOICE_ID}.onnx`, downloaded: false }
       }
       saveManifest(parsed)
@@ -221,10 +226,14 @@ async function downloadAndExtractPiperBin(
   })
 
   console.log(`[assetManager] Extracting piper-bin to ${piperDir}`)
+  if (!existsSync(piperDir)) mkdirSync(piperDir, { recursive: true })
+
   if (isWin) {
+    // The Windows zip has files at the archive root (no piper/ subdirectory),
+    // so we extract directly into piperDir to get userData/bin/piper/piper.exe.
     const result = spawnSync('powershell', [
       '-NoProfile', '-NonInteractive', '-Command',
-      `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${binDir}' -Force`
+      `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${piperDir}' -Force`
     ], { encoding: 'utf8' })
     if (result.status !== 0) {
       throw new Error(`Piper extraction failed: ${result.stderr || result.stdout}`)
@@ -272,10 +281,18 @@ function downloadFile(url: string, dest: string, onProgress: (received: number, 
     mkdirSync(dirname(dest), { recursive: true })
     const file = createWriteStream(dest)
 
-    const request = https.get(url, (response: IncomingMessage) => {
-      if (response.statusCode === 301 || response.statusCode === 302) {
+    const client = url.startsWith('https:') ? https : http
+    const request = client.get(url, (response: IncomingMessage) => {
+      if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
         file.close()
-        downloadFile(response.headers.location!, dest, onProgress).then(resolve).catch(reject)
+        const location = response.headers.location
+        if (!location) {
+          reject(new Error('Redirect with no Location header'))
+          return
+        }
+        // Resolve relative redirects against the current URL
+        const redirectUrl = new URL(location, url).href
+        downloadFile(redirectUrl, dest, onProgress).then(resolve).catch(reject)
         return
       }
 
