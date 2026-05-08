@@ -225,15 +225,13 @@ async function downloadAndExtractPiperBin(
     })
   })
 
-  console.log(`[assetManager] Extracting piper-bin to ${piperDir}`)
-  if (!existsSync(piperDir)) mkdirSync(piperDir, { recursive: true })
-
+  // The Windows zip contains a piper/ subdirectory at its root, so extracting
+  // to binDir produces userData/bin/piper/piper.exe — the expected path.
+  console.log(`[assetManager] Extracting piper-bin to ${binDir}`)
   if (isWin) {
-    // The Windows zip has files at the archive root (no piper/ subdirectory),
-    // so we extract directly into piperDir to get userData/bin/piper/piper.exe.
     const result = spawnSync('powershell', [
       '-NoProfile', '-NonInteractive', '-Command',
-      `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${piperDir}' -Force`
+      `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${binDir}' -Force`
     ], { encoding: 'utf8' })
     if (result.status !== 0) {
       throw new Error(`Piper extraction failed: ${result.stderr || result.stdout}`)
