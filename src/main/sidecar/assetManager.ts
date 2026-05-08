@@ -1,7 +1,16 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, createWriteStream } from 'node:fs'
-import { join } from 'node:path'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  createWriteStream,
+  unlinkSync,
+} from 'node:fs'
+import { join, dirname } from 'node:path'
 import https from 'node:https'
+import { spawnSync } from 'node:child_process'
 import { IncomingMessage } from 'node:http'
 import { ModelAssetId, ModelStatus, DownloadProgress } from '../../shared/types'
 
@@ -26,13 +35,34 @@ const MODEL_FILE = 'gemma-4-E2B-it.litertlm'
 const MODEL_REVISION = '84b6978eff6e4eea02825bc2ee4ea48579f13109'
 const MODEL_URL = `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_REVISION}/${MODEL_FILE}`
 
+// Pinned Piper standalone release. Bump together with piper-voice.mjs PIPER_TTS_VERSION
+// when upgrading. The standalone binary ships its own onnxruntime so no Python needed.
+const PIPER_RELEASE_TAG = '2023.11.14-2'
+const PIPER_VOICE_ID = 'en_US-hfc_female-medium'
+const PIPER_VOICE_BASE =
+  `https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/hfc_female/medium`
+
+function piperBinUrl(): string {
+  if (process.platform === 'win32')
+    return `https://github.com/rhasspy/piper/releases/download/${PIPER_RELEASE_TAG}/piper_windows_amd64.zip`
+  if (process.platform === 'darwin')
+    return `https://github.com/rhasspy/piper/releases/download/${PIPER_RELEASE_TAG}/piper_macos_aarch64.tar.gz`
+  return `https://github.com/rhasspy/piper/releases/download/${PIPER_RELEASE_TAG}/piper_linux_x86_64.tar.gz`
+}
+
+function piperBinRelPath(): string {
+  return process.platform === 'win32' ? 'bin/piper/piper.exe' : 'bin/piper/piper'
+}
+
 const MANIFEST_PATH = join(app.getPath('userData'), 'manifest.json')
 const MODELS_DIR = join(app.getPath('userData'), 'models')
 
 let downloadInProgress = false
 
 function expectedAssetVersion(id: ModelAssetId): string | undefined {
-  return id === 'litert-cpp-model' ? MODEL_REVISION : undefined
+  if (id === 'litert-cpp-model') return MODEL_REVISION
+  if (id === 'piper-bin') return PIPER_RELEASE_TAG
+  return undefined
 }
 
 export function getModelStatus(): ModelStatus {
@@ -58,16 +88,25 @@ export function getModelStatus(): ModelStatus {
 function loadManifest(): AssetManifest {
   if (existsSync(MANIFEST_PATH)) {
     try {
-      return JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8'))
+      const parsed = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')) as AssetManifest
+      // Migrate manifests created before piper assets were added
+      if (!parsed.assets['piper-bin']) {
+        parsed.assets['piper-bin'] = { path: piperBinRelPath(), downloaded: false, url: piperBinUrl() }
+      }
+      if (!parsed.assets['piper-voice']) {
+        parsed.assets['piper-voice'] = { path: `models/piper/${PIPER_VOICE_ID}.onnx`, downloaded: false }
+      }
+      saveManifest(parsed)
+      return parsed
     } catch (e) {
       console.error('[assetManager] Failed to parse manifest, recreating')
     }
   }
 
-  // The Piper voice + config are bundled via electron-builder extraResources
-  // (see package.json build.<platform>.extraResources). Only the LiteRT-LM
-  // model is downloaded at first run, because it is too large to ship in the
-  // installer.
+  // Piper binary and voice model are downloaded at first run.
+  // Only the LiteRT-LM model was originally download-only; Piper was bundled
+  // via extraResources but that created a build-time dependency. Both are now
+  // first-run downloads so the installer works on any machine.
   const defaultManifest: AssetManifest = {
     schema: 1,
     assets: {
@@ -75,6 +114,15 @@ function loadManifest(): AssetManifest {
         path: `models/${MODEL_FILE}`,
         downloaded: false,
         url: MODEL_URL
+      },
+      'piper-bin': {
+        path: piperBinRelPath(),
+        downloaded: false,
+        url: piperBinUrl()
+      },
+      'piper-voice': {
+        path: `models/piper/${PIPER_VOICE_ID}.onnx`,
+        downloaded: false
       }
     }
   }
@@ -99,34 +147,39 @@ export async function downloadAssets(
   const manifest = loadManifest()
 
   if (!existsSync(MODELS_DIR)) mkdirSync(MODELS_DIR, { recursive: true })
-  if (!existsSync(join(MODELS_DIR, 'tts'))) mkdirSync(join(MODELS_DIR, 'tts'), { recursive: true })
+  if (!existsSync(join(MODELS_DIR, 'piper'))) mkdirSync(join(MODELS_DIR, 'piper'), { recursive: true })
 
   try {
     for (const id of assetsToDownload) {
       const asset = manifest.assets[id]
       if (!asset) continue
 
-      // Refresh the URL/path from the current pinned constants so a manifest
-      // that was created against an older revision still re-downloads from
-      // the right place when the version mismatch invalidates it.
+      // Refresh URL/path from pinned constants so stale manifests re-download correctly.
       if (id === 'litert-cpp-model') {
         asset.url = MODEL_URL
         asset.path = `models/${MODEL_FILE}`
       }
-      if (!asset.url) continue
-
-      const destPath = join(app.getPath('userData'), asset.path)
-      console.log(`[assetManager] Downloading ${id} from ${asset.url} to ${destPath}`)
+      if (id === 'piper-bin') {
+        asset.url = piperBinUrl()
+        asset.path = piperBinRelPath()
+      }
+      if (id === 'piper-voice') {
+        asset.path = `models/piper/${PIPER_VOICE_ID}.onnx`
+      }
 
       try {
-        await downloadFile(asset.url, destPath, (received, total) => {
-          onProgress({
-            asset: id,
-            receivedBytes: received,
-            totalBytes: total,
-            percent: total ? Math.round((received / total) * 100) : undefined
+        if (id === 'piper-bin') {
+          await downloadAndExtractPiperBin(asset.url!, onProgress)
+        } else if (id === 'piper-voice') {
+          await downloadPiperVoice(onProgress)
+        } else {
+          if (!asset.url) continue
+          const destPath = join(app.getPath('userData'), asset.path)
+          console.log(`[assetManager] Downloading ${id} from ${asset.url} to ${destPath}`)
+          await downloadFile(asset.url, destPath, (received, total) => {
+            onProgress({ asset: id, receivedBytes: received, totalBytes: total, percent: total ? Math.round((received / total) * 100) : undefined })
           })
-        })
+        }
 
         asset.downloaded = true
         const expected = expectedAssetVersion(id)
@@ -136,7 +189,7 @@ export async function downloadAssets(
       } catch (e: any) {
         console.error(`[assetManager] Failed to download ${id}:`, e)
         onError(id, e.message || 'Download failed')
-        throw e // stop sequential downloads on first error
+        throw e
       }
     }
   } finally {
@@ -144,18 +197,90 @@ export async function downloadAssets(
   }
 }
 
+async function downloadAndExtractPiperBin(
+  url: string,
+  onProgress: (progress: DownloadProgress) => void
+): Promise<void> {
+  const userData = app.getPath('userData')
+  const isWin = process.platform === 'win32'
+  const ext = isWin ? '.zip' : '.tar.gz'
+  const archivePath = join(userData, `piper-archive${ext}`)
+  const binDir = join(userData, 'bin')
+  const piperDir = join(binDir, 'piper')
+
+  if (!existsSync(binDir)) mkdirSync(binDir, { recursive: true })
+
+  console.log(`[assetManager] Downloading piper-bin from ${url} to ${archivePath}`)
+  await downloadFile(url, archivePath, (received, total) => {
+    onProgress({
+      asset: 'piper-bin',
+      receivedBytes: received,
+      totalBytes: total,
+      percent: total ? Math.round((received / total) * 100) : undefined
+    })
+  })
+
+  console.log(`[assetManager] Extracting piper-bin to ${piperDir}`)
+  if (isWin) {
+    const result = spawnSync('powershell', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${binDir}' -Force`
+    ], { encoding: 'utf8' })
+    if (result.status !== 0) {
+      throw new Error(`Piper extraction failed: ${result.stderr || result.stdout}`)
+    }
+  } else {
+    const result = spawnSync('tar', ['-xzf', archivePath, '-C', binDir], { encoding: 'utf8' })
+    if (result.status !== 0) {
+      throw new Error(`Piper extraction failed: ${result.stderr}`)
+    }
+    // Set executable bit on the extracted binary
+    const binPath = join(piperDir, 'piper')
+    if (existsSync(binPath)) chmodSync(binPath, 0o755)
+  }
+
+  // Clean up archive after extraction
+  try { unlinkSync(archivePath) } catch { /* best-effort */ }
+}
+
+async function downloadPiperVoice(onProgress: (progress: DownloadProgress) => void): Promise<void> {
+  const voiceDir = join(MODELS_DIR, 'piper')
+  if (!existsSync(voiceDir)) mkdirSync(voiceDir, { recursive: true })
+
+  const onnxUrl = `${PIPER_VOICE_BASE}/${PIPER_VOICE_ID}.onnx`
+  const configUrl = `${PIPER_VOICE_BASE}/${PIPER_VOICE_ID}.onnx.json`
+  const onnxDest = join(voiceDir, `${PIPER_VOICE_ID}.onnx`)
+  const configDest = join(voiceDir, `${PIPER_VOICE_ID}.onnx.json`)
+
+  console.log(`[assetManager] Downloading piper voice model from ${onnxUrl}`)
+  await downloadFile(onnxUrl, onnxDest, (received, total) => {
+    onProgress({
+      asset: 'piper-voice',
+      receivedBytes: received,
+      totalBytes: total,
+      percent: total ? Math.round((received / total) * 100) : undefined
+    })
+  })
+
+  console.log(`[assetManager] Downloading piper voice config from ${configUrl}`)
+  // Config is tiny; report 100% immediately after
+  await downloadFile(configUrl, configDest, () => {})
+}
+
 function downloadFile(url: string, dest: string, onProgress: (received: number, total?: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
+    mkdirSync(dirname(dest), { recursive: true })
     const file = createWriteStream(dest)
-    
+
     const request = https.get(url, (response: IncomingMessage) => {
       if (response.statusCode === 301 || response.statusCode === 302) {
-        // Handle redirect (HuggingFace uses redirects for LFS)
+        file.close()
         downloadFile(response.headers.location!, dest, onProgress).then(resolve).catch(reject)
         return
       }
 
       if (response.statusCode !== 200) {
+        file.close()
         reject(new Error(`Server returned status code ${response.statusCode}`))
         return
       }

@@ -21,7 +21,10 @@ export function registerModelIpcHandlers(options: RegisterIpcHandlersOptions): v
     const assets = request.assets || getModelStatus().missing
 
     try {
-      await downloadAssets(
+      // downloadAssets sets downloadInProgress = true synchronously before its
+      // first await, so emitting status immediately after the call starts gives
+      // the renderer an in-progress state without waiting for the download to end.
+      const downloadPromise = downloadAssets(
         assets,
         (progress) => {
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.MODELS_DOWNLOAD_PROGRESS, progress)
@@ -33,8 +36,10 @@ export function registerModelIpcHandlers(options: RegisterIpcHandlersOptions): v
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.MODELS_DOWNLOAD_ERROR, { asset, message })
         }
       )
-      
-      // Notify final status
+      mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.MODELS_STATUS, getModelStatus())
+
+      await downloadPromise
+
       const status = getModelStatus()
       mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.MODELS_STATUS, status)
 

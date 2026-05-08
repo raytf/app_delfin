@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../navigation/routes'
-import { DownloadProgress, ModelStatus } from '../../../shared/types'
+import { DownloadProgress, ModelAssetId, ModelStatus } from '../../../shared/types'
+
+const ASSET_LABELS: Record<ModelAssetId, string> = {
+  'litert-cpp-model': 'Gemma 4 Model (~2 GB)',
+  'piper-bin':        'Piper TTS Engine (~30 MB)',
+  'piper-voice':      'Voice Model (~65 MB)',
+}
 
 export default function SetupScreen() {
   const navigate = useNavigate()
@@ -45,8 +51,8 @@ export default function SetupScreen() {
     <div className="flex flex-col items-center justify-center h-full p-8 text-white bg-slate-900">
       <h1 className="text-2xl font-bold mb-4">First-run Setup</h1>
       <p className="text-slate-400 mb-8 text-center">
-        Delfin needs to download the Gemma 4 model and voice assets to run locally.
-        This is a one-time download (~2 GB).
+        Delfin needs to download the Gemma 4 model and Piper TTS voice assets to run locally.
+        This is a one-time download.
       </p>
 
       {error && (
@@ -59,7 +65,7 @@ export default function SetupScreen() {
         {status.missing.map((id) => (
           <div key={id} className="bg-slate-800 p-4 rounded border border-slate-700">
             <div className="flex justify-between mb-2 text-sm">
-              <span className="capitalize">{id.replace(/-/g, ' ')}</span>
+              <span>{ASSET_LABELS[id] ?? id.replace(/-/g, ' ')}</span>
               <span>{progress[id]?.percent ?? 0}%</span>
             </div>
             <div className="w-full bg-slate-700 h-2 rounded overflow-hidden">
@@ -72,16 +78,13 @@ export default function SetupScreen() {
         ))}
       </div>
 
-      {!status.downloadInProgress ? (
-        <button
-          onClick={handleDownload}
-          className="mt-8 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full font-semibold transition-colors"
-        >
-          Download Assets
-        </button>
-      ) : (
-        <p className="mt-8 text-blue-400 animate-pulse font-medium">Downloading assets...</p>
-      )}
+      <button
+        onClick={handleDownload}
+        disabled={!!status.downloadInProgress}
+        className="mt-8 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-full font-semibold transition-colors"
+      >
+        {status.downloadInProgress ? 'Downloading...' : 'Download Assets'}
+      </button>
     </div>
   )
 }

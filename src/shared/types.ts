@@ -146,7 +146,7 @@ export interface SidecarStatus {
 
 export type PersistedSessionStatus = 'active' | 'completed' | 'failed' | 'aborted'
 
-export type ModelAssetId = 'litert-cpp-model'
+export type ModelAssetId = 'litert-cpp-model' | 'piper-bin' | 'piper-voice'
 
 export interface ModelStatus {
   ready: boolean

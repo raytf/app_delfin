@@ -147,31 +147,29 @@ export function spawnBackend(): void {
       childEnv.LITERT_CPP_MODEL =
         childEnv.LITERT_CPP_MODEL ?? join(app.getPath('userData'), 'models', modelFile)
 
-      // Piper TTS — bundled binary venv lives under resources/bin/piper/, the
-      // default voice + config live under resources/models/piper/. Layout
-      // matches scripts/piper-voice.mjs (Scripts/ on win32, bin/ elsewhere).
-      const piperVenvRel = process.platform === 'win32'
-        ? join('venv', 'Scripts', 'piper.exe')
-        : join('venv', 'bin', 'piper')
-      const bundledPiperBin = join(process.resourcesPath, 'bin', 'piper', piperVenvRel)
+      // Piper TTS — binary and voice model are downloaded to userData at first
+      // run by assetManager. The standalone Piper executable (not a Python venv)
+      // lives at userData/bin/piper/piper[.exe]; the voice model at
+      // userData/models/piper/<voice>.onnx[.json].
+      const piperBinName = process.platform === 'win32' ? 'piper.exe' : 'piper'
+      const piperBinPath = join(app.getPath('userData'), 'bin', 'piper', piperBinName)
       const piperVoice = childEnv.PIPER_VOICE ?? 'en_US-hfc_female-medium'
-      const bundledPiperModel = join(process.resourcesPath, 'models', 'piper', `${piperVoice}.onnx`)
-      const bundledPiperConfig = `${bundledPiperModel}.json`
+      const piperModel = join(app.getPath('userData'), 'models', 'piper', `${piperVoice}.onnx`)
+      const piperConfig = `${piperModel}.json`
 
-      const piperReady =
-        existsSync(bundledPiperBin) && existsSync(bundledPiperModel) && existsSync(bundledPiperConfig)
+      const piperReady = existsSync(piperBinPath) && existsSync(piperModel) && existsSync(piperConfig)
 
       if (piperReady) {
         childEnv.LITERT_CPP_TTS_BACKEND = childEnv.LITERT_CPP_TTS_BACKEND ?? 'piper'
-        childEnv.PIPER_BIN = childEnv.PIPER_BIN ?? bundledPiperBin
-        childEnv.PIPER_MODEL = childEnv.PIPER_MODEL ?? bundledPiperModel
-        childEnv.PIPER_CONFIG = childEnv.PIPER_CONFIG ?? bundledPiperConfig
+        childEnv.PIPER_BIN = childEnv.PIPER_BIN ?? piperBinPath
+        childEnv.PIPER_MODEL = childEnv.PIPER_MODEL ?? piperModel
+        childEnv.PIPER_CONFIG = childEnv.PIPER_CONFIG ?? piperConfig
       } else {
-        // Bundled assets missing — fall back to no TTS; renderer uses the
+        // Assets not yet downloaded — fall back to no TTS; renderer uses the
         // browser Web Speech API when no audio_* events arrive.
         childEnv.LITERT_CPP_TTS_BACKEND = childEnv.LITERT_CPP_TTS_BACKEND ?? 'none'
         console.warn(
-          `[backendProcess] Piper assets missing (bin=${existsSync(bundledPiperBin)}, model=${existsSync(bundledPiperModel)}, config=${existsSync(bundledPiperConfig)}); TTS disabled.`,
+          `[backendProcess] Piper assets missing (bin=${existsSync(piperBinPath)}, model=${existsSync(piperModel)}, config=${existsSync(piperConfig)}); TTS disabled.`,
         )
       }
     }
