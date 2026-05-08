@@ -44,7 +44,7 @@ Full per-OS setup & validation guides:
 
 ### macOS (arm64)
 
-**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (for Piper TTS runtime), [GitHub CLI](https://cli.github.com/) (`brew install gh`, then `gh auth login`) for CI artifact download
+**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (dev mode only — needed for the repo-local Piper TTS runtime; the packaged installer downloads a standalone Piper binary instead), [GitHub CLI](https://cli.github.com/) (`brew install gh`, then `gh auth login`) for CI artifact download
 
 Uses the **LiteRT-LM C++ bridge** — the primary backend on all platforms.
 
@@ -73,7 +73,7 @@ npm run dev
 
 ### Linux (x64)
 
-**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (for Piper TTS runtime), [GitHub CLI](https://cli.github.com/) (`sudo apt install gh`, then `gh auth login`) for CI artifact download
+**Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (dev mode only — needed for the repo-local Piper TTS runtime; the packaged installer downloads a standalone Piper binary instead), [GitHub CLI](https://cli.github.com/) (`sudo apt install gh`, then `gh auth login`) for CI artifact download
 
 Uses the **LiteRT-LM C++ bridge**.
 
@@ -153,7 +153,7 @@ or `--bridge-source build`.
 **Prerequisites:**
 
 - [Node.js 20+](https://nodejs.org/)
-- Python 3.12+ for the repo-local Piper runtime
+- Python 3.12+ (dev mode only — for the repo-local Piper TTS runtime; the packaged installer downloads a standalone Piper binary at first run instead)
 - GitHub CLI (`winget install --id GitHub.cli -e`, then `gh auth login`) for CI artifact download
 - Optional for backend source builds: [Git](https://git-scm.com/) on PATH, Bazelisk, Visual Studio 2022 Build Tools with **Desktop development with C++**, Python 3.13, and Java with `JAVA_HOME` set, per upstream LiteRT-LM Windows prerequisites
 
@@ -229,7 +229,9 @@ npm run dev:litert-cpp
 npm run dev
 ```
 
-> **Note on TTS:** `npm run dev:litert-cpp` bypasses the Python sidecar's Kokoro TTS. `npm run setup:litert-cpp` now bootstraps a repo-local pinned `piper-tts` runtime plus a default Piper voice and writes the `PIPER_*` env vars automatically. If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
+> **Note on TTS (dev mode):** `npm run dev:litert-cpp` bypasses the Python sidecar's Kokoro TTS. `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime plus a default Piper voice and writes the `PIPER_*` env vars automatically. If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
+>
+> **Packaged installer:** The installer does **not** bundle Piper. On first run the app downloads the Gemma 4 model, a standalone Piper binary (~30 MB), and the default voice model (~65 MB) — Python is not required on the user's machine.
 
 ---
 
@@ -239,9 +241,11 @@ npm run dev
 
 1. Reuses existing `bin/` bridge files if present; otherwise downloads the matching CI workflow artifact via `gh`
 2. Copies or downloads the Gemma 4 `.litertlm` model into `models/`
-3. Bootstraps a repo-local pinned `piper-tts` runtime and installs/activates the default Piper voice
+3. Bootstraps a repo-local pinned `piper-tts` Python runtime for **development TTS** and installs/activates the default Piper voice (requires Python 3.12+)
 4. Writes all required `PIPER_*` and bridge env vars into `.env`
 5. Initializes `.env` from `.env.example` if not already present
+
+> **Packaged app vs dev:** Step 3 sets up the Python-based Piper runtime used by `npm run dev:litert-cpp`. When running the packaged installer (`npm run dist`), the app downloads a standalone Piper binary at first run instead — no Python needed on the end-user's machine.
 
 Source builds are opt-in via `--source-build` for backend developers. The script does **not** silently fall back to source builds.
 
@@ -289,7 +293,9 @@ See [`.env.example`](.env.example) for the full reference. The `LLAMAFILE_*` var
 | `npm run dev:full`       | _Deprecated Python sidecar._ Starts the Python sidecar + Electron together (macOS / Linux / WSL2)                                    |
 | `npm run dev:sidecar`    | _Deprecated Python sidecar._ Starts just the Python sidecar                                                                           |
 
-### Piper voice helpers
+### Piper voice helpers (development only)
+
+These commands manage the repo-local Piper runtime used by `npm run dev:litert-cpp`. They do not affect the packaged installer, which downloads its own standalone Piper binary and default voice to the user's app-data directory at first run.
 
 | Command | What it does |
 | --- | --- |
@@ -317,7 +323,7 @@ npm run setup-check:windows       # Windows PowerShell
 
 ## Current user flow
 
-1. Launch Delfin and enter your name the first time.
+1. Install Delfin. On first launch, a setup screen downloads the Gemma 4 model, the Piper TTS engine, and the default voice (~2.1 GB total). No Python or other tooling required on the user's machine.
 2. Start a named study session from the home screen.
 3. Delfin minimizes to a compact overlay and begins listening when voice is enabled.
 4. Ask a question by voice or text; the active window is captured automatically.
@@ -430,11 +436,24 @@ wscat -c ws://localhost:8321/ws
 {"text": "Summarize this slide", "preset_id": "lecture-slide"}
 ```
 
-### Production build
+### Production build and releases
 
 ```bash
+# Compile and bundle (TypeScript → JS, Vite renderer build):
 npm run build
+
+# Build the platform installer (NSIS on Windows, DMG on macOS, AppImage on Linux):
+npm run dist
 ```
+
+**Versioning** follows semver. The version in `package.json` is stamped into the installer filename and `app.getVersion()` at runtime. To cut a release:
+
+```bash
+npm version patch   # or minor / major
+git push && git push --tags
+```
+
+`npm version` updates `package.json`, commits `vX.Y.Z`, and creates a git tag. Current version: **v0.0.1**. Never manually edit the version field — always use `npm version`.
 
 ---
 
