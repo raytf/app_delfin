@@ -1,5 +1,5 @@
-#ifndef DELFIN_LITERT_CPP_BRIDGE_SESSION_REGISTRY_H_
-#define DELFIN_LITERT_CPP_BRIDGE_SESSION_REGISTRY_H_
+#ifndef DELFIN_LITERT_CPP_BRIDGE_CONVERSATION_REGISTRY_H_
+#define DELFIN_LITERT_CPP_BRIDGE_CONVERSATION_REGISTRY_H_
 
 #include <memory>
 #include <mutex>
@@ -12,37 +12,38 @@
 
 namespace delfin::bridge {
 
-class SessionRegistry {
+class ConversationRegistry {
  public:
   absl::StatusOr<litert::lm::Conversation*> AcquireConversation(
-      litert::lm::Engine& engine, const std::string& session_id,
+      litert::lm::Engine& engine, const std::string& conversation_id,
       const std::string& system_prompt);
-  void ReleaseConversation(const std::string& session_id);
+  void ReleaseConversation(const std::string& conversation_id);
 
-  void RegisterActiveTurn(const std::string& turn_id, const std::string& session_id,
+  void RegisterActiveTurn(const std::string& turn_id,
+                          const std::string& conversation_id,
                           litert::lm::Conversation* conversation);
   void EraseActiveTurn(const std::string& turn_id);
   void Interrupt(const std::string& turn_id);
-  void ResetSession(const std::string& session_id);
+  void DropConversation(const std::string& conversation_id);
 
  private:
   struct ActiveTurn {
-    std::string session_id;
+    std::string conversation_id;
     litert::lm::Conversation* conversation = nullptr;
   };
 
-  struct SessionEntry {
+  struct ConversationEntry {
     std::unique_ptr<litert::lm::Conversation> conversation;
     int active_turns = 0;
     bool reset_pending = false;
   };
 
   std::mutex active_mutex_;
-  std::mutex sessions_mutex_;
+  std::mutex conversations_mutex_;
   std::unordered_map<std::string, ActiveTurn> active_turns_;
-  std::unordered_map<std::string, SessionEntry> sessions_;
+  std::unordered_map<std::string, ConversationEntry> conversations_;
 };
 
 }  // namespace delfin::bridge
 
-#endif  // DELFIN_LITERT_CPP_BRIDGE_SESSION_REGISTRY_H_
+#endif  // DELFIN_LITERT_CPP_BRIDGE_CONVERSATION_REGISTRY_H_

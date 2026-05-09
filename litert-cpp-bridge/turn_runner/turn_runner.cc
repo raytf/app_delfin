@@ -10,11 +10,11 @@ namespace delfin::bridge {
 using ::litert::lm::Message;
 
 absl::Status TurnRunner::RunGenerateTurn(
-    litert::lm::Engine& engine, SessionRegistry& session_registry,
+    litert::lm::Engine& engine, ConversationRegistry& conversation_registry,
     const GenerateTurn& turn,
     const std::function<void(ordered_json)>& emit_event) {
   if (turn.turn_id.empty()) return absl::InvalidArgumentError("requestId is required");
-  if (turn.session_id.empty()) return absl::InvalidArgumentError("sessionId is required");
+  if (turn.conversation_id.empty()) return absl::InvalidArgumentError("conversationId is required");
 
   if (MessageHasContentType(turn.message, "audio") &&
       !engine.GetEngineSettings().GetAudioExecutorSettings().has_value()) {
@@ -24,9 +24,9 @@ absl::Status TurnRunner::RunGenerateTurn(
 
   std::lock_guard<std::mutex> generation_lock(generation_mutex_);
   ASSIGN_OR_RETURN(auto* conversation,
-                   session_registry.AcquireConversation(
-                       engine, turn.session_id, turn.system_prompt));
-  session_registry.RegisterActiveTurn(turn.turn_id, turn.session_id, conversation);
+                   conversation_registry.AcquireConversation(
+                       engine, turn.conversation_id, turn.system_prompt));
+  conversation_registry.RegisterActiveTurn(turn.turn_id, turn.conversation_id, conversation);
 
   std::string full_text;
   auto callback = [&](absl::StatusOr<Message> maybe_message) {
@@ -44,14 +44,14 @@ absl::Status TurnRunner::RunGenerateTurn(
   absl::Status status = conversation->SendMessageAsync(
       turn.message, std::move(callback), {.task_group_id = turn.turn_id});
   if (!status.ok()) {
-    session_registry.EraseActiveTurn(turn.turn_id);
-    session_registry.ReleaseConversation(turn.session_id);
+    conversation_registry.EraseActiveTurn(turn.turn_id);
+    conversation_registry.ReleaseConversation(turn.conversation_id);
     return status;
   }
 
   status = engine.WaitUntilDone(absl::Seconds(timeout_seconds_));
-  session_registry.EraseActiveTurn(turn.turn_id);
-  session_registry.ReleaseConversation(turn.session_id);
+  conversation_registry.EraseActiveTurn(turn.turn_id);
+  conversation_registry.ReleaseConversation(turn.conversation_id);
   if (!status.ok()) return status;
 
   emit_event(BuildDoneEvent(turn.turn_id, full_text));

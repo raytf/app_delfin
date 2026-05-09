@@ -6,14 +6,14 @@ cc_binary(
         "engine/litert_engine_factory.cc",
         "turn_runner/turn_runner.cc",
         "protocol/bridge_protocol.cc",
-        "session_registry/session_registry.cc",
+        "conversation_registry/conversation_registry.cc",
     ],
     hdrs = [
         "app.h",
         "engine/litert_engine_factory.h",
         "turn_runner/turn_runner.h",
         "protocol/bridge_protocol.h",
-        "session_registry/session_registry.h",
+        "conversation_registry/conversation_registry.h",
     ],
     additional_linker_inputs = select({
         "@platforms//os:windows": [

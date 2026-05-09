@@ -17,15 +17,15 @@ absl::StatusOr<TurnCommand> ParseTurnCommand(const std::string& line) {
     if (!root.contains("requestId") || !root["requestId"].is_string()) {
       return absl::InvalidArgumentError("requestId is required");
     }
-    if (!root.contains("sessionId") || !root["sessionId"].is_string()) {
-      return absl::InvalidArgumentError("sessionId is required");
+    if (!root.contains("conversationId") || !root["conversationId"].is_string()) {
+      return absl::InvalidArgumentError("conversationId is required");
     }
     if (!root.contains("message") || !root["message"].is_object()) {
       return absl::InvalidArgumentError("message object is required");
     }
     GenerateTurn turn;
     turn.turn_id = root["requestId"].get<std::string>();
-    turn.session_id = root["sessionId"].get<std::string>();
+    turn.conversation_id = root["conversationId"].get<std::string>();
     turn.system_prompt = root.value("systemPrompt", "");
     turn.message = root["message"];
     return turn;
@@ -37,9 +37,22 @@ absl::StatusOr<TurnCommand> ParseTurnCommand(const std::string& line) {
     return turn;
   }
 
-  if (type == kTurnTypeResetSession) {
-    ResetSessionTurn turn;
-    turn.session_id = root.value("sessionId", "");
+  if (type == kTurnTypeCreateConversation) {
+    CreateConversation turn;
+    turn.conversation_id = root.value("conversationId", "");
+    turn.system_prompt = root.value("systemPrompt", "");
+    return turn;
+  }
+
+  if (type == kTurnTypeDropConversation) {
+    DropConversation turn;
+    turn.conversation_id = root.value("conversationId", "");
+    return turn;
+  }
+
+  if (type == kTurnTypeResetConversation) {
+    ResetConversation turn;
+    turn.conversation_id = root.value("conversationId", "");
     return turn;
   }
 

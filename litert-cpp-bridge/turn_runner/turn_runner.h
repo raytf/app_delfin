@@ -7,7 +7,7 @@
 
 #include "absl/status/status.h"
 #include "protocol/bridge_protocol.h"
-#include "session_registry/session_registry.h"
+#include "conversation_registry/conversation_registry.h"
 #include "runtime/engine/engine.h"
 
 namespace delfin::bridge {
@@ -17,7 +17,7 @@ class TurnRunner {
   explicit TurnRunner(int timeout_seconds) : timeout_seconds_(timeout_seconds) {}
 
   absl::Status RunGenerateTurn(
-      litert::lm::Engine& engine, SessionRegistry& session_registry,
+      litert::lm::Engine& engine, ConversationRegistry& conversation_registry,
       const GenerateTurn& turn,
       const std::function<void(ordered_json)>& emit_event);
 

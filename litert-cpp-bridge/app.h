@@ -6,7 +6,7 @@
 #include <string>
 
 #include "turn_runner/turn_runner.h"
-#include "session_registry/session_registry.h"
+#include "conversation_registry/conversation_registry.h"
 #include "runtime/engine/engine.h"
 
 namespace delfin::bridge {
@@ -23,7 +23,7 @@ class App {
 
   std::unique_ptr<litert::lm::Engine> engine_;
   TurnRunner turn_runner_;
-  SessionRegistry session_registry_;
+  ConversationRegistry conversation_registry_;
   std::string model_path_;
   std::mutex output_mutex_;
 };

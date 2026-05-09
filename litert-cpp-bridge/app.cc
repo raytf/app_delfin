@@ -37,13 +37,31 @@ void App::HandleLine(const std::string& line) {
   const TurnCommand command = *parsed_or;
   if (std::holds_alternative<InterruptTurn>(command)) {
     const auto& turn = std::get<InterruptTurn>(command);
-    session_registry_.Interrupt(turn.turn_id);
+    conversation_registry_.Interrupt(turn.turn_id);
     return;
   }
 
-  if (std::holds_alternative<ResetSessionTurn>(command)) {
-    const auto& turn = std::get<ResetSessionTurn>(command);
-    session_registry_.ResetSession(turn.session_id);
+  if (std::holds_alternative<CreateConversation>(command)) {
+    const auto& turn = std::get<CreateConversation>(command);
+    auto conversation_or = conversation_registry_.AcquireConversation(
+        *engine_, turn.conversation_id, turn.system_prompt);
+    if (!conversation_or.ok()) {
+      EmitEvent(BuildErrorEvent("", std::string(conversation_or.status().message())));
+      return;
+    }
+    conversation_registry_.ReleaseConversation(turn.conversation_id);
+    return;
+  }
+
+  if (std::holds_alternative<DropConversation>(command)) {
+    const auto& turn = std::get<DropConversation>(command);
+    conversation_registry_.DropConversation(turn.conversation_id);
+    return;
+  }
+
+  if (std::holds_alternative<ResetConversation>(command)) {
+    const auto& turn = std::get<ResetConversation>(command);
+    conversation_registry_.DropConversation(turn.conversation_id);
     return;
   }
 
@@ -56,7 +74,7 @@ void App::HandleLine(const std::string& line) {
   const auto turn = std::get<GenerateTurn>(command);
   std::thread([this, turn]() {
     const absl::Status status = turn_runner_.RunGenerateTurn(
-        *engine_, session_registry_, turn,
+        *engine_, conversation_registry_, turn,
         [this](ordered_json event) { EmitEvent(std::move(event)); });
     if (!status.ok()) {
       EmitEvent(BuildErrorEvent(turn.turn_id, std::string(status.message())));

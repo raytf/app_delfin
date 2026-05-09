@@ -1,4 +1,4 @@
-#include "session_registry/session_registry.h"
+#include "conversation_registry/conversation_registry.h"
 
 #include "absl/status/status.h"
 #include "runtime/conversation/io_types.h"
@@ -16,13 +16,13 @@ using ::nlohmann::ordered_json;
 namespace {
 absl::StatusOr<std::unique_ptr<Conversation>> CreateConversation(
     Engine& engine, const std::string& system_prompt) {
-  auto session_config = SessionConfig::CreateDefault();
-  session_config.SetVisionModalityEnabled(
+  auto conversation_config = SessionConfig::CreateDefault();
+  conversation_config.SetVisionModalityEnabled(
       engine.GetEngineSettings().GetVisionExecutorSettings().has_value());
-  session_config.SetAudioModalityEnabled(
+  conversation_config.SetAudioModalityEnabled(
       engine.GetEngineSettings().GetAudioExecutorSettings().has_value());
 
-  auto builder = ConversationConfig::Builder().SetSessionConfig(session_config);
+  auto builder = ConversationConfig::Builder().SetSessionConfig(conversation_config);
   if (!system_prompt.empty()) {
     JsonPreface preface;
     preface.messages = ordered_json::array(
@@ -35,22 +35,22 @@ absl::StatusOr<std::unique_ptr<Conversation>> CreateConversation(
 }
 }  // namespace
 
-absl::StatusOr<Conversation*> SessionRegistry::AcquireConversation(
-    Engine& engine, const std::string& session_id,
+absl::StatusOr<Conversation*> ConversationRegistry::AcquireConversation(
+    Engine& engine, const std::string& conversation_id,
     const std::string& system_prompt) {
-  if (session_id.empty()) {
-    return absl::InvalidArgumentError("sessionId is required");
+  if (conversation_id.empty()) {
+    return absl::InvalidArgumentError("conversationId is required");
   }
 
-  std::lock_guard<std::mutex> lock(sessions_mutex_);
-  auto it = sessions_.find(session_id);
-  if (it == sessions_.end()) {
+  std::lock_guard<std::mutex> lock(conversations_mutex_);
+  auto it = conversations_.find(conversation_id);
+  if (it == conversations_.end()) {
     ASSIGN_OR_RETURN(auto conversation, CreateConversation(engine, system_prompt));
-    SessionEntry entry;
+    ConversationEntry entry;
     entry.conversation = std::move(conversation);
     entry.active_turns = 1;
     Conversation* raw = entry.conversation.get();
-    sessions_.emplace(session_id, std::move(entry));
+    conversations_.emplace(conversation_id, std::move(entry));
     return raw;
   }
 
@@ -58,34 +58,34 @@ absl::StatusOr<Conversation*> SessionRegistry::AcquireConversation(
   return it->second.conversation.get();
 }
 
-void SessionRegistry::ReleaseConversation(const std::string& session_id) {
-  if (session_id.empty()) return;
+void ConversationRegistry::ReleaseConversation(const std::string& conversation_id) {
+  if (conversation_id.empty()) return;
 
-  std::lock_guard<std::mutex> lock(sessions_mutex_);
-  auto it = sessions_.find(session_id);
-  if (it == sessions_.end()) return;
+  std::lock_guard<std::mutex> lock(conversations_mutex_);
+  auto it = conversations_.find(conversation_id);
+  if (it == conversations_.end()) return;
 
   if (it->second.active_turns > 0) {
     it->second.active_turns -= 1;
   }
   if (it->second.active_turns == 0 && it->second.reset_pending) {
-    sessions_.erase(it);
+    conversations_.erase(it);
   }
 }
 
-void SessionRegistry::RegisterActiveTurn(const std::string& turn_id,
-                                         const std::string& session_id,
-                                         Conversation* conversation) {
+void ConversationRegistry::RegisterActiveTurn(
+    const std::string& turn_id, const std::string& conversation_id,
+    Conversation* conversation) {
   std::lock_guard<std::mutex> lock(active_mutex_);
-  active_turns_[turn_id] = ActiveTurn{session_id, conversation};
+  active_turns_[turn_id] = ActiveTurn{conversation_id, conversation};
 }
 
-void SessionRegistry::EraseActiveTurn(const std::string& turn_id) {
+void ConversationRegistry::EraseActiveTurn(const std::string& turn_id) {
   std::lock_guard<std::mutex> lock(active_mutex_);
   active_turns_.erase(turn_id);
 }
 
-void SessionRegistry::Interrupt(const std::string& turn_id) {
+void ConversationRegistry::Interrupt(const std::string& turn_id) {
   std::lock_guard<std::mutex> lock(active_mutex_);
   auto it = active_turns_.find(turn_id);
   if (it == active_turns_.end()) return;
@@ -93,17 +93,17 @@ void SessionRegistry::Interrupt(const std::string& turn_id) {
   it->second.conversation->CancelGroup(turn_id);
 }
 
-void SessionRegistry::ResetSession(const std::string& session_id) {
-  if (session_id.empty()) return;
+void ConversationRegistry::DropConversation(const std::string& conversation_id) {
+  if (conversation_id.empty()) return;
 
-  std::lock_guard<std::mutex> lock(sessions_mutex_);
-  auto it = sessions_.find(session_id);
-  if (it == sessions_.end()) return;
+  std::lock_guard<std::mutex> lock(conversations_mutex_);
+  auto it = conversations_.find(conversation_id);
+  if (it == conversations_.end()) return;
   if (it->second.active_turns > 0) {
     it->second.reset_pending = true;
     return;
   }
-  sessions_.erase(it);
+  conversations_.erase(it);
 }
 
 }  // namespace delfin::bridge
