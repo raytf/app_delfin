@@ -76,10 +76,10 @@ The LiteRT-LM C++ source tree, Bazelisk/Bazel, and compiler toolchain are **CI/d
   "build": {
     "appId": "com.delfin.desktop",
     "productName": "Delfin",
-    "directories": { "output": "dist" },
-    "files": ["out/**/*"],
+    "directories": { "output": "dist/installers" },
+    "files": ["dist/electron/**/*", "dist/sidecar/**/*"],
     "extraResources": [
-      { "from": "scripts/litert-cpp-proxy.mjs", "to": "litert-cpp-proxy.mjs" },
+      { "from": "dist/electron/main/litert-cpp-proxy.mjs", "to": "litert-cpp-proxy.mjs" },
       { "from": "scripts/litert-cpp-presets.mjs", "to": "litert-cpp-presets.mjs" }
     ],
     "mac": {
