@@ -1,0 +1,5 @@
+build/
+*.js
+*.js.map
+.env.local
+.env.*.local
