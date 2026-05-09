@@ -8,5 +8,18 @@ export interface SessionRepository {
   getOneById(sessionId: string): Promise<Nullable<Session>>;
   updateById(sessionId: string, session: Session): Promise<Nullable<Session>>;
   deleteById(sessionId: string): Promise<void>;
+  createSessionMessage(sessionId: string, message: SessionMessage): Promise<void>;
+  replaceSessionMessage(sessionId: string, messageId: string, message: SessionMessage): Promise<void>;
   getSessionMessages(sessionId: string): Promise<SessionMessage[]>;
+  persistMedia(
+    sessionId: string,
+    messageId: string,
+    input?: {
+      imageBase64?: string;
+      audioBase64?: string;
+    },
+  ): Promise<{
+    imagePath: Nullable<string>;
+    audioPath: Nullable<string>;
+  }>;
 }
