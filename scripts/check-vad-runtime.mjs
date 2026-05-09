@@ -2,7 +2,7 @@ import { access, readFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 
-const rendererOutDir = resolve('out/renderer')
+const rendererOutDir = resolve('dist/electron/renderer')
 const runtimeDir = resolve(rendererOutDir, 'vad-runtime')
 
 const requiredRuntimeFiles = [

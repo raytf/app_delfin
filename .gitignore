@@ -1,6 +1,8 @@
 node_modules/
 dist/
-out/
+dist/electron/
+dist/sidecar/
+dist/installers/
 .env
 __pycache__/
 *.pyc

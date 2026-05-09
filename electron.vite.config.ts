@@ -14,6 +14,9 @@ const ortDist = fwd(resolve('node_modules/onnxruntime-web/dist'))
 
 export default defineConfig({
   main: {
+    build: {
+      outDir: 'dist/electron/main',
+    },
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
@@ -22,6 +25,9 @@ export default defineConfig({
     },
   },
   preload: {
+    build: {
+      outDir: 'dist/electron/preload',
+    },
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
@@ -30,6 +36,9 @@ export default defineConfig({
     },
   },
   renderer: {
+    build: {
+      outDir: 'dist/electron/renderer',
+    },
     // In dev mode the renderer loads from the Vite HTTP server, so we must set
     // COOP/COEP there directly — webRequest.onHeadersReceived fires too late for
     // the initial document and SharedArrayBuffer stays undefined without this.

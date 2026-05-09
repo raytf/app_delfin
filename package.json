@@ -2,7 +2,7 @@
   "name": "delfin",
   "version": "0.0.1",
   "description": "Delfin — a live voice-based study assistant that understands your screen context. Fully local, private, no API costs.",
-  "main": "out/main/index.js",
+  "main": "dist/electron/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "dev:sidecar": "tsx watch sidecar/src/index.ts",
@@ -10,7 +10,7 @@
     "dev:litert-cpp": "node scripts/litert-cpp-proxy.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:node-sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
-    "build": "electron-vite build && npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=out/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && npm run build:sidecar",
+    "build": "electron-vite build && npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=dist/electron/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && npm run build:sidecar",
     "build:sidecar": "tsc -p sidecar/tsconfig.json",
     "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
@@ -38,14 +38,15 @@
     "appId": "com.delfin.desktop",
     "productName": "Delfin",
     "directories": {
-      "output": "dist"
+      "output": "dist/installers"
     },
     "files": [
-      "out/**/*"
+      "dist/electron/**/*",
+      "dist/sidecar/**/*"
     ],
     "extraResources": [
       {
-        "from": "out/main/litert-cpp-proxy.mjs",
+        "from": "dist/electron/main/litert-cpp-proxy.mjs",
         "to": "litert-cpp-proxy.mjs"
       }
     ],
