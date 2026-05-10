@@ -1,17 +1,19 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import {
   applyNpmConfig,
-  mergeBuildTarget,
   parseArgs,
   resolvePlan,
   usage,
   validatePlan,
 } from "./build-litert-cpp-bridge.mjs";
+
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 async function createLiteRtTree() {
   const root = await mkdtemp(join(tmpdir(), "litert-lm-"));
@@ -77,11 +79,11 @@ describe("build-litert-cpp-bridge helper", () => {
     expect(plan.bazelArgs).toEqual([
       "build",
       "--repo_env=ANDROID_NDK_HOME=",
-      "//runtime/engine:delfin_litert_bridge",
+      "//runtime/engine/delfin_bridge:delfin_litert_bridge",
       "--config=windows",
     ]);
-    expect(plan.copiedBridgeSource).toBe(
-      join(litertLmDir, "runtime", "engine", "delfin_litert_bridge.cc"),
+    expect(plan.copiedBridgeSourceDir).toBe(
+      join(litertLmDir, "runtime", "engine", "delfin_bridge"),
     );
     expect(plan.outputBinary).toContain("delfin_litert_bridge");
   });
@@ -112,16 +114,6 @@ describe("build-litert-cpp-bridge helper", () => {
     );
   });
 
-  it("merges the bridge Bazel target into the upstream BUILD file once", async () => {
-    const litertLmDir = await createLiteRtTree();
-    const plan = resolvePlan({ litertLmDir, dryRun: true });
-
-    expect(mergeBuildTarget(plan)).toBe(true);
-    expect(mergeBuildTarget(plan)).toBe(false);
-    const buildFile = await readFile(plan.upstreamBuildFile, "utf8");
-    expect(buildFile.match(/delfin_litert_bridge/g)).toHaveLength(2);
-  });
-
   it("reports a missing LiteRT-LM checkout clearly", () => {
     const plan = resolvePlan({
       litertLmDir: join(tmpdir(), "missing-litert-lm-tree"),
@@ -134,5 +126,13 @@ describe("build-litert-cpp-bridge helper", () => {
 
   it("documents the required checkout argument in help text", () => {
     expect(usage()).toContain("--litert-lm-dir <path>");
+    expect(usage()).toContain("default: litert-cpp-bridge/deps/LiteRT-LM");
+  });
+
+  it("defaults LiteRT-LM dir to litert-cpp-bridge/deps/LiteRT-LM", () => {
+    const plan = resolvePlan({});
+    expect(plan.litertLmDir).toBe(
+      resolve(rootDir, "litert-cpp-bridge", "deps", "LiteRT-LM"),
+    );
   });
 });

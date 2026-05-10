@@ -156,7 +156,7 @@ developers and require --source-build or --bridge-source build.
 
 Options:
   --litert-lm-dir <path>   LiteRT-LM checkout path
-                           (default: <parent folder of project>/LiteRT-LM)
+                           (default: litert-cpp-bridge/deps/LiteRT-LM)
   --native-windows         Force the native Windows flow. This is now the
                            default when running on a Windows host.
                            Only valid on Windows.
@@ -325,7 +325,7 @@ async function stepPrereqs(opts, bridgePlan) {
 function resolveLitertLmDir(opts) {
   if (opts.litertLmDir) return resolve(opts.litertLmDir)
   if (process.env.LITERT_LM_DIR) return resolve(process.env.LITERT_LM_DIR)
-  return join(dirname(rootDir), 'LiteRT-LM')
+  return join(rootDir, 'litert-cpp-bridge', 'deps', 'LiteRT-LM')
 }
 
 async function stepClone(litertLmDir, opts) {

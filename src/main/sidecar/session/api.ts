@@ -24,8 +24,8 @@ export class SidecarSessionClient {
     const response = await this.http.post<SidecarEnvelope<SessionResponse>>(
       "/sessions",
       {
-        session_name: input.sessionName,
-        preset_id: input.presetId,
+        name: input.sessionName,
+        presetId: input.presetId,
       },
     );
 

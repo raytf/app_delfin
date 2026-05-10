@@ -7,22 +7,22 @@ export interface SidecarEnvelope<T> {
 export interface SessionResponse {
   id: string;
   name: string;
-  preset_id: PresetId;
-  started_at: string;
-  ended_at: string | null;
+  presetId: PresetId | string | null;
+  startedAt: string | number | Date;
+  endedAt: string | number | Date | null;
   status: string;
-  message_count: number;
-  updated_at: string;
+  messageCount: number;
+  updatedAt: string | number | Date;
 }
 
 export interface SessionMessageResponse {
   id: string;
-  session_id: string;
+  sessionId: string;
   author: "user" | "assistant";
   content: string;
-  timestamp: number;
-  image_path?: string;
-  audio_path?: string;
+  timestamp: number | string | Date;
+  imagePath?: string | null;
+  audioPath?: string | null;
   error_message?: string;
   interrupted?: boolean;
 }

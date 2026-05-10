@@ -318,7 +318,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 else:
                     # Update preset for this connection if supplied
                     nonlocal preset_id, system_prompt
-                    incoming_preset = msg.get("presetId") or msg.get("preset_id")
+                    incoming_preset = msg.get("presetId")
                     if incoming_preset in PRESETS:
                         preset_id = incoming_preset
                         system_prompt = PRESETS[preset_id]

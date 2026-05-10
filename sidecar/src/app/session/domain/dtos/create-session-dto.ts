@@ -1,4 +1,4 @@
 export type CreateSessionDto = {
-  sessionName: string;
+  name: string;
   presetId?: string;
 };

@@ -1,9 +1,11 @@
-import { z } from 'zod';
-import { trimmedStringSchema } from '../../../../shared/validations/common';
+import { z } from "zod";
+import { trimmedStringSchema } from "../../../../shared/validations/common";
 
 export const createSessionValidationSchema = z.object({
-  sessionName: trimmedStringSchema,
+  name: trimmedStringSchema,
   presetId: trimmedStringSchema.optional(),
 });
 
-export type CreateSessionValidation = z.infer<typeof createSessionValidationSchema>;
+export type CreateSessionValidation = z.infer<
+  typeof createSessionValidationSchema
+>;

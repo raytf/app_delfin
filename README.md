@@ -180,11 +180,14 @@ npm run setup:litert-cpp
 ```
 
 For source-build-only validation, give Bazel a short output root before the
-first build. The setup script looks for LiteRT-LM in the parent folder by
-default, so pre-clone/configure it like this:
+first build. The setup script looks for LiteRT-LM at
+`litert-cpp-bridge/deps/LiteRT-LM` by default, so pre-clone/configure it like
+this:
 
 ```powershell
-cd ..
+cd litert-cpp-bridge
+mkdir -p deps
+cd deps
 git clone https://github.com/google-ai-edge/LiteRT-LM.git
 cd LiteRT-LM
 New-Item -ItemType Directory -Force C:\b | Out-Null
@@ -192,7 +195,7 @@ if (-not (Select-String -Path .\.bazelrc -Pattern 'output_user_root' -Quiet)) {
   Add-Content .\.bazelrc "`nstartup --output_user_root=C:/b"
 }
 bazelisk shutdown
-cd ..\app_delfin
+cd ..\..\..
 npm run setup:litert-cpp -- --source-build
 ```
 

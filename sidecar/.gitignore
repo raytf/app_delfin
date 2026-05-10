@@ -3,3 +3,5 @@ build/
 *.js.map
 .env.local
 .env.*.local
+
+data

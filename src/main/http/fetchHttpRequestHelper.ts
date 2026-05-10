@@ -120,7 +120,7 @@ export class FetchHttpRequestHelper extends HttpRequestHelper {
     if (!response.ok) {
       const payloadText = await response.text();
       let errorMessage = `Request failed with status ${response.status}`;
-
+      console.log({ res: JSON.parse(payloadText).error.logMessage });
       if (payloadText.trim().length > 0) {
         try {
           const payload = JSON.parse(payloadText) as {

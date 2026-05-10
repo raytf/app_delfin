@@ -31,7 +31,7 @@ absl::StatusOr<std::unique_ptr<Engine>> CreateEngine(const EngineOptions& option
   ASSIGN_OR_RETURN(EngineSettings settings,
                    EngineSettings::CreateDefault(std::move(model_assets), backend,
                                                  vision_backend, audio_backend));
-  return litert::lm::EngineFactory::CreateAny(std::move(settings));
+  return litert::lm::EngineFactory::CreateDefault(std::move(settings));
 }
 
 }  // namespace delfin::bridge
