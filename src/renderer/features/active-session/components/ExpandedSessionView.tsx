@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Clock, Minimize2, Square } from 'lucide-react'
-import type { ChatMessage } from '../../../../shared/types'
-import SessionConversation from '../../../components/SessionConversation'
+import type { SessionMessage } from '../../../../shared/entities/session'
+import SessionConversation from '../../../components/conversation/SessionConversation'
 import { useSessionStore } from '../../../stores/sessionStore'
 import type { WaveformVisualState } from '../../../utils/waveformState'
 import SessionPromptComposer from './SessionPromptComposer'
@@ -10,7 +10,7 @@ interface ExpandedSessionViewProps {
   errorMessage: string | null
   isAudioPlaying: boolean
   isSubmitting: boolean
-  messages: ChatMessage[]
+  messages: SessionMessage[]
   sessionName: string
   onMinimize: () => void
   onStop: () => void

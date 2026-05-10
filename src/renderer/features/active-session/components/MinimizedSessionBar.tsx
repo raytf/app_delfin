@@ -2,7 +2,7 @@ import { ChevronDown, Maximize2, MessageCircle, Mic, MicOff, Square } from 'luci
 import type { OverlayMode } from '../../../../shared/types'
 import type { WaveformVisualState } from '../../../utils/waveformState'
 import MinimizedPromptPanel from './MinimizedPromptPanel'
-import ThinkingDots from '../../../components/ThinkingDots'
+import ThinkingDots from '../../../components/conversation/ThinkingDots'
 
 interface MinimizedSessionBarProps {
   errorMessage: string | null

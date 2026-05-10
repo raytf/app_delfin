@@ -1,43 +1,52 @@
-import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
-import { VOICE_TURN_TEXT } from '../../shared/constants'
-import type { ChatMessage, EndedSessionSnapshot, SessionListItem } from '../../shared/types'
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { VOICE_TURN_TEXT } from "../../shared/constants";
+import type {
+  EndedSessionSnapshot,
+  Session,
+} from "../../shared/types";
+import type { SessionMessage } from "../../shared/entities/session";
 
 interface SessionStoreState {
-  activeSessionName: string | null
-  endedSessionSnapshot: EndedSessionSnapshot | null
-  errorMessage: string | null
-  isSubmitting: boolean
-  messages: ChatMessage[]
-  sessionHistory: SessionListItem[]
-  activeAssistantMessageId: string | null
-  vadListeningEnabled: boolean
-  minimizedResponseMessageId: string | null
-  sessionStartTime: number | null
-  clearConversation: () => void
-  clearEndedSessionSnapshot: () => void
-  clearLatestResponse: () => void
-  setActiveSessionName: (sessionName: string | null) => void
-  setEndedSessionSnapshot: (snapshot: EndedSessionSnapshot | null) => void
-  startSession: () => void
-  beginPromptSubmission: (input: { messageId: string; prompt: string }) => void
-  beginVoiceTurn: (input: { messageId: string }) => void
-  appendAssistantText: (text: string) => void
-  finishAssistantResponse: () => void
-  failAssistantResponse: (message: string) => void
-  removeSessionHistoryItem: (sessionId: string) => void
-  setSessionHistory: (sessions: SessionListItem[]) => void
-  toggleVadListening: () => void
-  setUserMessageImagePath: (input: { imagePath: string; messageId: string }) => void
+  activeSessionId: string | null;
+  activeSessionName: string | null;
+  endedSessionSnapshot: EndedSessionSnapshot | null;
+  errorMessage: string | null;
+  isSubmitting: boolean;
+  messages: SessionMessage[];
+  sessionHistory: Session[];
+  activeAssistantMessageId: string | null;
+  vadListeningEnabled: boolean;
+  minimizedResponseMessageId: string | null;
+  sessionStartTime: number | null;
+  clearConversation: () => void;
+  clearEndedSessionSnapshot: () => void;
+  clearLatestResponse: () => void;
+  setActiveSessionName: (sessionName: string | null) => void;
+  setEndedSessionSnapshot: (snapshot: EndedSessionSnapshot | null) => void;
+  startSession: (input: { sessionId: string }) => void;
+  beginPromptSubmission: (input: { messageId: string; prompt: string }) => void;
+  beginVoiceTurn: (input: { messageId: string }) => void;
+  appendAssistantText: (text: string) => void;
+  finishAssistantResponse: () => void;
+  failAssistantResponse: (message: string) => void;
+  removeSessionHistoryItem: (sessionId: string) => void;
+  setSessionHistory: (sessions: Session[]) => void;
+  toggleVadListening: () => void;
+  setUserMessageMedia: (input: {
+    imageDataUrl: string;
+    messageId: string;
+  }) => void;
 }
 
 function createMessageId(): string {
-  return crypto.randomUUID()
+  return crypto.randomUUID();
 }
 
 export const useSessionStore = create<SessionStoreState>()(
   persist(
     (set) => ({
+      activeSessionId: null,
       activeSessionName: null,
       endedSessionSnapshot: null,
       errorMessage: null,
@@ -52,6 +61,7 @@ export const useSessionStore = create<SessionStoreState>()(
       clearConversation: () =>
         set((state) => ({
           activeSessionName: state.activeSessionName,
+          activeSessionId: null,
           endedSessionSnapshot: state.endedSessionSnapshot,
           errorMessage: null,
           isSubmitting: false,
@@ -83,28 +93,29 @@ export const useSessionStore = create<SessionStoreState>()(
           endedSessionSnapshot: snapshot,
         }),
 
-      startSession: () =>
+      startSession: (input: { sessionId: string }) =>
         set((state) => ({
           ...state,
+          activeSessionId: input.sessionId,
           sessionStartTime: state.sessionStartTime ?? Date.now(),
         })),
 
       beginPromptSubmission: (input: { messageId: string; prompt: string }) =>
         set((state) => {
-          const userMessage: ChatMessage = {
+          const userMessage: SessionMessage = {
             id: input.messageId,
-            role: 'user',
+            role: "user",
             content: input.prompt,
             timestamp: Date.now(),
-          }
+          };
 
-          const assistantMessageId = createMessageId()
-          const assistantMessage: ChatMessage = {
+          const assistantMessageId = createMessageId();
+          const assistantMessage: SessionMessage = {
             id: assistantMessageId,
-            role: 'assistant',
-            content: '',
+            role: "assistant",
+            content: "",
             timestamp: Date.now(),
-          }
+          };
 
           return {
             errorMessage: null,
@@ -112,26 +123,26 @@ export const useSessionStore = create<SessionStoreState>()(
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
             minimizedResponseMessageId: assistantMessageId,
-          }
+          };
         }),
 
       beginVoiceTurn: (input: { messageId: string }) =>
         set((state) => {
-          const userMessage: ChatMessage = {
+          const userMessage: SessionMessage = {
             id: input.messageId,
-            role: 'user',
+            role: "user",
             content: VOICE_TURN_TEXT,
             timestamp: Date.now(),
-            isVoiceTurn: true,
-          }
+            audioPath: "pending",
+          };
 
-          const assistantMessageId = createMessageId()
-          const assistantMessage: ChatMessage = {
+          const assistantMessageId = createMessageId();
+          const assistantMessage: SessionMessage = {
             id: assistantMessageId,
-            role: 'assistant',
-            content: '',
+            role: "assistant",
+            content: "",
             timestamp: Date.now(),
-          }
+          };
 
           return {
             errorMessage: null,
@@ -139,13 +150,13 @@ export const useSessionStore = create<SessionStoreState>()(
             messages: [...state.messages, userMessage, assistantMessage],
             activeAssistantMessageId: assistantMessageId,
             minimizedResponseMessageId: assistantMessageId,
-          }
+          };
         }),
 
       appendAssistantText: (text: string) =>
         set((state) => {
           if (state.activeAssistantMessageId === null) {
-            return state
+            return state;
           }
 
           return {
@@ -154,7 +165,7 @@ export const useSessionStore = create<SessionStoreState>()(
                 ? { ...message, content: message.content + text }
                 : message,
             ),
-          }
+          };
         }),
 
       finishAssistantResponse: () =>
@@ -169,13 +180,13 @@ export const useSessionStore = create<SessionStoreState>()(
             state.activeAssistantMessageId === null
               ? state.messages
               : state.messages.map((entry) =>
-                entry.id === state.activeAssistantMessageId
-                  ? {
-                    ...entry,
-                    content: message,
-                  }
-                  : entry,
-              )
+                  entry.id === state.activeAssistantMessageId
+                    ? {
+                        ...entry,
+                        content: message,
+                      }
+                    : entry,
+                );
 
           return {
             errorMessage: message,
@@ -183,15 +194,17 @@ export const useSessionStore = create<SessionStoreState>()(
             messages,
             activeAssistantMessageId: null,
             minimizedResponseMessageId: state.activeAssistantMessageId,
-          }
+          };
         }),
 
       removeSessionHistoryItem: (sessionId: string) =>
         set((state) => ({
-          sessionHistory: state.sessionHistory.filter((session) => session.id !== sessionId),
+          sessionHistory: state.sessionHistory.filter(
+            (session) => session.id !== sessionId,
+          ),
         })),
 
-      setSessionHistory: (sessions: SessionListItem[]) =>
+      setSessionHistory: (sessions: Session[]) =>
         set({
           sessionHistory: sessions,
         }),
@@ -201,22 +214,26 @@ export const useSessionStore = create<SessionStoreState>()(
           vadListeningEnabled: !state.vadListeningEnabled,
         })),
 
-      setUserMessageImagePath: (input: { imagePath: string; messageId: string }) =>
+      setUserMessageMedia: (input: {
+        imageDataUrl: string;
+        messageId: string;
+      }) =>
         set((state) => ({
           messages: state.messages.map((message) =>
             message.id === input.messageId
               ? {
-                ...message,
-                imagePath: input.imagePath,
-              }
+                  ...message,
+                  imageDataUrl: input.imageDataUrl,
+                }
               : message,
           ),
         })),
     }),
     {
-      name: 'delfin-active-session',
+      name: "delfin-active-session",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        activeSessionId: state.activeSessionId,
         errorMessage: state.errorMessage,
         isSubmitting: state.isSubmitting,
         messages: state.messages,
@@ -228,4 +245,4 @@ export const useSessionStore = create<SessionStoreState>()(
       }),
     },
   ),
-)
+);

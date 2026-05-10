@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  type ChatMessage,
   type EndedSessionSnapshot,
-  MAIN_TO_RENDERER_CHANNELS,
   type OverlayMode,
 } from '../../../../shared/types'
+import type { SessionMessage } from '../../../../shared/entities/session'
+import { PresetId } from '../../../../shared/enums/presetId'
+import { MAIN_TO_RENDERER_CHANNELS } from '../../../../shared/constants'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
 import { useOverlayState } from '../../../hooks/useOverlayState'
 import { useSessionStore } from '../../../stores/sessionStore'
@@ -28,7 +29,9 @@ let lastAudioChunkPromise: Promise<void> = Promise.resolve()
 
 const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
 
-function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
+function getLatestAssistantMessage(
+  messages: SessionMessage[],
+): SessionMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'assistant') {
       return messages[index]
@@ -57,7 +60,7 @@ interface ActiveSession {
   isMuted: boolean
   isSubmitting: boolean
   latestResponseText: string | null
-  messages: ChatMessage[]
+  messages: SessionMessage[]
   toggleVadListening: () => void
   vadListeningEnabled: boolean
   waveformState: WaveformVisualState
@@ -82,7 +85,8 @@ export function useActiveSession({
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
-  const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
+  const setUserMessageMedia = useSessionStore((state) => state.setUserMessageMedia)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
@@ -265,11 +269,6 @@ export function useActiveSession({
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
 
-  const finishFallbackSpeechPlayback = useCallback(() => {
-    aiStreamingStartedRef.current = false
-    finishAudioPlayback()
-  }, [finishAudioPlayback])
-
   const cancelCurrentAssistantTurn = useCallback(() => {
     ignoreCurrentTurnOutputRef.current = true
     ignoreIncomingSidecarAudioRef.current = true
@@ -312,16 +311,22 @@ export function useActiveSession({
       clearFallbackSpeechTimer()
       beginVoiceTurn({ messageId })
 
+      if (activeSessionId === null) {
+        failAssistantResponse('Session is not active.')
+        return
+      }
+
       void window.api
         .submitSessionPrompt({
+          sessionId: activeSessionId,
           messageId,
           text: VOICE_TURN_TEXT,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
           audio: wavBase64,
         })
         .then((response) => {
-          setUserMessageImagePath({
-            imagePath: response.imagePath,
+          setUserMessageMedia({
+            imageDataUrl: response.imageDataUrl,
             messageId: response.messageId,
           })
         })
@@ -334,7 +339,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 
@@ -443,10 +449,10 @@ export function useActiveSession({
           raiseThreshold()
         }
         utterance.onend = () => {
-          finishFallbackSpeechPlayback()
+          finishAudioPlayback()
         }
         utterance.onerror = () => {
-          finishFallbackSpeechPlayback()
+          finishAudioPlayback()
         }
 
         window.speechSynthesis.speak(utterance)
@@ -455,7 +461,6 @@ export function useActiveSession({
     [
       cancelSpeechSynthesis,
       clearFallbackSpeechTimer,
-      finishFallbackSpeechPlayback,
       finishAudioPlayback,
       raiseThreshold,
       setAudioPlayingState,
@@ -517,9 +522,7 @@ export function useActiveSession({
 
     clearMinimizedVoiceCollapseTimer()
 
-    // Only auto-collapse after audio has played and stopped. When TTS is
-    // disabled the response text should stay visible until the user acts.
-    if (nextMode === null || !audioStartedForTurnRef.current) {
+    if (nextMode === null) {
       return
     }
 
@@ -789,7 +792,11 @@ export function useActiveSession({
     }
 
     try {
-      await window.api.stopSession()
+      if (activeSessionId === null) {
+        throw new Error('No active session id.')
+      }
+
+      await window.api.stopSession({ sessionId: activeSessionId })
 
       clearConversation()
       onSessionEndCommitted(nextEndedSessionData)
@@ -812,6 +819,7 @@ export function useActiveSession({
     sessionStartTime,
     stopAssistantWaveformLoop,
     stopScheduledAudioSources,
+    activeSessionId,
   ])
 
   const handleSubmitPrompt = useCallback(
@@ -847,14 +855,19 @@ export function useActiveSession({
       })
 
       try {
+        if (activeSessionId === null) {
+          throw new Error('Session is not active.')
+        }
+
         const response = await window.api.submitSessionPrompt({
+          sessionId: activeSessionId,
           messageId,
           text: trimmedText,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
         })
 
-        setUserMessageImagePath({
-          imagePath: response.imagePath,
+        setUserMessageMedia({
+          imageDataUrl: response.imageDataUrl,
           messageId: response.messageId,
         })
       } catch (error) {
@@ -867,7 +880,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 
