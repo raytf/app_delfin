@@ -1,3 +1,3 @@
 export type UpdateSessionDto = {
-  sessionName?: string;
+  name?: string;
 };

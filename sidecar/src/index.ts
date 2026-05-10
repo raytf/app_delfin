@@ -30,14 +30,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const repository = new FileSessionRepository(resolve(rootDir, 'sidecar/data/sessions'));
-const sessionService = new SessionServiceImpl(repository);
-const sessionRoutes = createSessionRoutes(sessionService);
-
 const inferenceEngine = new LitertCppInferenceEngine({
   binPath: configService.inference.bridgeBinPath,
   modelPath: configService.inference.modelPath,
   rootDir,
 });
+const sessionService = new SessionServiceImpl(repository, inferenceEngine);
+const sessionRoutes = createSessionRoutes(sessionService);
 const ttsEngine = PiperTtsEngine.fromConfig(configService);
 const turnService = new TurnServiceImpl(sessionService, inferenceEngine, ttsEngine);
 const turnController = new TurnController(turnService, inferenceEngine);

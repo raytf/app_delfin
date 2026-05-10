@@ -5,7 +5,6 @@ import type { TurnStreamer } from './turn-streamer';
 export interface TurnService {
   handleTurn(
     sessionId: string,
-    conversationId: string,
     turnRequest: TurnRequestDto,
     streamer: TurnStreamer,
     interrupted: { current: boolean },

@@ -4,20 +4,33 @@ import type { SessionService } from "../abstractions/session-service";
 import type { CreateSessionDto } from "../dtos/create-session-dto";
 import type { CreateSessionMessageDto } from "../dtos/create-session-message-dto";
 import type { UpdateSessionDto } from "../dtos/update-session-dto";
+import type { InferenceEngine } from "../../../../shared/abstractions/inference-engine";
 import { Session } from "../entities/session";
 import { SessionMessage } from "../entities/session-message";
 import { SessionAggregate as SessionAggregateClass } from "../aggregates/session-aggregate";
 import { NotFoundException } from "../../../../shared/exceptions/not-found-exception";
 
 export class SessionServiceImpl implements SessionService {
-  constructor(private readonly sessionRepository: SessionRepository) {}
+  constructor(
+    private readonly sessionRepository: SessionRepository,
+    private readonly inferenceEngine: InferenceEngine,
+  ) {}
 
   async create(sessionDto: CreateSessionDto): Promise<Session> {
     const session = new Session({
       name: sessionDto.name,
       presetId: sessionDto.presetId,
     });
-    return this.sessionRepository.create(session);
+    await this.inferenceEngine.createConversation({
+      conversationId: session.id,
+      systemPrompt: session.presetId,
+    });
+    try {
+      return await this.sessionRepository.create(session);
+    } catch (error) {
+      await this.inferenceEngine.dropConversation(session.id).catch(() => undefined);
+      throw error;
+    }
   }
 
   async get(): Promise<Session[]> {
@@ -38,8 +51,8 @@ export class SessionServiceImpl implements SessionService {
     updateDto: UpdateSessionDto,
   ): Promise<Session> {
     const aggregate = await this.getOneById(sessionId);
-    if (updateDto.sessionName !== undefined) {
-      aggregate.name = updateDto.sessionName;
+    if (updateDto.name !== undefined) {
+      aggregate.name = updateDto.name;
       aggregate.touch();
     }
     const updated = await this.sessionRepository.updateById(
@@ -54,6 +67,7 @@ export class SessionServiceImpl implements SessionService {
 
   async endById(sessionId: string): Promise<Session> {
     const aggregate = await this.getOneById(sessionId);
+    await this.inferenceEngine.dropConversation(aggregate.id);
     aggregate.end();
     const updated = await this.sessionRepository.updateById(
       sessionId,
@@ -66,6 +80,7 @@ export class SessionServiceImpl implements SessionService {
   }
 
   async deleteById(sessionId: string): Promise<void> {
+    await this.inferenceEngine.dropConversation(sessionId).catch(() => undefined);
     await this.sessionRepository.deleteById(sessionId);
   }
 

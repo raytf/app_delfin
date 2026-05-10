@@ -24,7 +24,7 @@ absl::Status TurnRunner::RunGenerateTurn(
 
   std::lock_guard<std::mutex> generation_lock(generation_mutex_);
   ASSIGN_OR_RETURN(auto* conversation,
-                   conversation_registry.AcquireConversation(
+                   conversation_registry.AcquireExistingConversation(
                        engine, turn.conversation_id, turn.system_prompt));
   conversation_registry.RegisterActiveTurn(turn.turn_id, turn.conversation_id, conversation);
 

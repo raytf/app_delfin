@@ -14,7 +14,10 @@ namespace delfin::bridge {
 
 class ConversationRegistry {
  public:
-  absl::StatusOr<litert::lm::Conversation*> AcquireConversation(
+  absl::Status CreateConversation(
+      litert::lm::Engine& engine, const std::string& conversation_id,
+      const std::string& system_prompt);
+  absl::StatusOr<litert::lm::Conversation*> AcquireExistingConversation(
       litert::lm::Engine& engine, const std::string& conversation_id,
       const std::string& system_prompt);
   void ReleaseConversation(const std::string& conversation_id);

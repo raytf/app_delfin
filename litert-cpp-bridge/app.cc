@@ -43,13 +43,12 @@ void App::HandleLine(const std::string& line) {
 
   if (std::holds_alternative<CreateConversation>(command)) {
     const auto& turn = std::get<CreateConversation>(command);
-    auto conversation_or = conversation_registry_.AcquireConversation(
+    const absl::Status status = conversation_registry_.CreateConversation(
         *engine_, turn.conversation_id, turn.system_prompt);
-    if (!conversation_or.ok()) {
-      EmitEvent(BuildErrorEvent("", std::string(conversation_or.status().message())));
+    if (!status.ok()) {
+      EmitEvent(BuildErrorEvent("", std::string(status.message())));
       return;
     }
-    conversation_registry_.ReleaseConversation(turn.conversation_id);
     return;
   }
 

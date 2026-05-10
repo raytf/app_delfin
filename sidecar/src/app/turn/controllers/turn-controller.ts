@@ -1,6 +1,5 @@
 import type WebSocket from "ws";
 import type { RawData } from "ws";
-import { getUUID } from "../../../shared/utils/common";
 import type { InferenceEngine } from "../../../shared/abstractions/inference-engine";
 import type { Nullable } from "../../../shared/types/object";
 import type { TurnService } from "../domain/abstractions/turn-service";
@@ -20,7 +19,6 @@ export class TurnController {
 
   registerConnection(ws: WebSocket): void {
     const streamer = new WebSocketTurnStreamer(ws);
-    const conversationId = getUUID();
 
     const queue: Array<{ sessionId: string; request: TurnRequestDto }> = [];
     let running = false;
@@ -38,7 +36,6 @@ export class TurnController {
       try {
         await this.turnService.handleTurn(
           next.sessionId,
-          conversationId,
           next.request,
           streamer,
           interrupted,
@@ -77,10 +74,6 @@ export class TurnController {
       const mapped = this.mapTurnRequest(parsed.data);
       queue.push(mapped);
       void runNext();
-    });
-
-    ws.on("close", () => {
-      this.inferenceEngine.resetConversation(conversationId);
     });
   }
 

@@ -13,6 +13,7 @@ import type { TurnRequestDto } from "../dtos/turn-dtos";
 import type { TurnService } from "../abstractions/turn-service";
 import type { TurnStreamer } from "../abstractions/turn-streamer";
 import type { Nullable } from "../../../../shared/types/object";
+import { BadRequestException } from "../../../../shared/exceptions";
 
 export class TurnServiceImpl implements TurnService {
   constructor(
@@ -23,12 +24,16 @@ export class TurnServiceImpl implements TurnService {
 
   async handleTurn(
     sessionId: string,
-    conversationId: string,
     turnRequest: TurnRequestDto,
     streamer: TurnStreamer,
     interrupted: { current: boolean },
     activeTurnIdRef: { current: Nullable<string> },
   ): Promise<void> {
+    const session = await this.sessionService.getOneById(sessionId);
+    if (session.status !== "active") {
+      throw new BadRequestException(`Session is not active: ${sessionId}`);
+    }
+    const conversationId = sessionId;
     const content = this.buildContent(turnRequest);
     if (content.length === 0) {
       await streamer.sendError("Request must include text, image, or audio.");

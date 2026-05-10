@@ -35,7 +35,7 @@ absl::StatusOr<std::unique_ptr<Conversation>> CreateConversation(
 }
 }  // namespace
 
-absl::StatusOr<Conversation*> ConversationRegistry::AcquireConversation(
+absl::Status ConversationRegistry::CreateConversation(
     Engine& engine, const std::string& conversation_id,
     const std::string& system_prompt) {
   if (conversation_id.empty()) {
@@ -44,14 +44,30 @@ absl::StatusOr<Conversation*> ConversationRegistry::AcquireConversation(
 
   std::lock_guard<std::mutex> lock(conversations_mutex_);
   auto it = conversations_.find(conversation_id);
+  if (it != conversations_.end()) {
+    return absl::AlreadyExistsError("conversation already exists");
+  }
+
+  ASSIGN_OR_RETURN(auto conversation, ::delfin::bridge::CreateConversation(engine, system_prompt));
+  ConversationEntry entry;
+  entry.conversation = std::move(conversation);
+  conversations_.emplace(conversation_id, std::move(entry));
+  return absl::OkStatus();
+}
+
+absl::StatusOr<Conversation*> ConversationRegistry::AcquireExistingConversation(
+    Engine& engine, const std::string& conversation_id,
+    const std::string& system_prompt) {
+  (void)engine;
+  (void)system_prompt;
+  if (conversation_id.empty()) {
+    return absl::InvalidArgumentError("conversationId is required");
+  }
+
+  std::lock_guard<std::mutex> lock(conversations_mutex_);
+  auto it = conversations_.find(conversation_id);
   if (it == conversations_.end()) {
-    ASSIGN_OR_RETURN(auto conversation, CreateConversation(engine, system_prompt));
-    ConversationEntry entry;
-    entry.conversation = std::move(conversation);
-    entry.active_turns = 1;
-    Conversation* raw = entry.conversation.get();
-    conversations_.emplace(conversation_id, std::move(entry));
-    return raw;
+    return absl::NotFoundError("conversation not found");
   }
 
   it->second.active_turns += 1;
