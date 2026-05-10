@@ -276,6 +276,7 @@ The defaults are sensible for most machines. Common settings you may want to cha
 | `LITERT_CPP_TTS_BACKEND` | `piper`                              | Set to `none` to disable Piper and fall back to browser Web Speech on `npm run dev:litert-cpp`    |
 | `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune partial Piper flushes for long text without punctuation; completed sentences always flush first |
 | `PIPER_MODEL`    | unset                                       | Managed by `npm run voice:use -- <voice-name>`; written automatically by `setup:litert-cpp`       |
+| `SIDECAR_URL`    | `http://localhost:8321`                     | Base URL used by Electron main process for sidecar REST endpoints                                   |
 | `SIDECAR_WS_URL` | `ws://localhost:8321/ws`                    | _Deprecated Python sidecar path only._ On WSL2, replace `localhost` with your WSL2 IP if needed   |
 | `TTS_BACKEND`    | `kokoro`                                    | _Deprecated Python sidecar path only._ Use `web-speech`, `mlx` (Apple Silicon), or `kokoro`       |
 

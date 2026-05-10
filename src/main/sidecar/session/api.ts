@@ -60,12 +60,3 @@ export class SidecarSessionClient {
     await this.http.delete<SidecarEnvelope<unknown>>(`/sessions/${sessionId}`);
   }
 }
-
-export function deriveSidecarHttpBaseUrl(wsUrl: string): string {
-  const url = new URL(wsUrl);
-  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
-  url.pathname = "";
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/$/, "");
-}

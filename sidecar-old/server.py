@@ -249,7 +249,10 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     loop = asyncio.get_running_loop()
     engine, active_backend = await loop.run_in_executor(None, load_engine)
     await loop.run_in_executor(None, pre_warm, engine)
-    if os.environ.get("TTS_ENABLED", "false").lower() == "true":
+    requested_tts_backend = os.environ.get("TTS_BACKEND", "web-speech").strip().lower()
+    tts_enabled = os.environ.get("TTS_ENABLED", "false").lower() == "true"
+    backend_enables_sidecar_tts = requested_tts_backend not in {"", "none", "web-speech"}
+    if tts_enabled or backend_enables_sidecar_tts:
         tts_pipeline = TTSPipeline()
     yield
     if engine is not None:

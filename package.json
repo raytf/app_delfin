@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:sidecar": "tsx watch sidecar/src/index.ts",
-    "dev:node-sidecar": "tsx watch sidecar/src/index.ts",
-    "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:node-sidecar\" \"npm run dev\"",
+    "dev:sidecar-old": "cd sidecar-old && uvicorn server:app --host 0.0.0.0 --port 8321",
+    "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
     "build": "electron-vite build && npm run build:sidecar",
     "build:sidecar": "tsc -p sidecar/tsconfig.json",

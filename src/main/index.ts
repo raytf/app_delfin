@@ -14,10 +14,7 @@ import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
-import {
-  deriveSidecarHttpBaseUrl,
-  SidecarSessionClient,
-} from "./sidecar/session/api";
+import { SidecarSessionClient } from "./sidecar/session/api";
 import { disconnectFromSidecar } from "./sidecar/session/ws";
 import { killBackend, spawnBackend } from "./sidecar/backendProcess";
 import { ConfigService } from "./config/config-service";
@@ -66,7 +63,7 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Delfin started");
-  spawnBackend();
+  spawnBackend(configService.childProcessEnv);
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
   const isDev = configService.runtime.isDev;
@@ -126,12 +123,11 @@ app.whenReady().then(() => {
   );
 
   const sidecarWsUrl = configService.runtime.sidecarWsUrl;
+  const sidecarUrl = configService.runtime.sidecarUrl;
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
-    sidecarSessionClient: new SidecarSessionClient(
-      deriveSidecarHttpBaseUrl(sidecarWsUrl),
-    ),
+    sidecarSessionClient: new SidecarSessionClient(sidecarUrl),
     sidecarWsUrl,
     switchOverlayMode,
   });
