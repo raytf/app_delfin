@@ -70,16 +70,22 @@ function getWindowBounds(mode: OverlayMode): Electron.Rectangle {
   }
 }
 
-function loadRenderer(window: BrowserWindow): void {
-  if (process.env["ELECTRON_RENDERER_URL"]) {
-    void window.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+function loadRenderer(
+  window: BrowserWindow,
+  electronRendererUrl?: string,
+): void {
+  if (electronRendererUrl) {
+    void window.loadURL(electronRendererUrl);
     return;
   }
 
   void window.loadFile(join(__dirname, "../renderer/index.html"));
 }
 
-export function createOverlayWindow(mode: OverlayMode): BrowserWindow {
+export function createOverlayWindow(
+  mode: OverlayMode,
+  electronRendererUrl?: string,
+): BrowserWindow {
   const initialBounds = getWindowBounds(mode);
   const isMinimizedMode = mode !== "expanded";
 
@@ -109,7 +115,7 @@ export function createOverlayWindow(mode: OverlayMode): BrowserWindow {
     window.show();
   });
 
-  loadRenderer(window);
+  loadRenderer(window, electronRendererUrl);
 
   return window;
 }

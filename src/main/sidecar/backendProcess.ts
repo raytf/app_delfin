@@ -12,6 +12,9 @@ import {
   unlinkSync,
   WriteStream,
 } from 'node:fs'
+import { ConfigService } from '../config/config-service'
+
+const configService = new ConfigService()
 
 let backendProcess: ChildProcess | null = null
 let proxyLogStream: WriteStream | null = null
@@ -109,7 +112,8 @@ function writeLogHeader(stream: WriteStream, childEnv: NodeJS.ProcessEnv): void 
 
 export function spawnBackend(): void {
   const isPackaged = app.isPackaged
-  const inferenceBackend = process.env.INFERENCE_BACKEND || (isPackaged ? 'litert-cpp' : 'litert')
+  const inferenceBackend =
+    configService.backend.inferenceBackend ?? (isPackaged ? 'litert-cpp' : 'litert')
 
   console.log(`[backendProcess] Spawning backend: ${inferenceBackend} (packaged: ${isPackaged})`)
 
@@ -127,10 +131,10 @@ export function spawnBackend(): void {
       : join(rootDir, 'scripts', 'litert-cpp-proxy.mjs')
 
     // Build a child env that points the proxy at the bundled bridge binary
-    // and the user-data-managed model. Mutating process.env directly would
+    // and the user-data-managed model. Mutating the main-process env object directly would
     // leak these values into the Electron main process for the rest of its
     // lifetime; we keep them scoped to the spawned child.
-    const childEnv: NodeJS.ProcessEnv = { ...process.env }
+    const childEnv: NodeJS.ProcessEnv = { ...configService.backend.rawEnv }
 
     // CRITICAL: process.execPath is always the Electron binary (in dev *and*
     // packaged builds). Without this flag, spawning execPath with a script

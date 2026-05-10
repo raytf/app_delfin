@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { ConfigService } from "../main/config/config-service";
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
@@ -20,13 +21,14 @@ import type {
   Session,
 } from "../shared/types";
 
-const api: ElectronAPI = {
-  // Evaluated once at preload time (Node.js context has access to process.env).
-  // Defaults to true so voice is on when the env var is absent.
-  voiceEnabled: process.env.VOICE_ENABLED !== "false",
+const configService = new ConfigService();
 
-  // Evaluated once at preload time. Defaults to false so speech output is opt-in.
-  ttsEnabled: process.env.TTS_ENABLED === "true",
+const api: ElectronAPI = {
+  // Evaluated once at preload time.
+  voiceEnabled: configService.features.voiceEnabled,
+
+  // Evaluated once at preload time.
+  ttsEnabled: configService.features.ttsEnabled,
 
   sidecarInterrupt: () =>
     ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT),

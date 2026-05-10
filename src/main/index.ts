@@ -19,11 +19,11 @@ import {
   SidecarSessionClient,
 } from "./sidecar/session/api";
 import { disconnectFromSidecar } from "./sidecar/session/ws";
-import { validateEnv } from "./envValidation";
+import { ConfigService } from "./config/config-service";
 import type { OverlayMode, OverlayState } from "../shared/types";
 
 config(); // load .env from repo root
-validateEnv(); // warn on missing / invalid env vars — never throws
+const configService = new ConfigService();
 
 app.setName("Delfin");
 
@@ -31,7 +31,10 @@ let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
 
 function createWindow(mode: OverlayMode): BrowserWindow {
-  const window = createOverlayWindow(mode);
+  const window = createOverlayWindow(
+    mode,
+    configService.runtime.electronRendererUrl,
+  );
   overlayMode = mode;
   mainWindow = window;
   window.on("closed", () => {
@@ -64,7 +67,7 @@ app.whenReady().then(() => {
   console.log("Delfin started");
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
-  const isDev = !!process.env["ELECTRON_RENDERER_URL"];
+  const isDev = configService.runtime.isDev;
   const iconPath = isDev
     ? join(app.getAppPath(), "src/renderer/assets/logo.png")
     : join(__dirname, "../renderer/assets/logo.png");
@@ -120,7 +123,7 @@ app.whenReady().then(() => {
     },
   );
 
-  const sidecarWsUrl = process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws";
+  const sidecarWsUrl = configService.runtime.sidecarWsUrl;
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
