@@ -80,11 +80,13 @@ export function registerSessionIpcHandlers(
 
       try {
         sendToSidecar({
-          session_id: request.sessionId,
-          image: frame.imageBase64,
+          sessionId: request.sessionId,
+          imageBase64: frame.imageBase64,
           text,
-          preset_id: request.presetId,
-          ...(request.audio !== undefined ? { audio: request.audio } : {}),
+          presetId: request.presetId,
+          ...(request.audio !== undefined
+            ? { audioBase64: request.audio }
+            : {}),
         });
       } catch (error) {
         throw error;

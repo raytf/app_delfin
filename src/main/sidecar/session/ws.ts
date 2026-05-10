@@ -3,11 +3,12 @@ import { sidecarSessionInboundMessageSchema } from "../../../shared/schemas";
 import type { SidecarSessionStreamMessage } from "../../../shared/schemas/sidecar";
 
 type SidecarSessionPromptMessage = {
-  session_id: string;
-  image?: string;
-  text: string;
-  preset_id: string;
-  audio?: string;
+  type?: "turn";
+  sessionId: string;
+  text?: string | null;
+  presetId: string;
+  imageBase64?: string | null;
+  audioBase64?: string | null;
 };
 
 type SidecarSessionInterruptMessage = {
