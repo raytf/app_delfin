@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import type {
   TtsAudioChunk,
   TtsAudioEnd,
@@ -8,14 +7,14 @@ import type {
   TtsEngine,
   TtsStream,
 } from '../../shared/abstractions/tts-engine';
-
-const SOFT_MIN_CHARS = Number(process.env.LITERT_CPP_TTS_SOFT_MIN_CHARS ?? '80');
-const SOFT_MAX_CHARS = Number(process.env.LITERT_CPP_TTS_SOFT_MAX_CHARS ?? '180');
+import type { SidecarConfigService } from '../../shared/abstractions/sidecar-config-service';
 
 const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 const splitCompleteSentences = (
   buffer: string,
+  softMinChars: number,
+  softMaxChars: number,
 ): { segments: string[]; remaining: string } => {
   const segments: string[] = [];
   let cursor = 0;
@@ -40,10 +39,10 @@ const splitCompleteSentences = (
   }
 
   const remaining = buffer.slice(cursor);
-  if (SOFT_MAX_CHARS > 0 && remaining.length >= SOFT_MAX_CHARS) {
-    let cut = remaining.lastIndexOf(' ', SOFT_MAX_CHARS);
-    if (cut < SOFT_MIN_CHARS) cut = remaining.indexOf(' ', SOFT_MIN_CHARS);
-    if (cut >= SOFT_MIN_CHARS) {
+  if (softMaxChars > 0 && remaining.length >= softMaxChars) {
+    let cut = remaining.lastIndexOf(' ', softMaxChars);
+    if (cut < softMinChars) cut = remaining.indexOf(' ', softMinChars);
+    if (cut >= softMinChars) {
       const segment = normalize(remaining.slice(0, cut));
       if (segment) segments.push(segment);
       return { segments, remaining: remaining.slice(cut).trimStart() };
@@ -53,13 +52,7 @@ const splitCompleteSentences = (
   return { segments, remaining };
 };
 
-const resolveSampleRate = (): number => {
-  const envRate = Number(process.env.PIPER_SAMPLE_RATE ?? '24000');
-  return Number.isFinite(envRate) && envRate > 0 ? envRate : 24000;
-};
-
 class PiperTtsStream implements TtsStream {
-  private readonly sampleRate = resolveSampleRate();
   private buffer = '';
   private chunkIndex = 0;
   private started = false;
@@ -68,7 +61,14 @@ class PiperTtsStream implements TtsStream {
   private work: Promise<void> = Promise.resolve();
 
   constructor(
-    private readonly config: { binPath: string; modelPath: string; configPath: string },
+    private readonly config: {
+      binPath: string;
+      modelPath: string;
+      configPath: string;
+      sampleRate: number;
+      softMinChars: number;
+      softMaxChars: number;
+    },
     private readonly handlers: {
       onStart: (event: TtsAudioStart) => Promise<void>;
       onChunk: (event: TtsAudioChunk) => Promise<void>;
@@ -79,8 +79,13 @@ class PiperTtsStream implements TtsStream {
   async pushText(text: string): Promise<void> {
     if (this.cancelled) return;
     this.buffer += text;
-    const { segments, remaining } = splitCompleteSentences(this.buffer);
+    const { segments, remaining } = splitCompleteSentences(
+      this.buffer,
+      this.config.softMinChars,
+      this.config.softMaxChars,
+    );
     this.buffer = remaining;
+
     for (const sentence of segments) {
       this.work = this.work.then(() => this.synthesizeSentence(sentence));
     }
@@ -90,9 +95,11 @@ class PiperTtsStream implements TtsStream {
     if (this.cancelled) return;
     const tail = normalize(this.buffer);
     this.buffer = '';
+
     if (tail) {
       this.work = this.work.then(() => this.synthesizeSentence(tail));
     }
+
     await this.work;
     if (this.started) {
       await this.handlers.onEnd({ ttsTime: (Date.now() - this.startedAt) / 1000 });
@@ -111,7 +118,7 @@ class PiperTtsStream implements TtsStream {
 
     if (!this.started) {
       this.started = true;
-      await this.handlers.onStart({ sampleRate: this.sampleRate, sentenceCount: 0 });
+      await this.handlers.onStart({ sampleRate: this.config.sampleRate, sentenceCount: 0 });
     }
 
     await this.handlers.onChunk({ audio: audioB64, index: this.chunkIndex++ });
@@ -136,6 +143,7 @@ class PiperTtsStream implements TtsStream {
           resolvePromise(Buffer.concat(stdoutChunks).toString('base64'));
           return;
         }
+
         const details = Buffer.concat(stderrChunks).toString('utf8').trim();
         rejectPromise(
           new Error(
@@ -163,33 +171,41 @@ export class PiperTtsEngine implements TtsEngine {
       binPath: string;
       modelPath: string;
       configPath: string;
+      sampleRate: number;
+      softMinChars: number;
+      softMaxChars: number;
     },
   ) {}
 
-  static fromEnv(rootDir: string): PiperTtsEngine {
-    const backend = (process.env.LITERT_CPP_TTS_BACKEND ?? 'none').trim().toLowerCase();
-    if (backend !== 'piper') {
-      return new PiperTtsEngine({ enabled: false, binPath: '', modelPath: '', configPath: '' });
+  static fromConfig(configService: SidecarConfigService): PiperTtsEngine {
+    const ttsConfig = configService.tts;
+
+    if (ttsConfig.backend !== 'piper') {
+      return new PiperTtsEngine({
+        enabled: false,
+        binPath: '',
+        modelPath: '',
+        configPath: '',
+        sampleRate: ttsConfig.piperSampleRate,
+        softMinChars: ttsConfig.softMinChars,
+        softMaxChars: ttsConfig.softMaxChars,
+      });
     }
 
-    const defaultBin = resolve(
-      rootDir,
-      'bin',
-      'piper',
-      'venv',
-      process.platform === 'win32' ? 'Scripts/piper.exe' : 'bin/piper',
-    );
+    const enabled =
+      existsSync(ttsConfig.piperBinPath) &&
+      existsSync(ttsConfig.piperModelPath) &&
+      existsSync(ttsConfig.piperConfigPath);
 
-    const binPath = process.env.PIPER_BIN ? resolve(rootDir, process.env.PIPER_BIN) : defaultBin;
-    const modelPath = process.env.PIPER_MODEL ? resolve(rootDir, process.env.PIPER_MODEL) : '';
-    const configPath = process.env.PIPER_CONFIG
-      ? resolve(rootDir, process.env.PIPER_CONFIG)
-      : modelPath
-        ? `${modelPath}.json`
-        : '';
-
-    const enabled = existsSync(binPath) && existsSync(modelPath) && existsSync(configPath);
-    return new PiperTtsEngine({ enabled, binPath, modelPath, configPath });
+    return new PiperTtsEngine({
+      enabled,
+      binPath: ttsConfig.piperBinPath,
+      modelPath: ttsConfig.piperModelPath,
+      configPath: ttsConfig.piperConfigPath,
+      sampleRate: ttsConfig.piperSampleRate,
+      softMinChars: ttsConfig.softMinChars,
+      softMaxChars: ttsConfig.softMaxChars,
+    });
   }
 
   isAvailable(): boolean {
@@ -202,11 +218,15 @@ export class PiperTtsEngine implements TtsEngine {
     onEnd: (event: TtsAudioEnd) => Promise<void>;
   }): TtsStream {
     if (!this.config.enabled) return new NoopTtsStream();
+
     return new PiperTtsStream(
       {
         binPath: this.config.binPath,
         modelPath: this.config.modelPath,
         configPath: this.config.configPath,
+        sampleRate: this.config.sampleRate,
+        softMinChars: this.config.softMinChars,
+        softMaxChars: this.config.softMaxChars,
       },
       handlers,
     );
