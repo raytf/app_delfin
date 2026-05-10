@@ -8,13 +8,6 @@ cc_binary(
         "protocol/bridge_protocol.cc",
         "conversation_registry/conversation_registry.cc",
     ],
-    hdrs = [
-        "app.h",
-        "engine/litert_engine_factory.h",
-        "turn_runner/turn_runner.h",
-        "protocol/bridge_protocol.h",
-        "conversation_registry/conversation_registry.h",
-    ],
     additional_linker_inputs = select({
         "@platforms//os:windows": [
             "@litert//litert/c:windows_exported_symbols.def",

@@ -1,7 +1,7 @@
 # LiteRT C++ Bridge
 
-This folder is a structured reimplementation of the bridge with the same JSONL
-runtime protocol as `native/litert-cpp-bridge/`.
+This folder is a structured implementation of the bridge with JSONL
+runtime protocol.
 
 ## Layout
 
