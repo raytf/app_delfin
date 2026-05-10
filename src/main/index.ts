@@ -19,6 +19,7 @@ import {
   SidecarSessionClient,
 } from "./sidecar/session/api";
 import { disconnectFromSidecar } from "./sidecar/session/ws";
+import { killBackend, spawnBackend } from "./sidecar/backendProcess";
 import { ConfigService } from "./config/config-service";
 import type { OverlayMode, OverlayState } from "../shared/types";
 
@@ -65,6 +66,7 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Delfin started");
+  spawnBackend();
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
   const isDev = configService.runtime.isDev;
@@ -146,6 +148,7 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   mainWindow = null;
   disconnectFromSidecar();
+  killBackend();
 
   if (process.platform !== "darwin") {
     app.quit();

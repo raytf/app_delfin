@@ -13,7 +13,7 @@ Quick start — see scripts/benchmark/SETUP.md for full setup instructions.
 LiteRT (run from WSL2 with sidecar already running):
     python scripts/benchmark/run.py --backend litert
 
-LiteRT C++ proxy (run with scripts/litert-cpp-proxy.mjs already running):
+LiteRT C++ sidecar (run with npm run dev:sidecar already running):
     python scripts/benchmark/run.py --backend litert-cpp
 
 llamafile (run from Windows PowerShell with server already running):

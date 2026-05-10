@@ -7,19 +7,16 @@
     "dev": "electron-vite dev",
     "dev:sidecar": "tsx watch sidecar/src/index.ts",
     "dev:node-sidecar": "tsx watch sidecar/src/index.ts",
-    "dev:litert-cpp": "node scripts/litert-cpp-proxy.mjs",
     "dev:full": "concurrently --names \"sidecar,electron\" --prefix-colors \"cyan,magenta\" \"npm run dev:node-sidecar\" \"npm run dev\"",
     "dev:mock": "concurrently --names \"mock,electron\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev\"",
-    "build": "electron-vite build && npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=dist/electron/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && npm run build:sidecar",
+    "build": "electron-vite build && npm run build:sidecar",
     "build:sidecar": "tsc -p sidecar/tsconfig.json",
     "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
-    "setup": "npm run init:env && npm run setup:sidecar && npm run download:models && npm run check:env",
-    "setup:sidecar": "node scripts/setup-sidecar.mjs",
+    "setup": "npm run init:env && npm run check:env",
     "setup:litert-cpp": "node scripts/setup-litert-cpp.mjs",
     "build:litert-cpp-bridge": "node scripts/build-litert-cpp-bridge.mjs",
     "init:env": "node scripts/init-env.mjs",
-    "download:models": "node scripts/download-models.mjs",
     "download:ci-bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\download-ci-bridge.ps1",
     "check:env": "node scripts/check-env.mjs",
     "check:vad-runtime": "node scripts/check-vad-runtime.mjs",
@@ -44,12 +41,7 @@
       "dist/electron/**/*",
       "dist/sidecar/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "dist/electron/main/litert-cpp-proxy.mjs",
-        "to": "litert-cpp-proxy.mjs"
-      }
-    ],
+    "extraResources": [],
     "mac": {
       "target": [
         {

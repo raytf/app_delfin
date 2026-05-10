@@ -22,7 +22,6 @@ const featureEnvSchema = z.object({
 });
 
 const inferenceEnvSchema = z.object({
-  INFERENCE_BACKEND: z.enum(["litert", "litert-cpp"]).optional(),
   MODEL_FILE: z.string().trim().optional(),
   LITERT_CPP_BIN: z.string().trim().optional(),
   LITERT_CPP_MODEL: z.string().trim().optional(),

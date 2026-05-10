@@ -657,7 +657,7 @@ function printSummary(litertLmDir, opts) {
   console.log(`  .env               : ${envPath} ${existsSync(envPath) ? '✅' : '⚠️  (missing)'}`)
   if (!opts.dryRun) {
     console.log('\n  Start the C++ backend:')
-    console.log('    npm run dev:litert-cpp\n')
+    console.log('    npm run dev:sidecar\n')
   }
 }
 

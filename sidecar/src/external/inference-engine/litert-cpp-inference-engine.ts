@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { existsSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import readline from "node:readline";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
   CreateConversationInput,
@@ -45,6 +46,8 @@ export class LitertCppInferenceEngine implements InferenceEngine {
   private startupError: Nullable<Error> = null;
 
   private startupTimer: ReturnType<typeof setTimeout>;
+  private readonly bridgeMarkerPath: string;
+  private gracefulShutdown = false;
 
   constructor(
     private readonly config: {
@@ -54,6 +57,7 @@ export class LitertCppInferenceEngine implements InferenceEngine {
     },
   ) {
     this.model = config.modelPath;
+    this.bridgeMarkerPath = join(dirname(config.modelPath), ".bridge-running");
 
     const rootDir =
       config.rootDir ??
@@ -70,6 +74,8 @@ export class LitertCppInferenceEngine implements InferenceEngine {
         .filter(Boolean)
         .join(":");
     }
+    this.clearStaleXnnpackCaches();
+    this.writeBridgeMarker();
 
     this.child = spawn(command, [...args, "--model_path", config.modelPath], {
       cwd: rootDir,
@@ -156,6 +162,7 @@ export class LitertCppInferenceEngine implements InferenceEngine {
   }
 
   async close(): Promise<void> {
+    this.gracefulShutdown = true;
     clearTimeout(this.startupTimer);
     for (const [turnId, handlers] of this.pending.entries()) {
       handlers.onError("LiteRT C++ bridge was closed.");
@@ -216,6 +223,9 @@ export class LitertCppInferenceEngine implements InferenceEngine {
     this.child.once("exit", (code, signal) => {
       clearTimeout(this.startupTimer);
       this.readyState = false;
+      if (this.gracefulShutdown || code === 0) {
+        this.clearBridgeMarker();
+      }
       const message =
         this.startupError?.message ??
         `LiteRT C++ bridge exited unexpectedly (${signal ?? code ?? "unknown"}).`;
@@ -227,6 +237,53 @@ export class LitertCppInferenceEngine implements InferenceEngine {
         this.pending.delete(turnId);
       }
     });
+  }
+
+  private writeBridgeMarker(): void {
+    try {
+      writeFileSync(this.bridgeMarkerPath, "");
+    } catch (error) {
+      process.stderr.write(
+        `[litert-cpp-bridge] failed to write marker: ${(error as Error).message}\n`,
+      );
+    }
+  }
+
+  private clearBridgeMarker(): void {
+    try {
+      if (existsSync(this.bridgeMarkerPath)) {
+        unlinkSync(this.bridgeMarkerPath);
+      }
+    } catch {
+      // best effort only
+    }
+  }
+
+  private clearStaleXnnpackCaches(): void {
+    if (!existsSync(this.bridgeMarkerPath)) {
+      return;
+    }
+    const modelDir = dirname(this.config.modelPath);
+    if (!existsSync(modelDir)) {
+      return;
+    }
+    let removed = 0;
+    for (const entry of readdirSync(modelDir)) {
+      if (!entry.endsWith(".xnnpack_cache")) continue;
+      try {
+        rmSync(join(modelDir, entry), { force: true });
+        removed += 1;
+      } catch (error) {
+        process.stderr.write(
+          `[litert-cpp-bridge] failed to remove stale cache ${entry}: ${(error as Error).message}\n`,
+        );
+      }
+    }
+    if (removed > 0) {
+      process.stdout.write(
+        `[litert-cpp-bridge] cleared ${removed} stale .xnnpack_cache file(s)\n`,
+      );
+    }
   }
 
   private resolveBridgeCommand(binPath: string): {

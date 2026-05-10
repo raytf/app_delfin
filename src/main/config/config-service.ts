@@ -11,17 +11,10 @@ type ElectronFeatureConfig = {
   ttsEnabled: boolean;
 };
 
-type ElectronBackendConfig = {
-  inferenceBackend?: "litert" | "litert-cpp";
-  rawEnv: NodeJS.ProcessEnv;
-};
-
 export class ConfigService {
   private readonly envData: ElectronEnv;
-  private readonly rawEnv: NodeJS.ProcessEnv;
 
   constructor(rawEnv: NodeJS.ProcessEnv = process.env) {
-    this.rawEnv = { ...rawEnv };
     this.envData = envSchema.parse(rawEnv);
   }
 
@@ -38,13 +31,6 @@ export class ConfigService {
     return {
       voiceEnabled: this.envData.VOICE_ENABLED !== "false",
       ttsEnabled: this.envData.TTS_ENABLED === "true",
-    };
-  }
-
-  get backend(): ElectronBackendConfig {
-    return {
-      inferenceBackend: this.envData.INFERENCE_BACKEND,
-      rawEnv: { ...this.rawEnv },
     };
   }
 

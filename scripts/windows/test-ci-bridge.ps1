@@ -376,7 +376,7 @@ try {
   Write-Host '✅ .env updated for the downloaded Windows bridge artifact' -ForegroundColor Green
 
   Remove-Item $logPath, $errorLogPath -Force -ErrorAction SilentlyContinue
-  $proxyProcess = Start-Process -FilePath (Get-NpmCommand) -ArgumentList @('run', 'dev:litert-cpp') -WorkingDirectory $repoRoot -PassThru -RedirectStandardOutput $logPath -RedirectStandardError $errorLogPath
+  $proxyProcess = Start-Process -FilePath (Get-NpmCommand) -ArgumentList @('run', 'dev:sidecar') -WorkingDirectory $repoRoot -PassThru -RedirectStandardOutput $logPath -RedirectStandardError $errorLogPath
   Write-Host "Started LiteRT C++ proxy (PID $($proxyProcess.Id)); waiting for health on port $Port..." -ForegroundColor Cyan
 
   $deadline = (Get-Date).AddSeconds(150)

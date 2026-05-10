@@ -41,12 +41,14 @@ async def handle_turn(
 ) -> None:
     """Stream tokens from the model directly to the WebSocket client."""
     content: list[dict] = []
-    if msg.get("image"):
-        blob = resize_image_blob(msg["image"])
+    image_blob = msg.get("imageBase64") or msg.get("image")
+    if image_blob:
+        blob = resize_image_blob(image_blob)
         content.append({"type": "image", "blob": blob})
 
-    if msg.get("audio"):
-        blob = msg["audio"]
+    audio_blob = msg.get("audioBase64") or msg.get("audio")
+    if audio_blob:
+        blob = audio_blob
         content.append({"type": "audio", "blob": blob})
 
     text = msg.get("text")
@@ -221,6 +223,7 @@ async def stream_tts_sentence_queue(
             await ws.send_json({
                 "type": "audio_start",
                 "sample_rate": tts_pipeline.sample_rate,
+                "sentence_count": 0,
             })
             logger.info("[TTS] +%.3fs audio_start sent", time.monotonic() - turn_t0)
             audio_started = True
@@ -312,8 +315,10 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 else:
                     # Update preset for this connection if supplied
                     nonlocal preset_id, system_prompt
-                    if "preset_id" in msg and msg["preset_id"] in PRESETS:
-                        preset_id = msg["preset_id"]
+                    incoming_preset = msg.get("presetId") or msg.get("preset_id")
+                    if incoming_preset in PRESETS:
+                        preset_id = incoming_preset
+                        system_prompt = PRESETS[preset_id]
                     await msg_queue.put(msg)
         except WebSocketDisconnect:
             await msg_queue.put(None)  # sentinel to unblock the main loop

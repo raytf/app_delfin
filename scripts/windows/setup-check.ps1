@@ -79,7 +79,7 @@ try {
     Invoke-WebRequest -Uri "http://localhost:$port/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop | Out-Null
     Write-Host "✅ Sidecar: running on port $port" -ForegroundColor Green
   } catch {
-    Write-Host "⚠️  Sidecar: not running on port $port (start with: npm run dev:full or npm run dev:litert-cpp)" -ForegroundColor Yellow
+    Write-Host "⚠️  Sidecar: not running on port $port (start with: npm run dev:full or npm run dev:sidecar)" -ForegroundColor Yellow
   }
 
   Write-Host ""

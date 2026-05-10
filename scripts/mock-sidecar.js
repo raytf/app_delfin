@@ -24,7 +24,8 @@ wss.on('connection', (ws) => {
       return
     }
 
-    console.log(`[mock-sidecar] Received: "${msg.text}" (preset: ${msg.preset_id})`)
+    const preset = msg.presetId || msg.preset_id
+    console.log(`[mock-sidecar] Received: "${msg.text}" (preset: ${preset})`)
 
     // Simulate plain streaming response (no structured message)
     const responseText =

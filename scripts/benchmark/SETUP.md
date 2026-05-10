@@ -113,7 +113,7 @@ and appended to `results/summary-<date>.csv`.
 ## Part 3 — LiteRT-LM C++ proxy benchmark (research)
 
 The LiteRT C++ benchmark talks to the same Delfin sidecar WebSocket protocol as
-the Python sidecar. Start `scripts/litert-cpp-proxy.mjs` first; it expects
+the Node sidecar. Start `npm run dev:sidecar` first; it expects
 `LITERT_CPP_BIN` to point at a JSONL/stdio bridge built on top of the LiteRT-LM
 C++ Conversation API. The upstream `litert_lm_main` demo binary is useful for
 build smoke tests but is not a drop-in Delfin bridge by itself.
@@ -121,7 +121,7 @@ build smoke tests but is not a drop-in Delfin bridge by itself.
 ```powershell
 $Env:LITERT_CPP_BIN = "D:\path\to\delfin_litert_bridge.exe"
 $Env:LITERT_CPP_MODEL = "D:\path\to\gemma-4-E2B-it.litertlm"
-npm run dev:litert-cpp
+npm run dev:sidecar
 ```
 
 In another terminal:
