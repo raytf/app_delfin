@@ -2,6 +2,7 @@
 
 > Last updated: 2026-05-12 (Bridge `done` event simplified to `{"type","done","requestId"}` — proxy uses its own `streamedText`; `extractModelText` helper removed from proxy; M2 tool-calling closed as N/A; bridge-minimal design principle documented.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
+> Note: `docs/README.md` uses a separate **lifecycle** scale (🟢 Active · 🚧 In Progress · ✅ Complete · 📦 Archived) for spec documents — these describe Gate 1→5 progress, not implementation completion.
 >
 > Sections below mirror [`docs/README.md`](docs/README.md): one block of "Foundations" (the hackathon MVP, now in maintenance) followed by one block per active feature area under `docs/features/`. The original per-phase tables were collapsed when the project moved off numbered phases on 2026-05-03 — see [`docs/archive/hackathon-mvp.md`](docs/archive/hackathon-mvp.md).
 
