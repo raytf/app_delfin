@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-12 (Bridge `done` event simplified to `{"type","done","requestId"}` — proxy uses its own `streamedText`; `extractModelText` helper removed from proxy; M2 tool-calling closed as N/A; bridge-minimal design principle documented.)
+> Last updated: 2026-05-12 (Bridge `done` event simplified; bridge-minimal design documented; 8 placeholder components confirmed as orphaned stubs not imported anywhere; settingsStore corrected from ⚠️ to ✅ — has real userName+persist implementation used in HomeScreen.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 > Note: `docs/README.md` uses a separate **lifecycle** scale (🟢 Active · 🚧 In Progress · ✅ Complete · 📦 Archived) for spec documents — these describe Gate 1→5 progress, not implementation completion.
 >
@@ -94,17 +94,17 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | `src/renderer/components/HomeScreen.tsx`                         | ✅     | Landing screen with Start Session button and recent-session deletion                                                                                       |
 | `src/renderer/components/ExpandedSessionView.tsx`                | ✅     | Prompt form, status display, auto-scrolling chat box with animated typing indicator                                                                        |
 | `src/renderer/components/MinimizedSessionBar.tsx`                | ✅     | Compact overlay bar with prompt input, expand, and end-session buttons                                                                                     |
-| `src/renderer/components/ChatPanel.tsx`                          | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/ChatInput.tsx`                          | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/CapturePreview.tsx`                     | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/QuickActions.tsx`                       | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/PresetPicker.tsx`                       | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/StatusIndicator.tsx`                    | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/StopButton.tsx`                         | ⚠️     | Placeholder                                                                                                                                                |
-| `src/renderer/components/MinimizeToggle.tsx`                     | ⚠️     | Placeholder                                                                                                                                                |
+| `src/renderer/components/ChatPanel.tsx`                          | ⚠️     | Orphaned stub — not imported anywhere; chat display built into `ExpandedSessionView` + `SessionConversation` |
+| `src/renderer/components/ChatInput.tsx`                          | ⚠️     | Orphaned stub — not imported anywhere; prompt input built into `SessionPromptComposer`     |
+| `src/renderer/components/CapturePreview.tsx`                     | ⚠️     | Orphaned stub — not imported anywhere; capture preview built into `ExpandedSessionView`    |
+| `src/renderer/components/QuickActions.tsx`                       | ⚠️     | Orphaned stub — not imported anywhere; quick actions built into `SessionPromptComposer`    |
+| `src/renderer/components/PresetPicker.tsx`                       | ⚠️     | Orphaned stub — not imported anywhere; preset selection built into `SessionPromptComposer` |
+| `src/renderer/components/StatusIndicator.tsx`                    | ⚠️     | Orphaned stub — not imported anywhere; connection status shown in `ExpandedSessionView`    |
+| `src/renderer/components/StopButton.tsx`                         | ⚠️     | Orphaned stub — not imported anywhere; stop/end controls in `MinimizedSessionBar`          |
+| `src/renderer/components/MinimizeToggle.tsx`                     | ⚠️     | Orphaned stub — not imported anywhere; expand/collapse controls in `MinimizedSessionBar`   |
 | `src/renderer/stores/sessionStore.ts`                            | ✅     | Active conversation state plus persisted session history updates, including deletion                                                                       |
-| `src/renderer/stores/settingsStore.ts`                           | ⚠️     | Placeholder — returns empty object                                                                                                                         |
-| `src/renderer/stores/captureStore.ts`                            | ⚠️     | Placeholder — returns empty object                                                                                                                         |
+| `src/renderer/stores/settingsStore.ts`                           | ✅     | Persists `userName` to localStorage via Zustand `persist`; used in `HomeScreen.tsx` for user greeting |
+| `src/renderer/stores/captureStore.ts`                            | ⚠️     | Placeholder — returns empty object; `autoRefresh` state deferred                           |
 | `src/renderer/types/assets.d.ts`                                 | ✅     | Renderer asset module declarations for strict TypeScript imports                                                                                           |
 
 ---
@@ -297,5 +297,5 @@ All three feature specs are ✅ Complete. The implementation files (`VoiceWavefo
 | `docs/explanations/session-overlay-state-machine.md`       | ✅     | Refreshed 2026-04-22: fixed window dimensions (380×64 / 460×115 / 460×360); corrected resize-in-place vs destroy+recreate; window is always frameless                                    |
 | `docs/explanations/electron-ipc-and-ws-message-flow.md`    | ✅     | Refreshed 2026-04-22: updated beginPromptSubmission/submitSessionPrompt signatures; added recordUserPrompt persistence step; corrected audio_start shape                                 |
 | `docs/explanations/react-zustand-state-flow.md`            | ✅     | Refreshed 2026-04-22: settingsStore is not a stub; added minimizedResponseMessageId + sessionStartTime fields; expanded IPC cleanup channel list                                         |
-| `docs/explanations/voice-audio-pipeline.md`                | ✅     | Refreshed 2026-04-22: screenshot taken in main process not renderer; updated submitSessionPrompt shape; corrected barge-in (mute + threshold + grace); audio_start has no sentence_count |
+| `docs/explanations/voice-audio-pipeline.md`                | ✅     | Refreshed 2026-04-22/2026-05-12: screenshot taken in main process not renderer; updated submitSessionPrompt shape; corrected barge-in (mute + threshold + grace); C++ proxy as primary backend; sentence_count optional in audio_start (Python sidecar omits it; C++ proxy may include it) |
 | `docs/explanations/screen-capture-and-window-filtering.md` | ✅     | No changes needed — consistent with current captureService implementation                                                                                                                |
