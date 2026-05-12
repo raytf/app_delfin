@@ -95,7 +95,7 @@ These are not specs — they are evergreen "how does X work" technical write-ups
 | [`explanations/react-zustand-state-flow.md`](explanations/react-zustand-state-flow.md)                       | How React components read from and write to Zustand stores   |
 | [`explanations/screen-capture-and-window-filtering.md`](explanations/screen-capture-and-window-filtering.md) | How `desktopCapturer` selects the foreground window          |
 | [`explanations/session-overlay-state-machine.md`](explanations/session-overlay-state-machine.md)             | The overlay mode/variant state machine                       |
-| [`explanations/sidecar-flow.md`](explanations/sidecar-flow.md)                                               | Inside the FastAPI sidecar — turn lifecycle and tool calling |
+| [`explanations/sidecar-flow.md`](explanations/sidecar-flow.md)                                               | Inside the inference backend — litert-cpp-proxy + C++ bridge turn lifecycle, Piper TTS, and deprecated Python sidecar reference |
 | [`explanations/voice-audio-pipeline.md`](explanations/voice-audio-pipeline.md)                               | VAD, voice capture, TTS playback, and barge-in               |
 
 ---

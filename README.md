@@ -38,9 +38,9 @@ For the LiteRT-LM C++ path, the C++ source tree and Bazel/MSVC toolchain are nee
 
 Full per-OS setup & validation guides:
 
-- [macOS guide](docs/features/backend/testing-guide-macos.md)
-- [Linux / WSL2 guide](docs/features/backend/testing-guide-linux.md)
-- [Windows guide (WSL2 + native)](docs/features/backend/testing-guide-windows.md)
+- [macOS guide](docs/guides/testing-guide-macos.md)
+- [Linux / WSL2 guide](docs/guides/testing-guide-linux.md)
+- [Windows guide (WSL2 + native)](docs/guides/testing-guide-windows.md)
 
 ### macOS (arm64)
 

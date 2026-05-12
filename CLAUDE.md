@@ -20,9 +20,10 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 
 ## Project-Specific Reminders
 
-- Current app runtime: Electron + React renderer, Electron main IPC bridge. Inference backend is the Python FastAPI sidecar (LiteRT-LM/Gemma 4) on macOS / Linux / WSL2, and the LiteRT-LM C++ bridge via `scripts/litert-cpp-proxy.mjs` on native Windows.
+- Current app runtime: Electron + React renderer, Electron main IPC bridge. **Primary inference backend is the LiteRT-LM C++ bridge** (`scripts/litert-cpp-proxy.mjs` Node proxy + `delfin_litert_bridge` native binary) on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar/server.py`) is **deprecated** and retained for developer reference only.
 - The legacy llamafile / `llama-server` backend is **deprecated** and retained only for benchmark comparison under `scripts/benchmark/`. Do not introduce new app-runtime code paths that depend on it.
-- `npm run dev:litert-cpp` currently bypasses `sidecar/tts.py`; the Node proxy emits no `audio_*` events yet, so TTS falls back to browser Web Speech even if `TTS_BACKEND=kokoro` is set.
+- `npm run dev:litert-cpp` starts the Node proxy with Piper TTS enabled (if configured). The proxy streams `audio_*` events for sentence-level TTS; if Piper is absent or disabled (`LITERT_CPP_TTS_BACKEND=none`), the renderer falls back to Web Speech automatically.
+- `npm run dev:full` starts the TypeScript session sidecar (`sidecar/src/index.ts`) + Electron — **not** the Python sidecar.
 - TypeScript is strict; avoid `any`.
 - Shared IPC/WebSocket types live in `src/shared/types.ts` and schemas in `src/shared/schemas.ts`.
 - CSS should use Tailwind utility classes only; no per-component CSS files.
@@ -30,11 +31,13 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 
 ## Useful Commands
 
-- `npm run dev:full` — Electron + Vite + Python sidecar.
-- `npm run dev:mock` — Electron + mock sidecar.
+- `npm run dev:litert-cpp` — **Primary.** Start the LiteRT-LM C++ backend WebSocket proxy with Piper TTS (run `setup:litert-cpp` first).
+- `npm run dev` — Electron + Vite only (use after `dev:litert-cpp` is running in another terminal).
+- `npm run dev:mock` — Electron + mock sidecar (UI development, no inference needed).
+- `npm run dev:full` — TypeScript session sidecar + Electron (no inference backend).
 - `npm run test` — Vitest suite.
 - `bash scripts/setup-check.sh` or `scripts/setup-check.ps1` — environment check.
-- `python scripts/benchmark/run.py --backend litert ...` — LiteRT benchmark.
-- `python scripts/benchmark/run.py --backend llamafile ...` — llamafile / llama-server benchmark.
+- `python scripts/benchmark/run.py --backend litert-cpp ...` — LiteRT-CPP benchmark.
+- `python scripts/benchmark/run.py --backend llamafile ...` — llamafile benchmark (deprecated comparison only).
 
 Benchmark outputs go under `results/`; commit `results/.gitkeep` only, not generated JSON/CSV files.

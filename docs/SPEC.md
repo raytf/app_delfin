@@ -33,30 +33,33 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
               │
         WebSocket (localhost:8321/ws)
               │
-┌─────────────▼───────────────┐
-│  Python FastAPI Sidecar     │
-│  - LiteRT-LM Engine        │
-│  - Gemma 4 E2B / E4B       │
-│  - Tool calling (structured)│
-│  - Vision (base64 blobs)    │
-│  - TTS pipeline             │
-│  - Interrupt handler        │
-└─────────────────────────────┘
+┌─────────────▼────────────────┐   JSONL/stdio
+│  Node.js WebSocket Proxy     │◄──────────────►  delfin_litert_bridge (C++)
+│  scripts/litert-cpp-proxy.mjs│                  LiteRT-LM engine
+│  - Preset resolution         │                  Gemma 4 E2B / E4B
+│  - Piper TTS pipeline        │                  Vision + audio input
+│  - Session / interrupt mgmt  │                  KV-cache per session
+└──────────────────────────────┘
+
+  [Deprecated] Python FastAPI Sidecar (sidecar/server.py)
+    LiteRT-LM Python API · Kokoro/MLX TTS
+    Still reachable on the same ws://localhost:8321/ws endpoint
+    for developer reference; not used in packaged builds.
 ```
 
 ## Tech Stack
 
-| Layer             | Technology                                                             |
-| ----------------- | ---------------------------------------------------------------------- |
-| Desktop framework | Electron 34+ via electron-vite                                         |
-| Renderer          | React 19, TypeScript 5, Tailwind CSS 4                                 |
-| State management  | Zustand 5                                                              |
-| Validation        | Zod 3                                                                  |
-| Inference engine  | LiteRT-LM ≥ 0.10.1 (Python API)                                        |
-| Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                          |
-| API server        | FastAPI + uvicorn                                                      |
-| TTS               | kokoro-onnx (Linux/WSL2), mlx-audio (macOS), Web Speech API (fallback) |
-| WebSocket         | ws (Node.js client), FastAPI built-in (server)                         |
+| Layer             | Technology                                                                        |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Desktop framework | Electron 41+ via electron-vite                                                    |
+| Renderer          | React 19, TypeScript 6, Tailwind CSS 4                                            |
+| State management  | Zustand 5                                                                         |
+| Validation        | Zod 4                                                                             |
+| Inference engine  | LiteRT-LM C++ bridge (primary — all platforms); Python API (deprecated)           |
+| Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                                     |
+| API server        | Node.js WebSocket proxy (`litert-cpp-proxy.mjs`); FastAPI + uvicorn (deprecated)  |
+| TTS               | Piper TTS via litert-cpp-proxy (primary); Web Speech API (fallback)               |
+| WebSocket         | ws (Node.js client + proxy server)                                                |
 
 ## Active Work Map
 
@@ -172,8 +175,9 @@ All messages between Electron and the sidecar are JSON. These types are the cont
 // Inference request
 interface WsOutboundMessage {
   image?: string; // base64 JPEG
-  text: string; // user question
+  text: string; // user question or VOICE_TURN_TEXT constant
   preset_id: string; // 'lecture-slide' | 'generic-screen'
+  audio?: string; // base64 WAV (voice turns only — 16 kHz, 16-bit mono)
 }
 
 // Interrupt
