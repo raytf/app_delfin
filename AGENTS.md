@@ -62,7 +62,8 @@ docs/
 │   │   ├── litert-cpp-audio-input-spec.md             ← ✅ Complete (Windows, 2026-05-03) — AC1–AC7 validated; macOS/Linux audio pending M4 cross-platform builds.
 │   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. Gate 1 active.
 │   │   ├── litert-cpp-bridge-build-dx-spec.md         ← 🚧 Build DX: vendored prebuilt LiteRT-LM bundle + CI workflow split + optional Bazel remote cache. Gate 1 — awaiting approval.
-│   │   └── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
+│   │   ├── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
+│   │   └── litert-cpp-piper-daemon-spec.md            ← 🚧 Long-lived Piper daemon to eliminate per-turn cold-start; Gate 1 — awaiting approval
 │   ├── distribution/                ← Packaging, installers, code signing, CI/CD
 │   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-06): LiteRT-LM C++ bridge on Windows x64 / macOS arm64 / Linux x64; Python sidecar deprecated for distribution. Gate 1 approved.
 │   │   ├── distribution-backend-migration-spec.md     ← 🚧 Wire `litert-cpp-proxy.mjs` into packaged runtime on all 3 OSes. Revised 2026-05-06. Gate 1 — awaiting approval.

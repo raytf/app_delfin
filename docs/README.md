@@ -47,6 +47,7 @@ Inference engines, native bridges, and benchmarking. Goal: a future-proof, cross
 | [`features/backend/litert-cpp-primary-backend-migration-spec.md`](features/backend/litert-cpp-primary-backend-migration-spec.md) | 🚧 In Progress | Umbrella for promoting the LiteRT C++ bridge to the default inference backend on all OSes. M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. |
 | [`features/backend/litert-cpp-bridge-build-dx-spec.md`](features/backend/litert-cpp-bridge-build-dx-spec.md)               | 🚧 In Progress | Build DX overhaul for the C++ bridge: split CI into a slow vendor-bundle producer + fast bridge compile, ship prebuilt LiteRT-LM bundles per `LITERT_LM_REF`, optional Bazel remote cache. Gate 1 — awaiting approval. |
 | [`features/backend/inference-benchmarking-spec.md`](features/backend/inference-benchmarking-spec.md)                       | ✅ Complete    | Standalone benchmark harness (`scripts/benchmark/`) comparing LiteRT-LM, LiteRT-CPP, and llamafile (TTFT, throughput, memory).                                               |
+| [`features/backend/litert-cpp-piper-daemon-spec.md`](features/backend/litert-cpp-piper-daemon-spec.md)                     | 🚧 In Progress | Long-lived Piper daemon for `litert-cpp-proxy.mjs` — keeps a single Piper subprocess alive across turns to eliminate per-turn Python/model cold-start. Gate 1 — awaiting approval. |
 
 ---
 

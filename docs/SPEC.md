@@ -192,22 +192,15 @@ interface WsInterruptMessage {
 interface WsInboundMessage {
   type:
     | "token"
-    | "structured"
     | "audio_start"
     | "audio_chunk"
     | "audio_end"
     | "done"
     | "error";
   text?: string; // for 'token'
-  data?: {
-    // for 'structured'
-    summary: string;
-    answer: string;
-    key_points: string[];
-  };
   audio?: string; // for 'audio_chunk' — base64 int16 PCM
   sample_rate?: number; // for 'audio_start' — PCM sample rate
-  sentence_count?: number; // for 'audio_start' — optional sentence metadata (proxy may send 0 when unknown)
+  sentence_count?: number; // for 'audio_start' — proxy may send 0 when unknown
   index?: number; // for 'audio_chunk' — sentence index
   tts_time?: number; // for 'audio_end' — synthesis time in seconds
   message?: string; // for 'error'
@@ -239,7 +232,6 @@ This means `done` represents the end of the full turn, not just the end of token
 | Renderer → Main | `session:get-message-image` | `{ imagePath: string }`                                    |
 | Main → Renderer | `frame:captured`            | `CaptureFrame`                                             |
 | Main → Renderer | `sidecar:token`             | `{ text: string }`                                         |
-| Main → Renderer | `sidecar:structured`        | `{ summary, answer, key_points }`                          |
 | Main → Renderer | `sidecar:audio_start`       | `{ sampleRate: number, sentenceCount: number }`            |
 | Main → Renderer | `sidecar:audio_chunk`       | `{ audio: string, index?: number }`                        |
 | Main → Renderer | `sidecar:audio_end`         | `{ ttsTime: number }`                                      |
@@ -247,3 +239,11 @@ This means `done` represents the end of the full turn, not just the end of token
 | Main → Renderer | `overlay:error`             | `{ message: string }`                                      |
 | Main → Renderer | `sidecar:error`             | `{ message: string }`                                      |
 | Main → Renderer | `sidecar:status`            | `{ connected: boolean, backend?: string, model?: string }` |
+| Renderer → Main | `models:get-status`         | —                                                          |
+| Renderer → Main | `models:download`           | `{ assets?: ModelAssetId[] }`                              |
+| Main → Renderer | `models:status`             | `ModelStatus`                                              |
+| Main → Renderer | `models:download-progress`  | `DownloadProgress`                                         |
+| Main → Renderer | `models:download-complete`  | `{ asset: ModelAssetId }`                                  |
+| Main → Renderer | `models:download-error`     | `{ asset?: ModelAssetId, message: string }`                |
+
+`ModelAssetId = 'litert-cpp-model' | 'piper-bin' | 'piper-voice'`. `ModelStatus = { ready: boolean, missing: ModelAssetId[], downloadInProgress: boolean }`. `DownloadProgress = { asset: ModelAssetId, receivedBytes: number, totalBytes?: number, percent?: number }`. These channels drive the first-run asset download flow (`SetupScreen.tsx`, `modelHandlers.ts`).
