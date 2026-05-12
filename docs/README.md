@@ -70,7 +70,8 @@ Persistent on-device knowledge that compounds across sessions.
 
 | File                                                                                                 | Status         | Description                                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`features/memory/memory-wiki-spec.md`](features/memory/memory-wiki-spec.md)                         | 🚧 In Progress | On-device LLM wiki (Karpathy pattern) maintained by Gemma 4 across sessions. Internal sub-phases M0 (E2B viability spike) → M3 (file ingest + runtime tools + lint). Migrated from former Phase 7. |
+| [`features/memory/memory-wiki-spec-v2.md`](features/memory/memory-wiki-spec-v2.md)                   | 🚧 In Progress | On-device knowledge base maintained by Gemma 4 across sessions, rebuilt on the Node.js proxy + C++ bridge stack. Hybrid storage (raw turn chunks + LLM-written summaries), EmbeddingGemma dense retrieval, seamless citations. Sub-phases M0 (spike) → M3 (retrieval into live turns). Gate 1 — awaiting approval. |
+| [`features/memory/memory-wiki-spec.md`](features/memory/memory-wiki-spec.md)                         | 📦 Archived    | v1 spec (Python-sidecar architecture). Superseded 2026-05-12 by `memory-wiki-spec-v2.md`. Retained for historical reference. |
 
 ---
 

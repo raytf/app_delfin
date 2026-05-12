@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-12 (Bridge `done` event simplified; bridge-minimal design documented; 8 placeholder components confirmed as orphaned stubs not imported anywhere; settingsStore corrected from ⚠️ to ✅; bridge version tracking added — `bin/bridge.version` records `LITERT_LM_REF`, setup auto-redownloads on stale installs.)
+> Last updated: 2026-05-12 (Bridge `done` event simplified; bridge-minimal design documented; 8 placeholder components confirmed as orphaned stubs; settingsStore corrected to ✅; bridge version tracking added; memory-wiki-spec rewritten as v2 on Node + bridge stack — Gate 1 awaiting approval, original v1 spec archived.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 > Note: `docs/README.md` uses a separate **lifecycle** scale (🟢 Active · 🚧 In Progress · ✅ Complete · 📦 Archived) for spec documents — these describe Gate 1→5 progress, not implementation completion.
 >
@@ -269,15 +269,19 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 
 ## Memory (`docs/features/memory/`)
 
-> Spec: [`memory-wiki-spec.md`](docs/features/memory/memory-wiki-spec.md). Sub-phases M0 → M3.
+> Active spec: [`memory-wiki-spec-v2.md`](docs/features/memory/memory-wiki-spec-v2.md) (Gate 1 — awaiting approval). V1 = stored Delfin sessions only; V2 = files/links; V3 = multimodal + retrieval polish.
+> Archived spec: [`memory-wiki-spec.md`](docs/features/memory/memory-wiki-spec.md) (Python-sidecar architecture, superseded 2026-05-12).
 
 | Item                                                              | Status | Notes                                                                                  |
 | ----------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------- |
-| M0 — E2B viability spike (`sidecar/memory/spike.py`)              | ❌     | Spec written; standalone script not yet implemented                                    |
-| M1 — Read-only wiki infrastructure (`store.py`, `index.py`, REST) | ❌     | Not started                                                                             |
-| M2 — Session ingest pipeline                                      | ❌     | Not started                                                                             |
-| M3 — File ingest + runtime tools + lint                           | ❌     | Not started                                                                             |
-| Renderer `MemoryView` reader                                      | ❌     | Not started                                                                             |
+| V1 M0 — Viability spike (`scripts/memory/spike.mjs`)              | ❌     | Spec drafted in v2; gated on Gate 1 approval before any code                            |
+| V1 M1 — Foundations (`scripts/memory/{store,index,embed,memoryRouter}.mjs`) | ❌ | Not started                                                                             |
+| V1 M2 — Auto-ingest pipeline (`scripts/memory/{ingest,ingestLlm}.mjs`, session-end hook) | ❌ | Not started; depends on bridge `decodingConstraint` extension          |
+| V1 M3 — Retrieval into live turns (`scripts/memory/retrieve.mjs`, "Sources used" strip) | ❌ | Not started                                                                       |
+| Bridge `decodingConstraint` JSONL field                            | ❌     | One-time extension to `delfin_litert_bridge.cc`; uses LiteRT-LM 0.11 `EnableConstrainedDecoding` + `LlGuidanceConfig` |
+| EmbeddingGemma ONNX provisioning via `assetManager.ts`             | ❌     | New asset class alongside `litert-cpp-model` / `piper-bin` / `piper-voice`              |
+| V2 — File/link uploads + MemoryView overlay                       | ❌     | Specced as future scope in v2 spec; separate Gate 1 cycle                                |
+| V3 — Multimodal + hybrid retrieval + reranker                      | ❌     | Specced as future scope in v2 spec; separate Gate 1 cycle                                |
 
 ---
 
