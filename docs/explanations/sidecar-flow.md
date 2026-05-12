@@ -114,14 +114,28 @@ The renderer falls back to Web Speech after `done` when no `audio_start` has arr
 
 ---
 
-## Why the Proxy Exists
+## Why the Proxy Exists — and the Bridge-Minimal Principle
 
-The C++ bridge speaks a simple JSONL protocol over stdio — it knows nothing about WebSockets, TTS, or application presets. The Node.js proxy is the glue layer that:
+The C++ bridge is a thin inference kernel. It knows nothing about WebSockets, TTS, application presets, or the Delfin protocol — and that is intentional. Building the bridge requires Bazel + the full LiteRT-LM dependency tree, which is slow. Keeping it minimal means rebuilds are rare: only when a new LiteRT-LM API call, hardware backend, or content modality is actually needed.
 
-- Translates between the Electron WebSocket protocol and the bridge's stdio protocol
-- Orchestrates TTS in parallel with token streaming
-- Enforces one-active-request-per-session to protect KV-cache integrity
-- Manages session lifecycle (`reset_session` on disconnect)
+**Bridge JSONL contract (stable):**
+
+| Direction | Message types |
+|-----------|---------------|
+| In | `generate`, `interrupt`, `reset_session` |
+| Out | `ready`, `token`, `done`, `error` |
+
+The `done` event carries only `{"type":"done","requestId":"..."}` — no text echo. The proxy accumulates `streamedText` from token events and uses that for everything downstream.
+
+**Everything else lives in the proxy.** A new Delfin feature belongs in `litert-cpp-proxy.mjs` by default:
+
+- WebSocket server + HTTP health endpoint
+- Preset resolution (`litert-cpp-presets.mjs`)
+- Message assembly (packing image / audio / text into the bridge's JSONL format)
+- TTS (Piper subprocess, PCM streaming, sentence splitting, `audio_start/chunk/end` protocol)
+- Per-connection session state and one-request-per-session enforcement
+- Bridge subprocess lifecycle (spawn, ready timeout, library path injection, graceful shutdown)
+- Future: conversation history trimming, Markdown stripping, latency tracking, memory extraction
 
 ---
 

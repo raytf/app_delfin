@@ -8,7 +8,7 @@
 
 | Field          | Value                                                                                                                                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | Gate 1 — spec active. M1 ✅ (audio input, 2026-05-03), M3 ✅ (Piper TTS off-Python, 2026-05-03). **2026-05-06: distribution specs updated to unified C++ for all 3 packaged OSes.** Remaining: M2 (tool-calling parity) and M4 (macOS/Linux runtime validation). M5 default-flip and M6 deprecation not yet started. |
+| **Status**     | Gate 1 — spec active. M1 ✅ (audio input, 2026-05-03), M2 ✅ N/A (tool-calling — never needed, 2026-05-12), M3 ✅ (Piper TTS off-Python, 2026-05-03). **2026-05-06: distribution specs updated to unified C++ for all 3 packaged OSes.** Remaining blocker: M4 (macOS/Linux runtime validation). M5a (Windows default flip) unblocked. M5b/c and M6 not yet started. |
 | **Created**    | 2026-05-03                                                                                                                                                                                                             |
 | **Revised**    | **2026-05-06** (distribution specs adopt unified C++ backend; Python sidecar retained as developer fallback only — see §Documentation impact)                                                                          |
 | **Depends on** | `litert-cpp-bridge-runtime-validation-spec.md` (Phase 1 ✅, Phases 3–4 pending), `litert-cpp-audio-input-spec.md` (AC1–AC7 ✅ Windows), `litert-cpp-proxy-piper-tts-spec.md` (✅ complete, archived)                  |
@@ -61,13 +61,16 @@ The migration is broken into six tracks. Tracks M1–M4 are technical prerequisi
 
 All AC1–AC7 in `litert-cpp-audio-input-spec.md` validated on Windows (commit `d3d3ddf`). Voice turns (mic → renderer → proxy → bridge) stream correctly; `audio_executor_unavailable` and `audio_decode_failed` error paths covered by tests; KV-cache reuse confirmed on two-turn voice sessions. macOS/Linux audio validation is pending the cross-platform builds in M4.
 
-### M2 — Tool-calling parity
+### M2 — Tool-calling parity ✅ N/A (2026-05-12)
 
-| File                                               | Change                                                                                                                                                                                                                                                                |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `native/litert-cpp-bridge/delfin_litert_bridge.cc` | Add support for the `respond_to_user` tool definition in the system prompt's `JsonPreface`, mirroring the schema used by the Python sidecar (`sidecar/server.py`; walkthrough in [`docs/explanations/sidecar-flow.md`](../../explanations/sidecar-flow.md)). Stream tool-call JSON as it arrives.                                                     |
-| `scripts/litert-cpp-proxy.mjs`                     | Forward tool-call JSON unchanged to the WebSocket; remove (or downgrade to last-resort) the existing text-extraction fallback once tool-calling is reliable.                                                                                                          |
-| `native/litert-cpp-bridge/delfin_litert_bridge.test.mjs` | Add a tool-call assertion: a fixed prompt produces a `respond_to_user` call with the expected schema fields.                                                                                                                                                     |
+The `respond_to_user` structured-output requirement was written when the Python sidecar still existed and used a tool-calling pattern to produce `Summary` / `Key points` fields. That pattern was never adopted in the C++ path and never consumed by the renderer:
+
+- The renderer (`SessionConversation.tsx`) renders `ChatMessage.content` as plain `whitespace-pre-wrap` text — no structured field parsing.
+- `src/shared/types.ts` has no tool-call message types in `WsInboundType`.
+- The presets (`litert-cpp-presets.mjs`) instruct the model to produce plain prose; no tool definitions are present.
+- The Python sidecar has been removed from the repository.
+
+The C++ path already produces equivalent output to the Python sidecar via plain token streaming. Under the bridge-minimal design principle (see `docs/explanations/sidecar-flow.md` §Why the Proxy Exists), any future structured-output parsing would belong in the proxy anyway, not the bridge. **M2 is removed from the blocking set for M5a.**
 
 ### M3 — TTS strategy resolution (off-Python) ✅ Complete (2026-05-03)
 
@@ -158,7 +161,7 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 | # | Criterion |
 | - | --------- |
 | AM1 | `litert-cpp-audio-input-spec.md` AC1–AC7 pass on Windows. | ✅ 2026-05-03 |
-| AM2 | M2 (tool calling) — a fixed multi-turn prompt produces structured `respond_to_user` output identical in shape to the Python sidecar's output for the same prompt. | ⏸ Pending |
+| AM2 | ~~M2 (tool calling)~~ — **N/A** (2026-05-12). Renderer never consumed structured output; plain token streaming is the accepted contract. | ✅ N/A |
 | AM3 | M3 — a TTS-off-Python decision has landed (separate spec) and is implemented for at least Windows; macOS/Linux can lag behind only if M5 is staged accordingly. | ✅ 2026-05-03 (Piper via Node proxy) |
 | AM4 | M4 — `litert-cpp-bridge-runtime-validation-spec.md` AC1–AC8 pass on Windows x64, macOS arm64+x64 (universal or twin binaries), and Linux x64. |
 | AM5 | M5a — `INFERENCE_BACKEND` default flipped to `litert-cpp` on Windows; `npm run dev:full` on a clean Windows checkout starts the C++ bridge with no extra flags and a voice + vision turn succeeds. |

@@ -45,22 +45,6 @@ function resolveBridgeCommand(binPath) {
   return { command: binPath, args: [] };
 }
 
-function extractModelText(doneEvent, fallbackText = "") {
-  if (typeof doneEvent?.text === "string" && doneEvent.text.trim()) {
-    return doneEvent.text;
-  }
-
-  const content = doneEvent?.message?.content;
-  if (Array.isArray(content)) {
-    const text = content
-      .filter((item) => item?.type === "text")
-      .map((item) => item.text ?? "")
-      .join("");
-    if (text.trim()) return text;
-  }
-
-  return fallbackText;
-}
 
 function normalizeTtsSegment(text) {
   return text.replace(/\s+/g, " ").trim();
@@ -765,9 +749,9 @@ export async function startLitertCppProxy(options = {}) {
                 softMaxChars: streamingTtsSoftMaxChars,
               });
             },
-            async onDone(doneEvent) {
+            async onDone() {
               try {
-                const finalText = extractModelText(doneEvent, streamedText);
+                const finalText = streamedText;
 
                 if (streamingTtsRun) {
                   enqueueStreamingTtsText("", { flush: true });

@@ -281,11 +281,15 @@ Benchmark output is written to `results/`. Commit `results/.gitkeep` only; do **
 ```
 Electron Renderer (React/Zustand)
         ↕ contextBridge (IPC)
-Electron Main (Node.js)  ←→  WebSocket ws://localhost:8321/ws  ←→  Python FastAPI sidecar
-                                                                      └── LiteRT-LM + Gemma 4 E2B
+Electron Main (Node.js)  ←→  WebSocket ws://localhost:8321/ws  ←→  litert-cpp-proxy.mjs (Node.js)
+                                                                      ├── delfin_litert_bridge[.exe] (C++)
+                                                                      │     └── LiteRT-LM + Gemma 4 E2B
+                                                                      └── piper (TTS subprocess)
 ```
 
 All inference I/O flows over **WebSocket** (not HTTP POST / SSE). See `docs/SPEC.md` §WebSocket Message Protocol for the full JSON contract.
+
+The C++ bridge is a thin inference kernel (JSONL over stdio). The Node.js proxy is the application layer: WebSocket server, preset resolution, TTS orchestration, health endpoint, session state. See `docs/explanations/sidecar-flow.md` §Why the Proxy Exists for the full boundary map.
 
 ---
 
@@ -312,6 +316,7 @@ These are confirmed facts — do not revisit without good reason:
 | **One-shot LiteRT C++ setup**     | `npm run setup:litert-cpp` is artifact-first on supported hosts: existing `bin/` bridge files → matching CI workflow artifact via `gh` (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, `delfin-litert-bridge-linux-x64`) → model + Piper runtime/voice + `.env`. It must not silently fall back to Bazel/source builds. Backend developers use `--source-build` (or compatibility `--bridge-source build`) to clone/use LiteRT-LM and build locally. Use `--wsl2-instructions` to print the older WSL2 guidance. macOS is arm64 only (Intel Macs out of scope).                   |
 | **LITERT_LM_REF pin**             | The constant `LITERT_LM_REF` in `scripts/setup-litert-cpp.mjs` (default `v0.10.2`, overridable via the env var of the same name) is the single source of truth for which upstream LiteRT-LM commit both the local setup script and the CI matrix workflow clone and build against. Update it there; the CI workflow reads it at runtime via `node -e`. **Always bump `MODEL_REVISION` in the same commit** — the two constants must stay in sync so the downloaded model's ABI matches the bridge. Bump procedure: (1) update `LITERT_LM_REF` to the new tag; (2) find the matching HuggingFace commit SHA from `https://huggingface.co/api/models/<MODEL_REPO>/commits/main`; (3) set `MODEL_REVISION` to that SHA; (4) push — CI rebuilds the bridge artifacts automatically. |
 | **CI bridge binary workflow**     | `.github/workflows/build-litert-cpp-bridge.yml` owns native bridge binary production for all three platforms (windows-x64, macos-arm64, linux-x64). It triggers on push/PR to `main`, on `release.published`, and on `workflow_dispatch`. It uploads per-platform archives as workflow artifacts and attaches them to GitHub Releases. The full `dist.yml` electron-builder packaging matrix (Track DC1) should consume these artifacts rather than rebuilding the bridge inline. |
+| **Bridge-minimal design**         | The C++ bridge (`native/litert-cpp-bridge/delfin_litert_bridge.cc`) is a thin inference kernel — it loads the model, streams tokens, manages per-session KV-cache, and handles interrupts. Nothing else. All application-layer concerns (WebSocket server, TTS, preset resolution, health endpoint, per-connection session state, error formatting) live in `scripts/litert-cpp-proxy.mjs`. **A new Delfin feature belongs in the proxy by default.** It only touches the bridge if it requires a new LiteRT-LM API call, a new hardware backend, or a new content modality. This keeps bridge rebuilds rare (Bazel + full LiteRT-LM dep tree is slow). The bridge's `done` event carries only `{"type":"done","requestId":"..."}` — no text echo; the proxy uses its own accumulated `streamedText` for TTS and downstream use. See `docs/explanations/sidecar-flow.md` §Why the Proxy Exists for the full boundary map. |
 
 ---
 

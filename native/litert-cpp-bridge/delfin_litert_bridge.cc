@@ -210,8 +210,7 @@ absl::Status Generate(Engine& engine, const ordered_json& request) {
                    AcquireConversation(engine, session_id, system_prompt));
   RegisterActiveRequest(request_id, session_id, conversation);
 
-  std::string full_text;
-  auto callback = [request_id, &full_text](absl::StatusOr<Message> message) {
+  auto callback = [request_id](absl::StatusOr<Message> message) {
     if (!message.ok()) {
       WriteEvent({{"type", "error"}, {"requestId", request_id},
                   {"message", std::string(message.status().message())}});
@@ -219,7 +218,6 @@ absl::Status Generate(Engine& engine, const ordered_json& request) {
     }
     const std::string token = ExtractText(*message);
     if (token.empty()) return;
-    full_text += token;
     WriteEvent({{"type", "token"}, {"requestId", request_id}, {"text", token}});
   };
 
@@ -235,14 +233,7 @@ absl::Status Generate(Engine& engine, const ordered_json& request) {
   ReleaseConversation(session_id);
   if (!status.ok()) return status;
 
-  ordered_json assistant_message = {
-      {"role", "model"},
-      {"content", ordered_json::array({{{"type", "text"}, {"text", full_text}}})},
-  };
-  WriteEvent({{"type", "done"},
-              {"requestId", request_id},
-              {"text", full_text},
-              {"message", assistant_message}});
+  WriteEvent({{"type", "done"}, {"requestId", request_id}});
   return absl::OkStatus();
 }
 

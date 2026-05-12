@@ -137,14 +137,7 @@ function createDelayedDoneBridge() {
     },
     releaseDone() {
       activeHandlers.onToken('Second sentence')
-      activeHandlers.onDone({
-        requestId: 'delayed-request',
-        text: 'First sentence. Second sentence',
-        message: {
-          role: 'model',
-          content: [{ type: 'text', text: 'First sentence. Second sentence' }],
-        },
-      })
+      activeHandlers.onDone({ requestId: 'delayed-request' })
     },
     interrupt() {},
     resetSession() {},
@@ -165,11 +158,7 @@ function createLongStreamingBridge() {
       handlers.onToken(longChunk)
     },
     releaseDone() {
-      activeHandlers.onDone({
-        requestId: 'long-streaming-request',
-        text: longChunk,
-        message: { role: 'model', content: [{ type: 'text', text: longChunk }] },
-      })
+      activeHandlers.onDone({ requestId: 'long-streaming-request' })
     },
     interrupt() {},
     resetSession() {},
@@ -210,11 +199,7 @@ function createMockBridge() {
       const response = `turn ${turnCount}: ${prompt}${includesImage ? ' [image]' : ''}`
       handlers.onToken(response.slice(0, 6))
       handlers.onToken(response.slice(6))
-      handlers.onDone({
-        requestId: request.requestId,
-        text: response,
-        message: { role: 'model', content: [{ type: 'text', text: response }] },
-      })
+      handlers.onDone({ requestId: request.requestId })
     },
     interrupt(requestId) {
       const handlers = inFlight.get(requestId)
