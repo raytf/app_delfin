@@ -14,6 +14,15 @@ downloads the matching CI workflow artifact via `gh`, then provisions the model,
 Piper runtime/voice, and `.env`. Local Bazel source builds are reserved for
 backend developers via `--source-build` or `--bridge-source build`.
 
+The setup script writes the active `LITERT_LM_REF` to `bin/bridge.version`
+(gitignored) after every successful download or source build. Subsequent runs
+read this file and auto-redownload when the recorded ref doesn't match the
+pinned `LITERT_LM_REF` in `scripts/setup-litert-cpp.mjs` — so bumping
+`LITERT_LM_REF` and re-running `npm run setup:litert-cpp` is enough to pick up
+a new bridge. See [`README.md` §Updating the LiteRT-LM bridge](../../README.md#updating-the-litert-lm-bridge) for the
+full upgrade procedure (LiteRT-LM tag + HuggingFace model SHA must be bumped
+together).
+
 | Host                 | Default `npm run setup:litert-cpp`                                  | Source build opt-in                              |
 | -------------------- | ------------------------------------------------------------------- | ------------------------------------------------ |
 | Linux x64            | Existing bin → `delfin-litert-bridge-linux-x64` artifact → env + Piper + model | `--source-build`                                 |

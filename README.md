@@ -14,8 +14,8 @@ The same five commands work on macOS (arm64), Linux (x64), and Windows (x64):
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
-npm run setup:litert-cpp   # downloads bridge artifact, Gemma 4 model, bootstraps Piper TTS
-npm run dev                # full stack: C++ backend proxy + Electron/Vite
+npm run setup   # seeds .env, downloads bridge artifact + Gemma 4 model, bootstraps Piper TTS, validates .env
+npm run dev     # full stack: C++ backend proxy + Electron/Vite
 ```
 
 **Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (dev mode: repo-local Piper TTS), [GitHub CLI](https://cli.github.com/) + `gh auth login`. Windows has extra optional requirements for source builds — see [Windows setup](#windows-x64) below.
@@ -47,7 +47,7 @@ brew install gh && gh auth login        # macOS
 ```bash
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin && npm install
-npm run setup:litert-cpp
+npm run setup
 npm run dev
 ```
 
@@ -64,11 +64,11 @@ Full guides: [macOS](docs/guides/testing-guide-macos.md) · [Linux / WSL2](docs/
 ```powershell
 git clone https://github.com/raytf/app_delfin.git
 cd app_delfin && npm install
-npm run setup:litert-cpp
+npm run setup
 npm run dev
 ```
 
-`setup:litert-cpp` downloads the prebuilt CI bridge artifact, provisions the Gemma 4 model, bootstraps the repo-local Piper TTS runtime, and writes `.env`. It does **not** silently fall back to source builds.
+`npm run setup` chains three steps: seed `.env` from `.env.example`, run `setup:litert-cpp` (download the prebuilt CI bridge artifact, provision the Gemma 4 model, bootstrap the repo-local Piper TTS runtime, patch `.env`), and validate `.env` keys. It does **not** silently fall back to source builds.
 
 If you already have an artifact from `.github/workflows/build-litert-cpp-bridge.yml`:
 
@@ -104,7 +104,7 @@ npm run setup:litert-cpp -- --source-build
 - **`SET INCLUDE=msvc_not_found`** — install **Build Tools for Visual Studio 2022 → Desktop development with C++**; confirm `where.exe cl` works.
 - **Bazel can't find Visual Studio** — `$env:BAZEL_VS = "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"`.
 
-> **TTS in dev mode:** `npm run dev:backend` uses Piper TTS. `setup:litert-cpp` bootstraps the repo-local Piper runtime and writes `PIPER_*` env vars automatically. If Piper fails, the renderer falls back to Web Speech.
+> **TTS in dev mode:** `npm run dev:backend` uses Piper TTS. `npm run setup` bootstraps the repo-local Piper runtime and writes `PIPER_*` env vars automatically. If Piper fails, the renderer falls back to Web Speech.
 >
 > **Packaged installer:** Piper is not bundled. On first run the app downloads the Gemma 4 model, a standalone Piper binary (~30 MB), and the default voice (~65 MB) — Python not required on the user's machine.
 
@@ -116,7 +116,7 @@ Full guide: [Windows](docs/guides/testing-guide-windows.md)
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | **Primary.** Full stack — C++ backend proxy + Electron/Vite; run `setup:litert-cpp` first |
+| `npm run dev` | **Primary.** Full stack — C++ backend proxy + Electron/Vite; run `npm run setup` first |
 | `npm run dev:frontend` | Electron + Vite only — use when `dev:backend` is already running in another terminal |
 | `npm run dev:backend` | C++ backend proxy only (port 8321) |
 | `npm run dev:mock` | Mock sidecar + Electron (UI dev, no inference needed) |
@@ -148,7 +148,7 @@ npm run check:windows              # full env check (Windows)
 | `VOICE_ENABLED` | `true` | Disable always-on VAD for text-only prompts |
 | `LITERT_CPP_TTS_BACKEND` | `piper` | Set to `none` to disable Piper and use Web Speech fallback |
 | `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
-| `PIPER_MODEL` | _(set by setup)_ | Managed by `npm run voice:use`; written automatically by `setup:litert-cpp` |
+| `PIPER_MODEL` | _(set by setup)_ | Managed by `npm run voice:use`; written automatically by `npm run setup` |
 | `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | _Deprecated Python path._ Replace `localhost` with WSL2 IP if needed |
 
 See [`.env.example`](.env.example) for the full reference.
@@ -161,7 +161,8 @@ See [`.env.example`](.env.example) for the full reference.
 
 | Script | Description |
 | --- | --- |
-| `npm run setup:litert-cpp` | **Recommended.** One-shot setup: CI bridge artifact, model, Piper runtime + voice, `.env` |
+| `npm run setup` | **Recommended.** Fresh-clone one-shot: seeds `.env`, runs `setup:litert-cpp`, then validates `.env` |
+| `npm run setup:litert-cpp` | Underlying step — CI bridge artifact, model, Piper runtime + voice, patches `.env`. Accepts `--source-build` and other flags |
 | `npm run check:windows` | Windows environment + bridge/model sanity check |
 | `npm run download:bridge:windows` | Download the latest Windows bridge artifact into `bin/` |
 | `npm run test:bridge:windows` | Verify bridge, wait for `/health`, optionally benchmark |
@@ -193,6 +194,23 @@ npm run dist    # platform installer: NSIS (Windows) / DMG (macOS) / AppImage (L
 ```
 
 **Versioning:** `npm version patch|minor|major` updates `package.json`, commits `vX.Y.Z`, and creates a git tag. Never manually edit the version field. Current version: **v0.0.1**.
+
+### Updating the LiteRT-LM bridge
+
+Two constants in `scripts/setup-litert-cpp.mjs` pin the bridge build and matching model weights and **must always be bumped together**:
+
+```js
+export const LITERT_LM_REF  = '...'   // upstream LiteRT-LM tag (e.g. v0.11.0)
+export const MODEL_REVISION = '...'   // HuggingFace commit SHA for the model
+```
+
+Procedure when LiteRT-LM ships a new release:
+
+1. Pick the new tag from [LiteRT-LM releases](https://github.com/google-ai-edge/LiteRT-LM/releases).
+2. Get the matching model SHA from `https://huggingface.co/api/models/<MODEL_REPO>/commits/main` (the first entry's `id`).
+3. Edit both constants in `scripts/setup-litert-cpp.mjs` and commit.
+4. Push — `.github/workflows/build-litert-cpp-bridge.yml` rebuilds the bridge artifacts for all three platforms automatically.
+5. After CI succeeds, run `npm run setup:litert-cpp` locally. It compares the pinned `LITERT_LM_REF` against `bin/bridge.version` and re-downloads the bridge when they differ — no extra flags needed.
 
 ---
 
