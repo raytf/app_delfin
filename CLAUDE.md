@@ -31,7 +31,8 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 
 ## Useful Commands
 
-- `npm run dev` — **Primary.** Full stack: C++ backend proxy + Electron/Vite (run `setup:litert-cpp` first).
+- `npm run setup` — **First-time setup.** Chains `setup:env` + `setup:litert-cpp` + `check:env` (seeds `.env`, downloads bridge + model + Piper, validates `.env`).
+- `npm run dev` — **Primary.** Full stack: C++ backend proxy + Electron/Vite (run `npm run setup` first).
 - `npm run dev:backend` — Backend proxy only (run in one terminal while `dev:frontend` runs in another).
 - `npm run dev:frontend` — Electron + Vite only (use when backend is already running).
 - `npm run dev:mock` — Mock backend + Electron/Vite (UI development, no model needed).

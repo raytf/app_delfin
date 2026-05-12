@@ -64,17 +64,19 @@ If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` an
 ```powershell
 cd C:\path\to\app_delfin
 npm install
-npm run setup:litert-cpp
+npm run setup
 npm run check:windows
 ```
 
 What this does:
 
-1. Creates/updates `.env` with `LITERT_CPP_*` and Piper values
-2. Reuses existing `bin\` bridge files, otherwise downloads `delfin-litert-bridge-windows-x64` from the latest successful GitHub Actions workflow run via `gh`
-3. Ensures the `.litertlm` model exists under `models\`
-4. Bootstraps the repo-local Piper runtime under `bin\piper\venv\`
-5. Downloads/activates the default Piper voice and writes `LITERT_CPP_TTS_BACKEND=piper`
+1. Seeds `.env` from `.env.example` if it does not already exist (`setup:env`)
+2. Creates/updates `.env` with `LITERT_CPP_*` and Piper values (`setup:litert-cpp`)
+3. Reuses existing `bin\` bridge files, otherwise downloads `delfin-litert-bridge-windows-x64` from the latest successful GitHub Actions workflow run via `gh`
+4. Ensures the `.litertlm` model exists under `models\`
+5. Bootstraps the repo-local Piper runtime under `bin\piper\venv\`
+6. Downloads/activates the default Piper voice and writes `LITERT_CPP_TTS_BACKEND=piper`
+7. Validates that `.env` has every key from `.env.example` (`check:env`)
 
 ### Optional bridge-only smoke test
 
@@ -93,7 +95,7 @@ What this does:
 4. Downloads the `.litertlm` model if missing, defaulting to Python `huggingface_hub` and falling back to Windows BITS, then `curl.exe` retry/resume with a temporary `.part` file
 5. Starts `npm run dev:backend` and waits for `http://localhost:8321/health`
 
-> This CI-artifact smoke test still validates the bridge + model path only. Prefer `npm run setup:litert-cpp` for a fresh clone because it also provisions Piper runtime/voice and `.env` TTS values.
+> This CI-artifact smoke test still validates the bridge + model path only. Prefer `npm run setup` for a fresh clone because it also seeds `.env`, provisions Piper runtime/voice, and validates env keys at the end.
 
 ### Run the full benchmark
 
