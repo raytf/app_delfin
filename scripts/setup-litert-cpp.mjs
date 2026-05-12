@@ -18,11 +18,11 @@ export const LITERT_LM_REPO = 'https://github.com/google-ai-edge/LiteRT-LM.git'
 // Pinned upstream LiteRT-LM ref. Both this script and the CI workflow at
 // .github/workflows/build-litert-cpp-bridge.yml consume this constant — keep
 // them in sync. Bump only after revalidating the bridge against the new ref.
-export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.10.2'
+export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.11.0'
 // Pinned HuggingFace model revision that matches LITERT_LM_REF above.
 // Must be bumped together with LITERT_LM_REF whenever the bridge is updated.
 // Use the exact commit SHA from huggingface.co/<repo>/commits/main.
-export const MODEL_REVISION = process.env.MODEL_REVISION ?? '84b6978eff6e4eea02825bc2ee4ea48579f13109'
+export const MODEL_REVISION = process.env.MODEL_REVISION ?? '6e5c4f1e395deb959c494953478fa5cec4b8008f'
 const DEFAULT_PIPER_VOICE = 'en/en_US/hfc_female/medium'
 const HF_BASE = 'https://huggingface.co'
 const BRIDGE_WORKFLOW_NAME = 'build-litert-cpp-bridge.yml'
