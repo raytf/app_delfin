@@ -176,13 +176,13 @@ The message sequence over WebSocket looks like:
 | Backend | When used | Notes |
 |---|---|---|
 | `kokoro` | `TTS_BACKEND=kokoro` | kokoro-onnx, Linux/WSL2, best quality |
-| `piper` | `LITERT_CPP_TTS_BACKEND=piper` on `npm run dev:litert-cpp` | Native CLI TTS for the LiteRT C++ proxy; emits the same `audio_*` protocol without Python |
+| `piper` | `LITERT_CPP_TTS_BACKEND=piper` on `npm run dev:backend` | Native CLI TTS for the LiteRT C++ proxy; emits the same `audio_*` protocol without Python |
 | `mlx` | `TTS_BACKEND=mlx` | macOS only, not yet implemented |
 | `web-speech` | default or any other value | Browser's built-in `speechSynthesis`, zero setup |
 
 When `TTS_BACKEND=web-speech`, the sidecar sends **no audio messages at all** — the renderer's `App.tsx` detects that no `audio_start` arrived within 500 ms of `done` and falls back to `speechSynthesis.speak(responseText)`.
 
-On `npm run dev:litert-cpp`, `TTS_BACKEND=kokoro` in `sidecar/tts.py` still has no effect because that path bypasses Python entirely. Instead, the LiteRT C++ Node proxy can now emit `audio_start` / `audio_chunk` / `audio_end` itself when `LITERT_CPP_TTS_BACKEND=piper` is set.
+On `npm run dev:backend`, `TTS_BACKEND=kokoro` in `sidecar/tts.py` still has no effect because that path bypasses Python entirely. Instead, the LiteRT C++ Node proxy can now emit `audio_start` / `audio_chunk` / `audio_end` itself when `LITERT_CPP_TTS_BACKEND=piper` is set.
 
 The proxy starts Piper on the first non-empty token, buffers streamed text, and flushes completed sentences into Piper stdin as soon as punctuation closes them. That lets `audio_start` arrive before bridge `done` while later tokens are still streaming. If Piper is disabled, misconfigured, interrupted, or fails mid-turn, the renderer fallback still covers the response.
 

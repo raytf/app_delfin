@@ -8,7 +8,7 @@
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
-Current app runtime is Electron → Python FastAPI sidecar → LiteRT-LM on macOS / Linux / WSL2, and Electron → Node WebSocket proxy → LiteRT-LM C++ bridge on native Windows. The legacy llamafile / `llama-server` path is **deprecated** — kept only for benchmark comparison (`scripts/benchmark/`); it is no longer the desktop distribution target.
+Current app runtime is **Electron → Node WebSocket proxy (`litert-cpp-proxy.mjs`) → LiteRT-LM C++ bridge (`delfin_litert_bridge`)** on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar/server.py`) is **deprecated** — retained for developer reference only. The legacy llamafile / `llama-server` path is also **deprecated** — kept only for benchmark comparison under `scripts/benchmark/`.
 
 ---
 
@@ -233,43 +233,44 @@ git push && git push --tags
 ## Development Commands
 
 ```bash
-# Start EVERYTHING from one command (Electron + Vite dev server + Python sidecar)
-npm run dev:full
-
-# Electron + Vite only (when running sidecar separately or using mock)
+# Start EVERYTHING — full stack (C++ backend proxy + Electron/Vite) — primary workflow
 npm run dev
 
-# Mock sidecar (use while building Electron UI — no model needed)
-node scripts/mock-sidecar.js
+# Frontend only (when running backend in a separate terminal)
+npm run dev:frontend
 
-# Real sidecar only (from repo root, inside a venv)
-cd sidecar
-pip install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8321
+# Backend only — LiteRT C++ proxy with Piper TTS (run `setup:litert-cpp` first)
+npm run dev:backend
+
+# Mock backend + frontend (UI development, no model needed)
+npm run dev:mock
+
+# Deprecated: TypeScript session sidecar + frontend (no inference backend)
+npm run dev:sidecar
+
+# First-time setup
+npm run setup                  # full setup: env + litert-cpp + env check
+npm run setup:litert-cpp       # download prebuilt bridge artifacts + model + Piper voice
 
 # Environment check
-bash scripts/setup-check.sh
+bash scripts/setup-check.sh    # macOS / Linux
+npm run check:windows          # Windows (PowerShell)
 
-# Piper voice management for the LiteRT C++ proxy path
+# Piper voice management
 npm run voice:list
 npm run voice:use -- en_US-hfc_female-medium
 npm run voice:install -- en/en_US/hfc_female/medium --use
 
-# Test WebSocket sidecar manually (install wscat: npm i -g wscat)
+# Test WebSocket backend manually (install wscat: npm i -g wscat)
 wscat -c ws://localhost:8321/ws
 # then type: {"text": "Summarize this slide", "preset_id": "lecture-slide"}
 
-# Benchmark dependencies (install into the active Python env for the shell you are using)
-pip install -r scripts/benchmark/requirements.txt
+# Benchmarks (install deps first: pip install -r scripts/benchmark/requirements.txt)
+npm run benchmark:litert-cpp   # LiteRT C++ bridge benchmark (5 runs)
+npm run benchmark:litert-py    # Python LiteRT sidecar benchmark — deprecated comparison only
 
-# Benchmark current LiteRT sidecar (run from WSL2 with npm run dev:sidecar already running)
-python scripts/benchmark/run.py --backend litert --sidecar-pid <PID> --runs 5 --scenarios s1,s2,s3
-
-# Benchmark llamafile / llama-server (run natively with server already listening on localhost:8080)
-python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --runs 5 --scenarios s1,s2,s3
-
-# Optional: let the benchmark launch llama-server / llamafile and track its PID automatically
-python scripts/benchmark/run.py --backend llamafile --llamafile-bin <path-to-llama-server> --llamafile-model <path-to-gemma-gguf>
+# Build C++ bridge from source (slow — requires Bazel + LiteRT-LM dep tree)
+npm run bridge:build
 ```
 
 Benchmark output is written to `results/`. Commit `results/.gitkeep` only; do **not** commit generated benchmark JSON/CSV files.
@@ -308,7 +309,7 @@ These are confirmed facts — do not revisit without good reason:
 | **Voice turn text field**         | For pure voice turns, `text` is set to the constant `VOICE_TURN_TEXT = "Please respond to what the user just asked."`. Empty string is not used because `sessionHandlers.ts` has an empty-text guard; the fixed instruction also gives the model explicit context about its role.                                                                                                                                                                       |
 | **Audio backend**                 | `audio_backend` in `litert_lm.Engine` is always CPU (GPU audio not supported). Exposed as `LITERT_AUDIO_BACKEND` env var but defaults to `CPU`. The engine already has `audio_backend=litert_lm.Backend.CPU` in both GPU-attempt and CPU-fallback paths.                                                                                                                                                                                                |
 | **Web Speech fallback cleanup**  | When the renderer falls back to `SpeechSynthesisUtterance`, it must clear the assistant-speaking state on `onend` / `onerror`. If that state is left `true`, the VAD auto-mute effect never releases and later voice turns appear dead even though `vad-web` is still mounted.                                                                                                                                                                         |
-| **LiteRT C++ proxy TTS**         | `npm run dev:litert-cpp` bypasses `sidecar/tts.py`. Off-Python speech on that path is controlled by `LITERT_CPP_TTS_BACKEND`; with `piper`, `scripts/litert-cpp-proxy.mjs` emits `audio_start` / `audio_chunk` / `audio_end` before final `done` as completed sentences arrive, plus conservative long partial chunks controlled by `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS`. **Dev mode:** `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime under `bin/piper/venv`, repairs missing companion packages such as `pathvalidate`, installs/activates the default Piper voice, and writes the required `PIPER_*` values automatically. **Packaged app:** Piper is NOT bundled in the installer. `assetManager.ts` downloads a standalone Piper binary (GitHub releases, platform-specific zip/tar.gz) and the voice ONNX+config from HuggingFace into `app.getPath('userData')` on first run — Python is not required on the end-user's machine. `backendProcess.ts` resolves `PIPER_BIN`/`PIPER_MODEL`/`PIPER_CONFIG` from `userData` paths. If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes and the renderer falls back to browser Web Speech.                                                                 |
+| **LiteRT C++ proxy TTS**         | `npm run dev:backend` bypasses `sidecar/tts.py`. Off-Python speech on that path is controlled by `LITERT_CPP_TTS_BACKEND`; with `piper`, `scripts/litert-cpp-proxy.mjs` emits `audio_start` / `audio_chunk` / `audio_end` before final `done` as completed sentences arrive, plus conservative long partial chunks controlled by `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS`. **Dev mode:** `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime under `bin/piper/venv`, repairs missing companion packages such as `pathvalidate`, installs/activates the default Piper voice, and writes the required `PIPER_*` values automatically. **Packaged app:** Piper is NOT bundled in the installer. `assetManager.ts` downloads a standalone Piper binary (GitHub releases, platform-specific zip/tar.gz) and the voice ONNX+config from HuggingFace into `app.getPath('userData')` on first run — Python is not required on the end-user's machine. `backendProcess.ts` resolves `PIPER_BIN`/`PIPER_MODEL`/`PIPER_CONFIG` from `userData` paths. If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes and the renderer falls back to browser Web Speech.                                                                 |
 | **Barge-in protection**           | Two-layer: (1) raise Silero `positiveSpeechThreshold` from 0.50 → 0.92 while AI is speaking; (2) 800 ms grace period after `audio_start` during which `onSpeechStart` is silently ignored, preventing the mic from picking up the AI's own voice.                                                                                                                                                                                                       |
 | **WSL2 espeak-ng fix**            | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`.                                                                                                                                                                                                      |
 | **Benchmark harness**             | `scripts/benchmark/run.py` compares the current LiteRT sidecar over WebSocket with llamafile/`llama-server` over OpenAI-compatible REST streaming. It measures TTFT, throughput, total turn time, approximate/exact output token count, peak RSS when a PID is available, and system metadata.                                                                                                                                                          |

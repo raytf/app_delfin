@@ -30,14 +30,14 @@ The 2026-05-03 decision (LiteRT-LM C++ on Windows, frozen Python sidecar on macO
 | Inference — packaged Windows x64 | LiteRT-LM C++ bridge | **Unchanged** — LiteRT-LM C++ bridge |
 | Inference — packaged macOS arm64 | LiteRT-LM frozen Python sidecar (PyInstaller) | **LiteRT-LM C++ bridge** (`delfin_litert_bridge` + `.dylib`) + `litert-cpp-proxy.mjs` |
 | Inference — packaged Linux x64 | LiteRT-LM frozen Python sidecar (PyInstaller) | **LiteRT-LM C++ bridge** (`delfin_litert_bridge` + `.so`) + `litert-cpp-proxy.mjs` |
-| Inference — dev mode | LiteRT-LM via `.venv` (macOS/Linux/WSL2); `dev:litert-cpp` (Windows) | **Unchanged** — Python sidecar kept as a developer fallback (`npm run dev:sidecar`) |
+| Inference — dev mode | LiteRT-LM via `.venv` (macOS/Linux/WSL2); `dev:backend` (Windows) | **Unchanged** — Python sidecar kept as a developer fallback (`npm run dev:sidecar`) |
 | TTS — packaged | Windows: Piper; macOS/Linux: Kokoro (frozen) | **Piper on all three packaged platforms** via `LITERT_CPP_TTS_BACKEND=piper` |
 | PyInstaller frozen sidecar | Required for macOS/Linux packaging | **Removed from MVP scope** — DP3 track is superseded |
 | `INFERENCE_BACKEND` build-time value | `litert-cpp` (Windows), `litert` (macOS/Linux) | **`litert-cpp` for all three packaged builds** |
 
 | User type | Packaged app backend | Dev workflow backend |
 | ------------------- | -------------------- | ---------------------- |
-| Windows x64 | LiteRT-LM C++ bridge | Python sidecar or `dev:litert-cpp` |
+| Windows x64 | LiteRT-LM C++ bridge | Python sidecar or `dev:backend` |
 | macOS arm64 | LiteRT-LM C++ bridge | Python sidecar (`npm run dev:sidecar`) |
 | Linux x64 | LiteRT-LM C++ bridge | Python sidecar (`npm run dev:sidecar`) |
 
@@ -72,7 +72,7 @@ The 2026-05-01 hybrid decision (llamafile on Windows, frozen Python sidecar on m
 | --------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Inference — packaged Windows      | llamafile binary (first-run download)          | **LiteRT-LM C++ bridge** (`delfin_litert_bridge.exe` bundled as app resource) + `scripts/litert-cpp-proxy.mjs` |
 | Inference — packaged macOS/Linux  | LiteRT-LM via frozen Python sidecar            | Unchanged (frozen Python sidecar). Native LiteRT-LM C++ on macOS/Linux is planned but blocked on a non-Windows build of the bridge. |
-| Inference — dev mode              | LiteRT-LM via `.venv` (or `dev:llamafile`)     | LiteRT-LM via `.venv` on macOS/Linux/WSL2; `npm run dev:litert-cpp` on native Windows                        |
+| Inference — dev mode              | LiteRT-LM via `.venv` (or `dev:llamafile`)     | LiteRT-LM via `.venv` on macOS/Linux/WSL2; `npm run dev:backend` on native Windows                           |
 | Windows TTS                       | Investigate Piper or freeze kokoro-onnx        | **Piper** via `LITERT_CPP_TTS_BACKEND=piper`; the LiteRT C++ proxy emits sentence-level `audio_*` messages   |
 | Backend selector                  | `INFERENCE_BACKEND=litert\|llamafile`          | `INFERENCE_BACKEND=litert\|litert-cpp`. The `llamafile` value is removed from the Electron runtime path.     |
 | `setup:llamafile` / `dev:llamafile` / `benchmark:llamafile` npm scripts | Active app fallback | **Removed.** llamafile remains comparable only via the standalone benchmark harness (`scripts/benchmark/`). |
@@ -210,7 +210,7 @@ Allow students on the supported desktop platforms to download, install, and run 
 - **macOS / Linux:** LiteRT-LM via a frozen Python sidecar (PyInstaller) — bundled with the installer as a platform binary. Faster, Gemma-4-optimised, stateful KV cache.
 
 **Dev mode (all platforms, running from source):**
-- `npm run dev:full` uses LiteRT-LM via `sidecar/.venv` on macOS/Linux/WSL2
+- `npm run dev` uses LiteRT-LM via `sidecar/.venv` on macOS/Linux/WSL2
 - `npm run dev:llamafile` uses llamafile on native Windows (no WSL2)
 - `INFERENCE_BACKEND` env var controls which path is active
 
@@ -232,7 +232,7 @@ Assets for packaged distribution are downloaded to `app.getPath('userData')` on 
 - Keep the existing WebSocket-based renderer ↔ main IPC protocol **unchanged** — `wsClient.ts`, `sidecarBridge.ts`, and all renderer code require zero modifications
 - On the llamafile path, a lightweight Node.js WebSocket proxy (`scripts/llamafile-proxy.mjs`) sits between Electron and llamafile: it speaks the identical sidecar WebSocket protocol inbound and translates to llamafile's REST/SSE API outbound
 - Electron main selects which process to spawn via `INFERENCE_BACKEND=litert|llamafile`; both paths present the same WebSocket interface on the same port
-- In development mode, `npm run dev:full` continues to use the Python sidecar via `.venv` (no change for contributors)
+- In development mode, `npm run dev` continues to use the Python sidecar via `.venv` (no change for contributors)
 - CPU-only for MVP; CUDA (Windows/Linux) and Metal (macOS) are stretch goals once CPU path is stable
 
 ## Execution track map
@@ -335,7 +335,7 @@ Sub-spec checklists are definitive. This high-level checklist covers the end-to-
 - [ ] TTS backend decision is made (Piper or frozen kokoro-onnx)
 - [ ] Packaged Electron app can launch llama-server and complete one real prompt on all three target platforms
 - [ ] First-run download flow works on a clean machine with no existing model cache
-- [ ] `npm run dev:full` still works for contributors using the original Python sidecar
+- [ ] `npm run dev` still works for contributors using the original Python sidecar
 - [ ] Windows x64 NSIS installer installs and launches successfully
 - [ ] macOS x64 and arm64 DMG installs and launches successfully
 - [ ] Linux x64 AppImage launches successfully

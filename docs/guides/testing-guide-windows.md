@@ -65,7 +65,7 @@ If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` an
 cd C:\path\to\app_delfin
 npm install
 npm run setup:litert-cpp
-npm run setup-check:windows
+npm run check:windows
 ```
 
 What this does:
@@ -81,8 +81,8 @@ What this does:
 ```powershell
 cd C:\path\to\app_delfin
 npm install
-npm run download:ci-bridge:windows
-npm run test:ci-bridge:windows -- --SkipBenchmark
+npm run download:bridge:windows
+npm run test:bridge:windows -- --SkipBenchmark
 ```
 
 What this does:
@@ -91,29 +91,29 @@ What this does:
 2. Stages `delfin_litert_bridge.exe` and `libGemmaModelConstraintProvider.dll` into `bin\`
 3. Ensures `.env` points `LITERT_CPP_BIN` and `LITERT_CPP_MODEL` at the expected paths
 4. Downloads the `.litertlm` model if missing, defaulting to Python `huggingface_hub` and falling back to Windows BITS, then `curl.exe` retry/resume with a temporary `.part` file
-5. Starts `npm run dev:litert-cpp` and waits for `http://localhost:8321/health`
+5. Starts `npm run dev:backend` and waits for `http://localhost:8321/health`
 
 > This CI-artifact smoke test still validates the bridge + model path only. Prefer `npm run setup:litert-cpp` for a fresh clone because it also provisions Piper runtime/voice and `.env` TTS values.
 
 ### Run the full benchmark
 
 ```powershell
-npm run test:ci-bridge:windows
+npm run test:bridge:windows
 ```
 
 ### Test a specific workflow run
 
 ```powershell
-npm run download:ci-bridge:windows -- --RunId <RUN_ID>
+npm run download:bridge:windows -- --RunId <RUN_ID>
 # or
-npm run test:ci-bridge:windows -- --DownloadArtifact --RunId <RUN_ID>
+npm run test:bridge:windows -- --DownloadArtifact --RunId <RUN_ID>
 ```
 
 ### Full app validation
 
 ```powershell
 # Terminal 1 — native LiteRT C++ proxy
-npm run dev:litert-cpp
+npm run dev:backend
 
 # Terminal 2 — Electron app
 npm run dev
@@ -174,7 +174,7 @@ After that, validate with the same two-terminal app check used above:
 
 ```powershell
 # Terminal 1
-npm run dev:litert-cpp
+npm run dev:backend
 
 # Terminal 2
 npm run dev

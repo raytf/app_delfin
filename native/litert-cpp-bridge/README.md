@@ -63,7 +63,7 @@ running on Windows:
 ```text
 WSL2 (Ubuntu)                            Windows host
 ─────────────────                        ─────────────────
-$ npm run dev:litert-cpp                 $ npm run dev
+$ npm run dev:backend                 $ npm run dev
   ├─ scripts/litert-cpp-proxy.mjs          ├─ Electron main
   ├─ bin/delfin_litert_bridge              ├─ Vite renderer
   └─ Piper TTS (Linux)                     └─ ws://localhost:8321 ──┐
@@ -136,7 +136,7 @@ Common failures:
   Studio 2022 17.14 / MSVC 14.44 (text, vision, and audio scenarios).
 - App-facing runtime copy needs both `delfin_litert_bridge.exe` and
   `libGemmaModelConstraintProvider.dll` next to it in `bin/`.
-- Text, vision, and audio turns stream successfully through `npm run dev:litert-cpp`.
+- Text, vision, and audio turns stream successfully through `npm run dev:backend`.
 - Vision + per-session KV-cache reuse + native audio input are all **built and
   runtime-validated** in the current `bin/delfin_litert_bridge.exe`:
   - `--vision_backend` flag, `JsonPreface`, `g_sessions` map, `reset_session`
@@ -212,7 +212,7 @@ pre-existing LiteRT-LM checkout.
    copies the resulting executable into Delfin's gitignored `bin/` directory:
 
    ```bash
-   npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path>/LiteRT-LM
+   npm run bridge:build -- -- --litert-lm-dir <path>/LiteRT-LM
    ```
 
    The helper applies `--config=windows` automatically when invoked from
@@ -247,7 +247,7 @@ Use `node scripts/build-litert-cpp-bridge.mjs --plan --litert-lm-dir <path>` for
    LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
    ```
 
-Then run `npm run dev:litert-cpp` and `npm run benchmark:litert-cpp`.
+Then run `npm run dev:backend` and `npm run benchmark:litert-cpp`.
 
 After rebuilding from post-`570d2fa` source, run the full benchmark sweep
 (including S2 vision) to validate the vision + KV-cache changes:

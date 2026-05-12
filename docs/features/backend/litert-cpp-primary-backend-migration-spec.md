@@ -74,7 +74,7 @@ The C++ path already produces equivalent output to the Python sidecar via plain 
 
 ### M3 — TTS strategy resolution (off-Python) ✅ Complete (2026-05-03)
 
-**Chosen strategy: Piper, managed by the Node.js proxy.** `scripts/litert-cpp-proxy.mjs` now emits sentence-level `audio_start` / `audio_chunk` / `audio_end` events before the final `done` when `LITERT_CPP_TTS_BACKEND=piper`. Voice management is handled by `scripts/piper-voice.mjs` (`npm run voice:list`, `voice:install`, `voice:use`). The Python sidecar is **no longer needed for TTS on the `dev:litert-cpp` path**.
+**Chosen strategy: Piper, managed by the Node.js proxy.** `scripts/litert-cpp-proxy.mjs` now emits sentence-level `audio_start` / `audio_chunk` / `audio_end` events before the final `done` when `LITERT_CPP_TTS_BACKEND=piper`. Voice management is handled by `scripts/piper-voice.mjs` (`npm run voice:list`, `voice:install`, `voice:use`). The Python sidecar is **no longer needed for TTS on the `dev:backend` path**.
 
 If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes the turn and the renderer falls back to browser Web Speech — same graceful degradation the Python sidecar path uses.
 
@@ -103,7 +103,7 @@ The distribution specs (updated 2026-05-06) already treat the Python sidecar as 
 | `.env.example`                    | Phase 5a (after M1 + M2 + Windows M4 complete): change `INFERENCE_BACKEND` default to `litert-cpp` for Windows. macOS/Linux developers continue to default to `litert` (Python) until their M4 + M3 are complete.                                            |
 | `.env.example`                    | Phase 5b (after macOS M4 + M3 complete): flip macOS default to `litert-cpp`.                                                                                                                                                                                  |
 | `.env.example`                    | Phase 5c (after Linux M4 complete): flip Linux default to `litert-cpp`.                                                                                                                                                                                       |
-| `package.json`                    | Make `npm run dev:full` resolve to `npm run dev:litert-cpp` on platforms where the default has flipped. Keep `npm run dev:sidecar` as an explicit opt-in for the deprecated Python path.                                                                     |
+| `package.json`                    | Make `npm run dev` resolve to `npm run dev:backend` on platforms where the default has flipped. Keep `npm run dev:sidecar` as an explicit opt-in for the deprecated Python path.                                                                              |
 | `scripts/setup-check.sh` / `.ps1` | Add a check for `bin/delfin_litert_bridge[.exe]` and `LITERT_CPP_MODEL`. Print a deprecation note when only the Python sidecar setup is detected on a platform whose default has flipped.                                                                    |
 | `scripts/setup-sidecar.mjs`       | No functional change; add a console note that the Python sidecar is now a fallback path on platforms whose default has flipped.                                                                                                                              |
 | `scripts/init-env.mjs`            | When generating a fresh `.env`, write the platform-appropriate `INFERENCE_BACKEND` default per the phase above.                                                                                                                                              |
@@ -112,7 +112,7 @@ The distribution specs (updated 2026-05-06) already treat the Python sidecar as 
 
 | Action                                                                                                                                                                                |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `README.md` — mark `npm run dev:sidecar` and `dev:full → sidecar` as deprecated developer fallbacks; recommend `dev:litert-cpp` (or the new `dev:full` once it points at the bridge). |
+| `README.md` — mark `npm run dev:sidecar` and `dev → sidecar` as deprecated developer fallbacks; recommend `dev:backend` (or the new `dev` once it points at the bridge). |
 | `docs/explanations/sidecar-flow.md` — add a deprecation banner; keep the explanation intact so the fallback path remains documented.                                                  |
 | `docs/SPEC.md` — update §Architecture to make the C++ bridge the primary path and the Python sidecar a fallback footnote on each platform whose default has flipped.                 |
 | Removing the `sidecar/` tree and `setup:sidecar` is **not** in scope here; tracked as a follow-up cleanup spec after one full release cycle on the new default.                       |
@@ -148,9 +148,9 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 
 | Script                            | Behaviour change                                                                                                                                                                                |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev:full`                | Resolves to `dev:litert-cpp` on platforms whose default has flipped; resolves to `dev:sidecar` (Python) elsewhere. Implementation can be a thin Node wrapper that checks `process.platform`.   |
+| `npm run dev`                     | Resolves to `dev:backend` on platforms whose default has flipped; resolves to `dev:sidecar` (Python) elsewhere. Implementation can be a thin Node wrapper that checks `process.platform`.      |
 | `npm run dev:sidecar`             | Unchanged. Documented as deprecated fallback once the corresponding platform's default has flipped.                                                                                             |
-| `npm run dev:litert-cpp`          | Unchanged.                                                                                                                                                                                       |
+| `npm run dev:backend`             | Unchanged.                                                                                                                                                                                       |
 | `npm run setup`                   | Unchanged composition; behaviour change is in `setup-check` and `init-env` only.                                                                                                                |
 | `npm run setup:litert-cpp`        | **New** — one-shot C++ backend bring-up: clones LiteRT-LM, builds the bridge via Bazel, initialises `.env`, upserts `LITERT_CPP_BIN` / `LITERT_CPP_MODEL`, installs the default Piper voice, and copies or downloads the `.litertlm` model. All steps are idempotent. See `scripts/setup-litert-cpp.mjs`. |
 
@@ -164,7 +164,7 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 | AM2 | ~~M2 (tool calling)~~ — **N/A** (2026-05-12). Renderer never consumed structured output; plain token streaming is the accepted contract. | ✅ N/A |
 | AM3 | M3 — a TTS-off-Python decision has landed (separate spec) and is implemented for at least Windows; macOS/Linux can lag behind only if M5 is staged accordingly. | ✅ 2026-05-03 (Piper via Node proxy) |
 | AM4 | M4 — `litert-cpp-bridge-runtime-validation-spec.md` AC1–AC8 pass on Windows x64, macOS arm64+x64 (universal or twin binaries), and Linux x64. |
-| AM5 | M5a — `INFERENCE_BACKEND` default flipped to `litert-cpp` on Windows; `npm run dev:full` on a clean Windows checkout starts the C++ bridge with no extra flags and a voice + vision turn succeeds. |
+| AM5 | M5a — `INFERENCE_BACKEND` default flipped to `litert-cpp` on Windows; `npm run dev` on a clean Windows checkout starts the C++ bridge with no extra flags and a voice + vision turn succeeds. |
 | AM6 | M5b/c — same for macOS and Linux respectively, on a clean checkout, with no Python sidecar process running. |
 | AM7 | `setup-check` reports the correct status for both backends and prints the deprecation note where appropriate. |
 | AM8 | The Python sidecar still launches successfully via `npm run dev:sidecar` on every platform whose default has flipped (fallback regression check). |
@@ -179,14 +179,14 @@ No changes. Both contracts (`docs/SPEC.md` §WebSocket Message Protocol, §IPC c
 | ~~Audio-input parity slips (M1 takes longer than expected) and blocks the entire migration.~~ | **Resolved** | M1 complete on Windows (2026-05-03). macOS/Linux audio validation follows M4 cross-platform builds. |
 | ~~TTS-off-Python (M3) is harder than expected and macOS/Linux defaults are stuck on `litert` (Python) indefinitely.~~ | **Resolved** | Piper via Node proxy ships on all platforms. M3 complete 2026-05-03. |
 | Tool-calling parity (M2) reveals a C++-side limitation that the JSON-extraction fallback cannot mask cleanly.                                                                     | Medium     | Spike M2 first inside Phase 1; if blocked, escalate before any default-flip work.                                                                                                                          |
-| Developers without the bridge binary find `npm run dev:full` broken after the default flip on their platform.                                                                     | Medium-High | `setup-check` must explicitly call out the missing binary with the exact command to obtain it; until the fetch-binary mechanism (deferred decision) lands, that command is `npm run build:litert-cpp-bridge` with toolchain prerequisites linked. |
+| Developers without the bridge binary find `npm run dev` broken after the default flip on their platform.                                                                          | Medium-High | `setup-check` must explicitly call out the missing binary with the exact command to obtain it; until the fetch-binary mechanism (deferred decision) lands, that command is `npm run bridge:build` with toolchain prerequisites linked. |
 | macOS universal binary doubles CI time beyond budget.                                                                                                                              | Low-Medium | Fall back to two arch-specific binaries if needed (M4 already mentions this).                                                                                                                              |
 | Removing/downgrading the proxy's text-extraction fallback in M2 hides a model-output drift later.                                                                                  | Low        | Keep the fallback as a last-resort path with a console warning; only fully remove it after one release cycle of clean tool calls.                                                                          |
 
 ### Open questions
 
 1. **Prebuilt bridge binary distribution** — deliberately not decided here. A decision-task should be added to `distribution-cicd-spec.md` to evaluate (a) GitHub Releases asset per platform, (b) workflow artifacts, (c) both, and to produce a `npm run fetch:litert-cpp-bridge` script. This task must be resolved before AM5/AM6 can be considered "developer-friendly" (without it, devs still need the C++ toolchain to flip).
-2. **Error UX when `litert-cpp` default is set but the binary is missing** — should `npm run dev:full` auto-fall-back to `dev:sidecar` with a warning, or fail loudly? Lean toward fail-loudly with a clear remediation message; confirm during M5a implementation.
+2. **Error UX when `litert-cpp` default is set but the binary is missing** — should `npm run dev` auto-fall-back to `dev:sidecar` with a warning, or fail loudly? Lean toward fail-loudly with a clear remediation message; confirm during M5a implementation.
 
 ---
 

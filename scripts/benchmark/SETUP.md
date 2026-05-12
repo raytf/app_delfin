@@ -48,7 +48,7 @@ Note the PID — pass it via `--sidecar-pid` for RSS memory tracking.
 The npm script uses the sidecar virtualenv automatically — no separate `pip install` needed:
 
 ```bash
-npm run benchmark:litert
+npm run benchmark:litert-py
 ```
 
 To pass extra flags (e.g. `--sidecar-pid` for RSS tracking):
@@ -121,7 +121,7 @@ build smoke tests but is not a drop-in Delfin bridge by itself.
 ```powershell
 $Env:LITERT_CPP_BIN = "D:\path\to\delfin_litert_bridge.exe"
 $Env:LITERT_CPP_MODEL = "D:\path\to\gemma-4-E2B-it.litertlm"
-npm run dev:litert-cpp
+npm run dev:backend
 ```
 
 In another terminal:
@@ -205,7 +205,7 @@ same CSV file for easy side-by-side comparison in Excel or Google Sheets.
 
 | Command                        | Equivalent                             |
 | ------------------------------ | -------------------------------------- |
-| `npm run benchmark:litert`     | `run.py --backend litert --runs 5`     |
+| `npm run benchmark:litert-py`  | `run.py --backend litert --runs 5`     |
 | `npm run benchmark:litert-cpp` | `run.py --backend litert-cpp --runs 5` |
 | llamafile (manual)             | See Part 2 — run `run.py --backend llamafile --llamafile-host localhost:8080 ...` directly |
 

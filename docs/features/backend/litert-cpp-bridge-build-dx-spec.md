@@ -25,7 +25,7 @@ Cut the cold-build cycle for `delfin_litert_bridge` from ~40 min (CI) / ~25–35
 `native/litert-cpp-bridge/delfin_litert_bridge.cc` is ~320 lines. The dominant cost in every build is compiling and linking the upstream `google-ai-edge/LiteRT-LM` Bazel tree (abseil, TFLite runtime, sentencepiece, protobuf, GPU/audio executors, model constraint provider). Both existing entry points pay this cost in full:
 
 1. **CI artifacts** (`.github/workflows/build-litert-cpp-bridge.yml`) — ~40 min per platform (`windows-2022`, `macos-15`, `ubuntu-24.04`).
-2. **Local build** (`npm run setup:litert-cpp` / `npm run build:litert-cpp-bridge`) — requires Bazelisk + JDK + Python + MSVC/clang + Git LFS; cold build ~25–35 min, plus dependency install on first run.
+2. **Local build** (`npm run setup:litert-cpp` / `npm run bridge:build`) — requires Bazelisk + JDK + Python + MSVC/clang + Git LFS; cold build ~25–35 min, plus dependency install on first run.
 
 `LITERT_LM_REF` changes infrequently. The canonical pattern for "small wrapper around a giant upstream SDK" (Apache Arrow language wheels, Rerun's `rerun_c`, Lightly Edge SDK, vendored CUDA bindings) is to **publish prebuilt vendor binaries once per upstream version** and let downstream wrappers compile against those. This spec applies that pattern.
 
@@ -126,7 +126,7 @@ Listed for visibility only; not implemented in this spec:
 
 - `npm run setup:litert-cpp` — defaults to vendor path (behaviour change).
 - `npm run setup:litert-cpp -- --from-source` — current Bazel behaviour.
-- `npm run build:litert-cpp-bridge:vendor` — explicit vendor build for CI / scripted use.
+- `npm run bridge:build:vendor` — explicit vendor build for CI / scripted use.
 
 ---
 

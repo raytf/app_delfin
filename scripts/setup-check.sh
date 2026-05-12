@@ -105,7 +105,7 @@ SIDECAR_PORT=${SIDECAR_PORT:-8321}
 if curl -s "http://localhost:$SIDECAR_PORT/health" > /dev/null 2>&1; then
   echo "✅ Sidecar: running on port $SIDECAR_PORT"
 else
-  echo "⚠️  Sidecar: not running on port $SIDECAR_PORT (start with: npm run dev:full)"
+  echo "⚠️  Sidecar: not running on port $SIDECAR_PORT (start with: npm run dev)"
 fi
 
 echo ""

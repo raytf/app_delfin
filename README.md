@@ -59,7 +59,7 @@ Then start the app in two terminals:
 
 ```bash
 # Terminal 1 — LiteRT-LM C++ backend WebSocket proxy
-npm run dev:litert-cpp
+npm run dev:backend
 ```
 
 ```bash
@@ -88,7 +88,7 @@ Then start the app in two terminals:
 
 ```bash
 # Terminal 1 — LiteRT-LM C++ backend WebSocket proxy
-npm run dev:litert-cpp
+npm run dev:backend
 ```
 
 ```bash
@@ -205,11 +205,11 @@ If you already have a successful CI run for `.github/workflows/build-litert-cpp-
 
 ```powershell
 gh auth login
-npm run download:ci-bridge:windows
-npm run test:ci-bridge:windows -- --SkipBenchmark
+npm run download:bridge:windows
+npm run test:bridge:windows -- --SkipBenchmark
 ```
 
-`npm run test:ci-bridge:windows` can also download a specific run for you via `-- --DownloadArtifact --RunId <id>`. Omit `-- --SkipBenchmark` to run the full `benchmark:litert-cpp` sweep after the `/health` smoke check.
+`npm run test:bridge:windows` can also download a specific run for you via `-- --DownloadArtifact --RunId <id>`. Omit `-- --SkipBenchmark` to run the full `benchmark:litert-cpp` sweep after the `/health` smoke check.
 
 #### Troubleshooting Windows setup
 
@@ -221,7 +221,7 @@ Then start the app in **two PowerShell terminals**:
 
 ```powershell
 # Terminal 1 — start the LiteRT-LM C++ backend WebSocket proxy on port 8321
-npm run dev:litert-cpp
+npm run dev:backend
 ```
 
 ```powershell
@@ -229,7 +229,7 @@ npm run dev:litert-cpp
 npm run dev
 ```
 
-> **Note on TTS (dev mode):** `npm run dev:litert-cpp` bypasses the Python sidecar's Kokoro TTS. `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime plus a default Piper voice and writes the `PIPER_*` env vars automatically. If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
+> **Note on TTS (dev mode):** `npm run dev:backend` bypasses the Python sidecar's Kokoro TTS. `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime plus a default Piper voice and writes the `PIPER_*` env vars automatically. If Piper is disabled or fails, the renderer falls back to browser Web Speech automatically.
 >
 > **Packaged installer:** The installer does **not** bundle Piper. On first run the app downloads the Gemma 4 model, a standalone Piper binary (~30 MB), and the default voice model (~65 MB) — Python is not required on the user's machine.
 
@@ -245,7 +245,7 @@ npm run dev
 4. Writes all required `PIPER_*` and bridge env vars into `.env`
 5. Initializes `.env` from `.env.example` if not already present
 
-> **Packaged app vs dev:** Step 3 sets up the Python-based Piper runtime used by `npm run dev:litert-cpp`. When running the packaged installer (`npm run dist`), the app downloads a standalone Piper binary at first run instead — no Python needed on the end-user's machine.
+> **Packaged app vs dev:** Step 3 sets up the Python-based Piper runtime used by `npm run dev:backend`. When running the packaged installer (`npm run dist`), the app downloads a standalone Piper binary at first run instead — no Python needed on the end-user's machine.
 
 Source builds are opt-in via `--source-build` for backend developers. The script does **not** silently fall back to source builds.
 
@@ -253,7 +253,7 @@ Source builds are opt-in via `--source-build` for backend developers. The script
 
 > **Deprecated.** `npm run setup` configures the Python sidecar, which is no longer the primary backend. Prefer `npm run setup:litert-cpp` for all new setups.
 
-1. **`npm run init:env`** — copies `.env.example` → `.env` if needed
+1. **`npm run setup:env`** — copies `.env.example` → `.env` if needed
 2. **`npm run setup:sidecar`** — creates `sidecar/.venv` and installs Python dependencies (including `httpx`, `psutil` for benchmarking)
 3. **`npm run download:models`** — downloads Kokoro TTS assets into `sidecar/` (~340 MB)
 4. **`npm run check:env`** — warns about missing or suspicious environment values
@@ -273,7 +273,7 @@ The defaults are sensible for most machines. Common settings you may want to cha
 | `VOICE_ENABLED`  | `true`                                      | Disable always-on voice input if you only want text prompts                                       |
 | `TTS_ENABLED`    | `true`                                      | Disable spoken playback entirely                                                                  |
 | `LITERT_CPP_BRIDGE_REPO` | unset                               | Optional `owner/repo` override for `setup:litert-cpp` bridge Release/artifact lookup               |
-| `LITERT_CPP_TTS_BACKEND` | `piper`                              | Set to `none` to disable Piper and fall back to browser Web Speech on `npm run dev:litert-cpp`    |
+| `LITERT_CPP_TTS_BACKEND` | `piper`                              | Set to `none` to disable Piper and fall back to browser Web Speech on `npm run dev:backend`    |
 | `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune partial Piper flushes for long text without punctuation; completed sentences always flush first |
 | `PIPER_MODEL`    | unset                                       | Managed by `npm run voice:use -- <voice-name>`; written automatically by `setup:litert-cpp`       |
 | `SIDECAR_WS_URL` | `ws://localhost:8321/ws`                    | _Deprecated Python sidecar path only._ On WSL2, replace `localhost` with your WSL2 IP if needed   |
@@ -287,15 +287,15 @@ See [`.env.example`](.env.example) for the full reference. The `LLAMAFILE_*` var
 
 | Command                  | What it does                                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev:litert-cpp` | **Primary.** Starts the LiteRT-LM C++ backend WebSocket proxy (port 8321) with Piper TTS; run `setup:litert-cpp` first               |
-| `npm run dev`            | Starts Electron + Vite only — use after `dev:litert-cpp` is already running in another terminal                                       |
+| `npm run dev:backend`    | **Primary.** Starts the LiteRT-LM C++ backend WebSocket proxy (port 8321) with Piper TTS; run `setup:litert-cpp` first               |
+| `npm run dev`            | Starts Electron + Vite only — use after `dev:backend` is already running in another terminal                                         |
 | `npm run dev:mock`       | Starts the mock sidecar + Electron (UI development, no inference needed)                                                              |
 | `npm run dev:full`       | _Deprecated Python sidecar._ Starts the Python sidecar + Electron together (macOS / Linux / WSL2)                                    |
 | `npm run dev:sidecar`    | _Deprecated Python sidecar._ Starts just the Python sidecar                                                                           |
 
 ### Piper voice helpers (development only)
 
-These commands manage the repo-local Piper runtime used by `npm run dev:litert-cpp`. They do not affect the packaged installer, which downloads its own standalone Piper binary and default voice to the user's app-data directory at first run.
+These commands manage the repo-local Piper runtime used by `npm run dev:backend`. They do not affect the packaged installer, which downloads its own standalone Piper binary and default voice to the user's app-data directory at first run.
 
 | Command | What it does |
 | --- | --- |
@@ -303,7 +303,7 @@ These commands manage the repo-local Piper runtime used by `npm run dev:litert-c
 | `npm run voice:use -- en_US-hfc_female-medium` | Updates `.env` to use an installed Piper voice |
 | `npm run voice:install -- en/en_US/hfc_female/medium --use` | Downloads a voice from `rhasspy/piper-voices`, reads its sample rate, and switches `.env` |
 
-`npm run setup:litert-cpp` bootstraps the repo-local `piper-tts` runtime, installs/activates the default voice, and writes `PIPER_BIN` plus the active `PIPER_MODEL` / `PIPER_CONFIG` / `PIPER_SAMPLE_RATE`; Piper voice switching only affects `npm run dev:litert-cpp`. `PIPER_SAMPLE_RATE` is optional when the selected `.onnx.json` config contains `audio.sample_rate`.
+`npm run setup:litert-cpp` bootstraps the repo-local `piper-tts` runtime, installs/activates the default voice, and writes `PIPER_BIN` plus the active `PIPER_MODEL` / `PIPER_CONFIG` / `PIPER_SAMPLE_RATE`; Piper voice switching only affects `npm run dev:backend`. `PIPER_SAMPLE_RATE` is optional when the selected `.onnx.json` config contains `audio.sample_rate`.
 
 ### Verify the sidecar is healthy
 
@@ -316,7 +316,7 @@ curl http://localhost:8321/health    # LiteRT sidecar / LiteRT-LM C++ proxy
 
 ```bash
 bash scripts/setup-check.sh        # Linux / macOS / WSL2
-npm run setup-check:windows       # Windows PowerShell
+npm run check:windows              # Windows PowerShell
 ```
 
 ---
@@ -402,19 +402,19 @@ Removed (benchmark comparison only):
 | Script                         | Description                                                                                  |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
 | `npm run setup:litert-cpp`     | **Recommended.** One-shot setup: CI bridge artifact, Gemma 4 model, repo-local Piper runtime + voice, `.env` |
-| `npm run setup-check:windows`  | Windows environment + bridge/model sanity check                                               |
-| `npm run download:ci-bridge:windows` | Download the latest successful Windows bridge artifact into `bin/`                       |
-| `npm run test:ci-bridge:windows` | Start the downloaded bridge via `dev:litert-cpp`, wait for `/health`, and optionally benchmark |
+| `npm run check:windows`        | Windows environment + bridge/model sanity check                                               |
+| `npm run download:bridge:windows` | Download the latest successful Windows bridge artifact into `bin/`                        |
+| `npm run test:bridge:windows`  | Start the downloaded bridge via `dev:backend`, wait for `/health`, and optionally benchmark  |
 
-| `npm run dev:litert-cpp`       | **Primary.** Run the LiteRT-LM C++ backend WebSocket proxy with Piper TTS                     |
-| `npm run dev`                  | Run Electron + Vite only (use after `dev:litert-cpp` is running)                              |
+| `npm run dev:backend`          | **Primary.** Run the LiteRT-LM C++ backend WebSocket proxy with Piper TTS                     |
+| `npm run dev`                  | Run Electron + Vite only (use after `dev:backend` is running)                                 |
 | `npm run dev:mock`             | Run mock sidecar + Electron (no inference needed)                                            |
 | `npm run dev:full`             | _Deprecated._ Run Python sidecar + Electron together (macOS / Linux / WSL2)                  |
 | `npm run dev:sidecar`          | _Deprecated._ Run the Python sidecar only                                                    |
 | `npm run setup`                | _Deprecated._ First-run setup for Python venv and Kokoro TTS assets                          |
 
 | `npm run benchmark:litert-cpp` | Benchmark the LiteRT-LM C++ backend on the Delfin sidecar protocol                           |
-| `npm run benchmark:litert`     | Benchmark the Python sidecar (deprecated path; uses sidecar venv automatically)              |
+| `npm run benchmark:litert-py`  | Benchmark the Python sidecar (deprecated path; uses sidecar venv automatically)              |
 
 | `npm run build`                | Build the Electron app and validate VAD runtime assets                                       |
 | `npm test`                     | Run Vitest unit tests                                                                        |

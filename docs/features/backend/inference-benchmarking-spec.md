@@ -44,7 +44,7 @@ Results from each run are written to `results/` and compared manually.
 ### Files modified
 
 - `.gitignore` — added `results/*` with `!results/.gitkeep`
-- `package.json` — added `benchmark:litert` and `benchmark:llamafile` npm scripts
+- `package.json` — added `benchmark:litert-py` and `benchmark:llamafile` npm scripts
 
 ## Out of scope
 
@@ -106,7 +106,7 @@ python scripts/benchmark/run.py \
 npm convenience scripts (default 5 runs, all scenarios):
 
 ```bash
-npm run benchmark:litert
+npm run benchmark:litert-py
 npm run benchmark:litert-cpp
 npm run benchmark:llamafile
 ```

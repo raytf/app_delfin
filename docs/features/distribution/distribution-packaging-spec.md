@@ -42,7 +42,7 @@ The LiteRT-LM C++ source tree, Bazelisk/Bazel, and compiler toolchain are **CI/d
 
 - All packaged builds: `INFERENCE_BACKEND=litert-cpp`
 
-**Developer note:** `npm run dev:sidecar` and `npm run dev:full` continue to use the Python sidecar for contributors who prefer the Python-backed dev workflow on macOS/Linux/WSL2.
+**Developer note:** `npm run dev:sidecar` and `npm run dev` continue to use the Python sidecar for contributors who prefer the Python-backed dev workflow on macOS/Linux/WSL2.
 
 ---
 
@@ -213,7 +213,7 @@ When `app.isPackaged`, Electron spawns `scripts/litert-cpp-proxy.mjs` on **all t
 //   npm run dev:sidecar  → spawns Python uvicorn via sidecar/.venv
 
 // Dev mode (Windows native):
-//   npm run dev:litert-cpp  → spawns scripts/litert-cpp-proxy.mjs directly
+//   npm run dev:backend  → spawns scripts/litert-cpp-proxy.mjs directly
 ```
 
 `scripts/litert-cpp-proxy.mjs`, `scripts/litert-cpp-presets.mjs`, and the platform bridge binary + shared library are all bundled as `extraResources`. Node.js is embedded in Electron, so the proxy is spawned via Electron's own runtime. The LiteRT-LM C++ source tree and compiler toolchain are CI-only — never present on the user's machine.
@@ -223,7 +223,7 @@ When `app.isPackaged`, Electron spawns `scripts/litert-cpp-proxy.mjs` on **all t
 ```ts
 const isPackaged = app.isPackaged;
 // isPackaged  → LiteRT-LM C++ path (bridge + proxy from resources; model from userData) — all platforms
-// !isPackaged → dev:litert-cpp (Windows) or dev:sidecar / dev:full (macOS / Linux / WSL2)
+// !isPackaged → dev:backend (Windows) or dev:sidecar / dev (macOS / Linux / WSL2)
 ```
 
 ### Track DP3 — frozen Python sidecar _(superseded 2026-05-06)_
@@ -304,7 +304,7 @@ Bridge binary, shared library, `litert-cpp-proxy.mjs`, and `litert-cpp-presets.m
 - [ ] Installing the Linux AppImage on a clean machine shows SetupScreen; model + Piper voice downloads complete; app runs a prompt end-to-end via LiteRT-LM C++ bridge
 - [ ] Vision prompt (screenshot) works on all three packaged builds (LiteRT-LM C++ bridge + vision input)
 - [ ] Piper TTS produces audio on all three packaged builds
-- [ ] `npm run dev:sidecar` and `npm run dev:full` still work for contributors on macOS/Linux/WSL2 (Python sidecar dev fallback)
+- [ ] `npm run dev:sidecar` and `npm run dev` still work for contributors on macOS/Linux/WSL2 (Python sidecar dev fallback)
 - [ ] Manifest checksum verification passes; tampered files are re-downloaded
 - [ ] `INFERENCE_BACKEND=litert-cpp` is baked into all three packaged builds; it is not user-visible
 
