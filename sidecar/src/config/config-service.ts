@@ -46,7 +46,9 @@ export class ConfigService extends SidecarConfigService {
         ? './bin/piper/venv/Scripts/piper.exe'
         : './bin/piper/venv/bin/piper';
 
-    const backend = this.envData.TTS_BACKEND ?? 'none';
+    // Only `piper` enables sidecar TTS; any other value (incl. the Python
+    // sidecar's kokoro/mlx/web-speech) falls back to renderer Web Speech.
+    const backend = this.envData.TTS_BACKEND === 'piper' ? 'piper' : 'none';
     const piperModel = this.envData.PIPER_MODEL
       ? this.resolvePath(this.envData.PIPER_MODEL)
       : '';

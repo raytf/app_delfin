@@ -9,7 +9,11 @@ export const envSchema = z.object({
   LITERT_CPP_BIN: z.string().trim().optional(),
   LITERT_CPP_MODEL: z.string().trim().optional(),
 
-  TTS_BACKEND: z.enum(['none', 'piper']).optional(),
+  // TTS_BACKEND is shared with the deprecated Python sidecar, where it also
+  // takes kokoro|mlx|web-speech. The TypeScript sidecar only does Piper, so
+  // accept any string here — config-service narrows non-`piper` values to
+  // `none` (renderer Web Speech fallback) rather than crashing on startup.
+  TTS_BACKEND: z.string().trim().optional(),
   TTS_SOFT_MIN_CHARS: nonNegativeInt.optional(),
   TTS_SOFT_MAX_CHARS: nonNegativeInt.optional(),
 
