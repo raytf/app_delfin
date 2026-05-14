@@ -4,36 +4,50 @@ import type { TurnStreamer } from '../domain/abstractions/turn-streamer';
 export class WebSocketTurnStreamer implements TurnStreamer {
   constructor(private readonly ws: WebSocket) {}
 
-  async sendToken(text: string): Promise<void> {
-    this.send({ type: 'token', text });
+  async sendToken(requestId: string, text: string): Promise<void> {
+    this.send({ type: "token", requestId, text });
   }
 
-  async sendAudioStart(sampleRate: number, sentenceCount: number): Promise<void> {
+  async sendAudioStart(
+    requestId: string,
+    sampleRate: number,
+    sentenceCount: number,
+  ): Promise<void> {
     this.send({
-      type: 'audio_start',
+      type: "audio_start",
+      requestId,
       sample_rate: sampleRate,
       sentence_count: sentenceCount,
     });
   }
 
-  async sendAudioChunk(audio: string, index?: number): Promise<void> {
+  async sendAudioChunk(
+    requestId: string,
+    audio: string,
+    index?: number,
+  ): Promise<void> {
     this.send({
-      type: 'audio_chunk',
+      type: "audio_chunk",
+      requestId,
       audio,
       ...(index !== undefined ? { index } : {}),
     });
   }
 
-  async sendAudioEnd(ttsTime: number): Promise<void> {
-    this.send({ type: 'audio_end', tts_time: ttsTime });
+  async sendAudioEnd(requestId: string, ttsTime: number): Promise<void> {
+    this.send({ type: "audio_end", requestId, tts_time: ttsTime });
   }
 
-  async sendDone(): Promise<void> {
-    this.send({ type: 'done' });
+  async sendDone(requestId: string, interrupted = false): Promise<void> {
+    this.send({ type: "done", requestId, interrupted });
   }
 
-  async sendError(message: string): Promise<void> {
-    this.send({ type: 'error', message });
+  async sendError(message: string, requestId?: string): Promise<void> {
+    this.send({
+      type: "error",
+      message,
+      ...(requestId !== undefined ? { requestId } : {}),
+    });
   }
 
   private send(payload: object): void {

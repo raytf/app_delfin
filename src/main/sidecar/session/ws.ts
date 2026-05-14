@@ -4,6 +4,7 @@ import type { SidecarSessionStreamMessage } from "../../../shared/schemas/sideca
 
 type SidecarSessionPromptMessage = {
   type?: "turn";
+  requestId: string;
   sessionId: string;
   text?: string | null;
   presetId: string;
@@ -13,6 +14,7 @@ type SidecarSessionPromptMessage = {
 
 type SidecarSessionInterruptMessage = {
   type: "interrupt";
+  requestId: string;
 };
 
 let socket: WebSocket | null = null;

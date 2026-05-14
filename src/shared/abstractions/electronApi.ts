@@ -19,7 +19,7 @@ export interface ElectronAPI {
   voiceEnabled: boolean;
   /** True when TTS_ENABLED=true in .env. Used by renderer fallback logic. */
   ttsEnabled: boolean;
-  sidecarInterrupt: () => void;
+  sidecarInterrupt: (requestId: string) => void;
   getOverlayState: () => Promise<OverlayState>;
   startSession: (request: SessionStartRequest) => Promise<SessionStartResponse>;
   stopSession: (request: SessionStopRequest) => Promise<void>;
@@ -40,15 +40,27 @@ export interface ElectronAPI {
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
   onOverlayError: (cb: (data: { message: string }) => void) => void;
-  onSidecarToken: (cb: (data: { text: string }) => void) => void;
+  onSidecarToken: (
+    cb: (data: { requestId: string; text: string }) => void,
+  ) => void;
   onSidecarAudioStart: (
-    cb: (data: { sampleRate: number; sentenceCount: number }) => void,
+    cb: (data: {
+      requestId: string;
+      sampleRate: number;
+      sentenceCount: number;
+    }) => void,
   ) => void;
   onSidecarAudioChunk: (
-    cb: (data: { audio: string; index?: number }) => void,
+    cb: (data: { requestId: string; audio: string; index?: number }) => void,
   ) => void;
-  onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) => void;
-  onSidecarDone: (cb: () => void) => void;
-  onSidecarError: (cb: (data: { message: string }) => void) => void;
+  onSidecarAudioEnd: (
+    cb: (data: { requestId: string; ttsTime: number }) => void,
+  ) => void;
+  onSidecarDone: (
+    cb: (data: { requestId: string; interrupted: boolean }) => void,
+  ) => void;
+  onSidecarError: (
+    cb: (data: { requestId?: string; message: string }) => void,
+  ) => void;
   removeAllListeners: (channel: string) => void;
 }

@@ -39,7 +39,7 @@ const sessionService = new SessionServiceImpl(repository, inferenceEngine);
 const sessionRoutes = createSessionRoutes(sessionService);
 const ttsEngine = PiperTtsEngine.fromConfig(configService);
 const turnService = new TurnServiceImpl(sessionService, inferenceEngine, ttsEngine);
-const turnController = new TurnController(turnService, inferenceEngine);
+const turnController = new TurnController(turnService);
 
 app.get('/health', (_req, res) => {
   res.json({

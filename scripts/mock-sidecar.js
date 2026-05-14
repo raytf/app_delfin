@@ -9,6 +9,8 @@ const wss = new WebSocketServer({ port: PORT })
 
 wss.on('connection', (ws) => {
   console.log('[mock-sidecar] Client connected')
+  let activeInterval = null
+  let activeRequestId = null
 
   ws.on('message', (raw) => {
     let msg
@@ -20,12 +22,31 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.type === 'interrupt') {
-      console.log('[mock-sidecar] Interrupt received')
+      console.log(`[mock-sidecar] Interrupt received (${msg.requestId})`)
+      if (activeRequestId === msg.requestId && activeInterval !== null) {
+        clearInterval(activeInterval)
+        activeInterval = null
+        ws.send(JSON.stringify({
+          type: 'done',
+          requestId: msg.requestId,
+          interrupted: true,
+        }))
+      }
       return
     }
 
+    if (activeInterval !== null && activeRequestId !== null) {
+      clearInterval(activeInterval)
+      ws.send(JSON.stringify({
+        type: 'done',
+        requestId: activeRequestId,
+        interrupted: true,
+      }))
+    }
+
+    activeRequestId = msg.requestId
     const preset = msg.presetId || msg.preset_id
-    console.log(`[mock-sidecar] Received: "${msg.text}" (preset: ${preset})`)
+    console.log(`[mock-sidecar] Received: "${msg.text}" (preset: ${preset}, requestId: ${activeRequestId})`)
 
     // Simulate plain streaming response (no structured message)
     const responseText =
@@ -33,13 +54,25 @@ wss.on('connection', (ws) => {
 
     const words = responseText.split(' ')
     let i = 0
-    const interval = setInterval(() => {
+    activeInterval = setInterval(() => {
       if (i >= words.length) {
-        clearInterval(interval)
-        ws.send(JSON.stringify({ type: 'done' }))
+        if (activeInterval !== null) {
+          clearInterval(activeInterval)
+          activeInterval = null
+        }
+        ws.send(JSON.stringify({
+          type: 'done',
+          requestId: activeRequestId,
+          interrupted: false,
+        }))
+        activeRequestId = null
         return
       }
-      ws.send(JSON.stringify({ type: 'token', text: words[i] + ' ' }))
+      ws.send(JSON.stringify({
+        type: 'token',
+        requestId: activeRequestId,
+        text: words[i] + ' ',
+      }))
       i++
     }, 100)
   })

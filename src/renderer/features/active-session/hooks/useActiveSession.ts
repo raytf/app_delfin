@@ -121,6 +121,7 @@ export function useActiveSession({
   const ignoreCurrentTurnOutputRef = useRef(false)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
+  const activeRequestIdRef = useRef<string | null>(null)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
   const assistantWaveformBarsRef = useRef(createWaveformBars())
   const assistantWaveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
@@ -270,6 +271,8 @@ export function useActiveSession({
   }, [setAudioPlayingState])
 
   const cancelCurrentAssistantTurn = useCallback(() => {
+    const requestId = activeRequestIdRef.current
+    activeRequestIdRef.current = null
     ignoreCurrentTurnOutputRef.current = true
     ignoreIncomingSidecarAudioRef.current = true
     aiStreamingStartedRef.current = false
@@ -283,10 +286,12 @@ export function useActiveSession({
     finishAudioPlayback()
     finishAssistantResponse()
 
-    try {
-      window.api.sidecarInterrupt()
-    } catch (error) {
-      console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+    if (requestId !== null) {
+      try {
+        window.api.sidecarInterrupt(requestId)
+      } catch (error) {
+        console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+      }
     }
   }, [
     cancelSpeechSynthesis,
@@ -301,8 +306,10 @@ export function useActiveSession({
 
   const submitVoiceTurn = useCallback(
     (wavBase64: string) => {
+      const requestId = crypto.randomUUID()
       const messageId = crypto.randomUUID()
 
+      activeRequestIdRef.current = requestId
       ignoreCurrentTurnOutputRef.current = false
       ignoreIncomingSidecarAudioRef.current = false
       aiStreamingStartedRef.current = false
@@ -312,12 +319,14 @@ export function useActiveSession({
       beginVoiceTurn({ messageId })
 
       if (activeSessionId === null) {
+        activeRequestIdRef.current = null
         failAssistantResponse('Session is not active.')
         return
       }
 
       void window.api
         .submitSessionPrompt({
+          requestId,
           sessionId: activeSessionId,
           messageId,
           text: VOICE_TURN_TEXT,
@@ -331,6 +340,10 @@ export function useActiveSession({
           })
         })
         .catch((error: unknown) => {
+          if (activeRequestIdRef.current !== requestId) {
+            return
+          }
+          activeRequestIdRef.current = null
           failAssistantResponse(error instanceof Error ? error.message : 'Voice turn failed.')
         })
     },
@@ -551,6 +564,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarToken((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         return
       }
@@ -560,6 +577,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioStart((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreIncomingSidecarAudioRef.current = true
         return
@@ -582,6 +603,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioChunk((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreIncomingSidecarAudioRef.current) {
         return
       }
@@ -621,6 +646,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioEnd((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         audioStreamActiveRef.current = false
         return
@@ -640,7 +669,12 @@ export function useActiveSession({
       }
     })
 
-    window.api.onSidecarDone(() => {
+    window.api.onSidecarDone((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+      activeRequestIdRef.current = null
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreCurrentTurnOutputRef.current = false
         ignoreIncomingSidecarAudioRef.current = false
@@ -653,12 +687,30 @@ export function useActiveSession({
       aiStreamingStartedRef.current = false
       finishAssistantResponse()
 
+      if (data.interrupted) {
+        return
+      }
+
       const latestAssistantText =
         getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
       speakWithWebSpeech(latestAssistantText)
     })
 
     window.api.onSidecarError((data) => {
+      if (
+        data.requestId !== undefined &&
+        data.requestId !== activeRequestIdRef.current
+      ) {
+        return
+      }
+
+      if (
+        data.requestId === undefined ||
+        data.requestId === activeRequestIdRef.current
+      ) {
+        activeRequestIdRef.current = null
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreCurrentTurnOutputRef.current = false
         ignoreIncomingSidecarAudioRef.current = false
@@ -785,10 +837,14 @@ export function useActiveSession({
     assistantGainNodeRef.current = null
     assistantAnalyserRef.current = null
 
-    try {
-      window.api.sidecarInterrupt()
-    } catch (error) {
-      console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+    const requestId = activeRequestIdRef.current
+    activeRequestIdRef.current = null
+    if (requestId !== null) {
+      try {
+        window.api.sidecarInterrupt(requestId)
+      } catch (error) {
+        console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+      }
     }
 
     try {
@@ -829,6 +885,7 @@ export function useActiveSession({
         return
       }
 
+      const requestId = crypto.randomUUID()
       const messageId = crypto.randomUUID()
 
       ignoreCurrentTurnOutputRef.current = false
@@ -849,6 +906,7 @@ export function useActiveSession({
         ignoreIncomingSidecarAudioRef.current = false
       }
 
+      activeRequestIdRef.current = requestId
       beginPromptSubmission({
         messageId,
         prompt: trimmedText,
@@ -860,6 +918,7 @@ export function useActiveSession({
         }
 
         const response = await window.api.submitSessionPrompt({
+          requestId,
           sessionId: activeSessionId,
           messageId,
           text: trimmedText,
@@ -871,6 +930,10 @@ export function useActiveSession({
           messageId: response.messageId,
         })
       } catch (error) {
+        if (activeRequestIdRef.current !== requestId) {
+          return
+        }
+        activeRequestIdRef.current = null
         failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
       }
     },

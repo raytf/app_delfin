@@ -11,7 +11,7 @@ export type TurnMessage = {
 };
 
 export type RunTurnInput = {
-  turnId: string;
+  requestId: string;
   conversationId: string;
   systemPrompt: string;
   message: TurnMessage;
@@ -46,7 +46,7 @@ export interface InferenceEngine {
   createConversation(input: CreateConversationInput): Promise<void>;
   dropConversation(conversationId: string): Promise<void>;
   runTurn(input: RunTurnInput, handlers: RunTurnHandlers): Promise<void>;
-  interruptTurn(turnId: Nullable<string>): void;
+  interruptTurn(requestId: Nullable<string>): void;
   resetConversation(conversationId: Nullable<string>): void;
   close(): Promise<void>;
 }

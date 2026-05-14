@@ -9,6 +9,7 @@ export type {
 export type { SessionStatus };
 
 export interface SessionPromptRequest {
+  requestId: string;
   sessionId: string;
   messageId: string;
   text: string;
@@ -29,6 +30,7 @@ export interface SessionStopRequest {
 }
 
 export interface SessionPromptResponse {
+  requestId: string;
   messageId: string;
   imageDataUrl: string;
 }

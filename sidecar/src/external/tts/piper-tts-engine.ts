@@ -7,7 +7,9 @@ import type {
   TtsEngine,
   TtsStream,
 } from '../../shared/abstractions/tts-engine';
-import type { SidecarConfigService } from '../../shared/abstractions/sidecar-config-service';
+import type {
+  SidecarConfigService,
+} from '../../shared/abstractions/sidecar-config-service';
 
 const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
@@ -59,6 +61,7 @@ class PiperTtsStream implements TtsStream {
   private cancelled = false;
   private readonly startedAt = Date.now();
   private work: Promise<void> = Promise.resolve();
+  private activeChild: ReturnType<typeof spawn> | null = null;
 
   constructor(
     private readonly config: {
@@ -108,12 +111,20 @@ class PiperTtsStream implements TtsStream {
 
   async cancel(): Promise<void> {
     this.cancelled = true;
+    this.activeChild?.kill();
+    this.activeChild = null;
   }
 
   private async synthesizeSentence(sentence: string): Promise<void> {
     if (this.cancelled || sentence.length === 0) return;
 
-    const audioB64 = await this.runPiper(sentence);
+    let audioB64: string;
+    try {
+      audioB64 = await this.runPiper(sentence);
+    } catch (error) {
+      if (this.cancelled) return;
+      throw error;
+    }
     if (!audioB64 || this.cancelled) return;
 
     if (!this.started) {
@@ -134,11 +145,16 @@ class PiperTtsStream implements TtsStream {
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
+      this.activeChild = child;
 
       child.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
       child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
       child.once('error', (error) => rejectPromise(error));
       child.once('exit', (code, signal) => {
+        if (this.activeChild === child) {
+          this.activeChild = null;
+        }
+
         if (code === 0) {
           resolvePromise(Buffer.concat(stdoutChunks).toString('base64'));
           return;

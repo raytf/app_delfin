@@ -80,6 +80,7 @@ export function registerSessionIpcHandlers(
 
       try {
         sendToSidecar({
+          requestId: request.requestId,
           sessionId: request.sessionId,
           imageBase64: frame.imageBase64,
           text,
@@ -93,6 +94,7 @@ export function registerSessionIpcHandlers(
       }
 
       return {
+        requestId: request.requestId,
         messageId: request.messageId,
         imageDataUrl: `data:image/jpeg;base64,${frame.imageBase64}`,
       };

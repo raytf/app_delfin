@@ -1,8 +1,16 @@
 export interface TurnStreamer {
-  sendToken(text: string): Promise<void>;
-  sendAudioStart(sampleRate: number, sentenceCount: number): Promise<void>;
-  sendAudioChunk(audio: string, index?: number): Promise<void>;
-  sendAudioEnd(ttsTime: number): Promise<void>;
-  sendDone(): Promise<void>;
-  sendError(message: string): Promise<void>;
+  sendToken(requestId: string, text: string): Promise<void>;
+  sendAudioStart(
+    requestId: string,
+    sampleRate: number,
+    sentenceCount: number,
+  ): Promise<void>;
+  sendAudioChunk(
+    requestId: string,
+    audio: string,
+    index?: number,
+  ): Promise<void>;
+  sendAudioEnd(requestId: string, ttsTime: number): Promise<void>;
+  sendDone(requestId: string, interrupted?: boolean): Promise<void>;
+  sendError(message: string, requestId?: string): Promise<void>;
 }

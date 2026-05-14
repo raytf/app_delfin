@@ -30,8 +30,10 @@ const api: ElectronAPI = {
   // Evaluated once at preload time.
   ttsEnabled: configService.features.ttsEnabled,
 
-  sidecarInterrupt: () =>
-    ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT),
+  sidecarInterrupt: (requestId: string) =>
+    ipcRenderer.send(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, {
+      requestId,
+    }),
 
   getOverlayState: () =>
     ipcRenderer.invoke(
@@ -98,13 +100,17 @@ const api: ElectronAPI = {
       cb(data),
     ),
 
-  onSidecarToken: (cb: (data: { text: string }) => void) =>
+  onSidecarToken: (cb: (data: { requestId: string; text: string }) => void) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, (_event, data) =>
       cb(data),
     ),
 
   onSidecarAudioStart: (
-    cb: (data: { sampleRate: number; sentenceCount: number }) => void,
+    cb: (data: {
+      requestId: string;
+      sampleRate: number;
+      sentenceCount: number;
+    }) => void,
   ) =>
     ipcRenderer.on(
       MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START,
@@ -112,23 +118,31 @@ const api: ElectronAPI = {
     ),
 
   onSidecarAudioChunk: (
-    cb: (data: { audio: string; index?: number }) => void,
+    cb: (data: { requestId: string; audio: string; index?: number }) => void,
   ) =>
     ipcRenderer.on(
       MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK,
       (_event, data) => cb(data),
     ),
 
-  onSidecarAudioEnd: (cb: (data: { ttsTime: number }) => void) =>
+  onSidecarAudioEnd: (
+    cb: (data: { requestId: string; ttsTime: number }) => void,
+  ) =>
     ipcRenderer.on(
       MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END,
       (_event, data) => cb(data),
     ),
 
-  onSidecarDone: (cb: () => void) =>
-    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE, () => cb()),
+  onSidecarDone: (
+    cb: (data: { requestId: string; interrupted: boolean }) => void,
+  ) =>
+    ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE, (_event, data) =>
+      cb(data),
+    ),
 
-  onSidecarError: (cb: (data: { message: string }) => void) =>
+  onSidecarError: (
+    cb: (data: { requestId?: string; message: string }) => void,
+  ) =>
     ipcRenderer.on(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, (_event, data) =>
       cb(data),
     ),

@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import readline from "node:readline";
 import { dirname, join, resolve } from "node:path";
@@ -16,6 +16,12 @@ import type { Nullable } from "../../shared/types/object";
 type PendingTurn = RunTurnHandlers;
 
 const BRIDGE_READY_TIMEOUT_MS = 120_000;
+type SpawnedProcess = ReturnType<typeof spawn>;
+type BridgeProcess = SpawnedProcess & {
+  stdin: NonNullable<SpawnedProcess["stdin"]>;
+  stdout: NonNullable<SpawnedProcess["stdout"]>;
+  stderr: NonNullable<SpawnedProcess["stderr"]>;
+};
 
 type BridgeEvent = {
   type?: unknown;
@@ -27,7 +33,7 @@ type BridgeEvent = {
 };
 
 export class LitertCppInferenceEngine implements InferenceEngine {
-  private readonly child: ChildProcessWithoutNullStreams;
+  private readonly child: BridgeProcess;
 
   private readonly pending = new Map<string, PendingTurn>();
 
@@ -81,7 +87,7 @@ export class LitertCppInferenceEngine implements InferenceEngine {
       cwd: rootDir,
       stdio: ["pipe", "pipe", "pipe"],
       env,
-    });
+    }) as BridgeProcess;
 
     this.readyPromise = new Promise<void>((resolvePromise, rejectPromise) => {
       this.readyResolve = resolvePromise;
@@ -134,11 +140,11 @@ export class LitertCppInferenceEngine implements InferenceEngine {
 
   async runTurn(input: RunTurnInput, handlers: RunTurnHandlers): Promise<void> {
     await this.readyPromise;
-    this.pending.set(input.turnId, handlers);
+    this.pending.set(input.requestId, handlers);
 
     const payload = {
       type: "generate",
-      requestId: input.turnId,
+      requestId: input.requestId,
       conversationId: input.conversationId,
       systemPrompt: input.systemPrompt,
       message: input.message,
@@ -147,10 +153,10 @@ export class LitertCppInferenceEngine implements InferenceEngine {
     this.child.stdin.write(`${JSON.stringify(payload)}\n`);
   }
 
-  interruptTurn(turnId: Nullable<string>): void {
-    if (!this.readyState || !turnId) return;
+  interruptTurn(requestId: Nullable<string>): void {
+    if (!this.readyState || !requestId) return;
     this.child.stdin.write(
-      `${JSON.stringify({ type: "interrupt", requestId: turnId })}\n`,
+      `${JSON.stringify({ type: "interrupt", requestId })}\n`,
     );
   }
 

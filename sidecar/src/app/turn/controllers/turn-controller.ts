@@ -1,52 +1,16 @@
 import type WebSocket from "ws";
 import type { RawData } from "ws";
-import type { InferenceEngine } from "../../../shared/abstractions/inference-engine";
-import type { Nullable } from "../../../shared/types/object";
 import type { TurnService } from "../domain/abstractions/turn-service";
 import type { TurnRequestDto } from "../domain/dtos/turn-dtos";
 import { WebSocketTurnStreamer } from "./websocket-turn-streamer";
-import {
-  TurnRequest,
-  WsRequest,
-  wsRequestSchema,
-} from "./validations/ws-request-validation";
+import { wsRequestSchema } from "./validations/ws-request-validation";
+import type { TurnRequest } from "./validations/ws-request-validation";
 
 export class TurnController {
-  constructor(
-    private readonly turnService: TurnService,
-    private readonly inferenceEngine: InferenceEngine,
-  ) {}
+  constructor(private readonly turnService: TurnService) {}
 
   registerConnection(ws: WebSocket): void {
     const streamer = new WebSocketTurnStreamer(ws);
-
-    const queue: Array<{ sessionId: string; request: TurnRequestDto }> = [];
-    let running = false;
-    const activeTurnIdRef: { current: Nullable<string> } = { current: null };
-    const interrupted = { current: false };
-
-    const runNext = async (): Promise<void> => {
-      if (running) return;
-      const next = queue.shift();
-      if (!next) return;
-
-      running = true;
-      interrupted.current = false;
-
-      try {
-        await this.turnService.handleTurn(
-          next.sessionId,
-          next.request,
-          streamer,
-          interrupted,
-          activeTurnIdRef,
-        );
-      } finally {
-        running = false;
-        activeTurnIdRef.current = null;
-        void runNext();
-      }
-    };
 
     ws.on("message", (raw: RawData) => {
       let rawPayload: unknown;
@@ -66,14 +30,20 @@ export class TurnController {
       }
 
       if (parsed.data.type === "interrupt") {
-        interrupted.current = true;
-        this.inferenceEngine.interruptTurn(activeTurnIdRef.current);
+        this.turnService.interruptTurn(parsed.data.requestId);
         return;
       }
 
       const mapped = this.mapTurnRequest(parsed.data);
-      queue.push(mapped);
-      void runNext();
+      this.turnService.handleTurn(mapped.sessionId, mapped.request, streamer);
+    });
+
+    ws.on("close", () => {
+      this.turnService.closeConnection();
+    });
+
+    ws.on("error", () => {
+      this.turnService.closeConnection();
     });
   }
 
@@ -84,6 +54,7 @@ export class TurnController {
     return {
       sessionId: payload.sessionId,
       request: {
+        requestId: payload.requestId,
         text: payload.text ?? null,
         imageBase64: payload.imageBase64 ?? null,
         audioBase64: payload.audioBase64 ?? null,

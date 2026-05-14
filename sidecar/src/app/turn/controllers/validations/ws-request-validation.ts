@@ -3,11 +3,13 @@ import { trimmedStringSchema } from "../../../../shared/validations/common";
 
 export const interruptTurnSchema = z.object({
   type: z.literal("interrupt"),
+  requestId: trimmedStringSchema,
 });
 
 const turnRequestSchema = z
   .object({
     type: z.literal("turn").optional(),
+    requestId: trimmedStringSchema,
     sessionId: trimmedStringSchema,
     presetId: trimmedStringSchema.default("generic-screen"),
     text: z.string().nullable().optional(),
