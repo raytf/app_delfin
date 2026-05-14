@@ -1,8 +1,10 @@
-"""LiteRT-LM backend adapter.
+"""LiteRT-LM backend adapter — the deprecated Python FastAPI sidecar.
 
-Connects to the existing Delfin FastAPI sidecar over WebSocket.
+Connects to the Python sidecar (sidecar-old/server.py) over WebSocket. Retained
+for comparison only; the primary backend is litert_cpp.py (the TypeScript
+sidecar + C++ bridge). The /ws protocol below is shared by both.
 
-Protocol (from sidecar/server.py):
+Protocol (from sidecar-old/server.py):
   → send JSON: {"text": "...", "image": "<base64>", "preset_id": "..."}
   ← recv JSON: {"type": "token", "text": "..."}  (streaming)
   ← recv JSON: {"type": "done"}                   (generation complete)
