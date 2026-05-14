@@ -54,7 +54,7 @@ Before CI is set up, document and script a repeatable manual release process so 
 **Manual release checklist (current platform):**
 
 ```
-1. Ensure npm run dev:full works and one real prompt succeeds
+1. Ensure npm run dev works and one real prompt succeeds
 2. Run npm run dist
 3. Verify the output in dist/:
    - Windows: Delfin Setup x.y.z.exe
@@ -187,7 +187,7 @@ jobs:
 Original outline (still applies as the consumer-side handoff):
 
 1. Restore or clone the pinned `google-ai-edge/LiteRT-LM` source tree.
-2. Run `npm run build:litert-cpp-bridge -- --litert-lm-dir <checkout> --output-dir bin`.
+2. Run `npm run bridge:build -- --litert-lm-dir <checkout> --output-dir bin`.
 3. Upload `bin/delfin_litert_bridge.exe` as an intermediate workflow artifact for diagnostics.
 4. Run Electron packaging with that binary included as an app resource.
 

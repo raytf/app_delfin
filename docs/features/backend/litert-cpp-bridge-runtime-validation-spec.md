@@ -34,7 +34,7 @@ Per `native-windows-backend-research-spec.md` §A5, a passing Track A validation
 
 | Step | Command / Action | Result |
 | ---- | ---------------- | ------ |
-| 1a   | `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path-to-LiteRT-LM>` → verify `bin/delfin_litert_bridge.exe` and `bin/libGemmaModelConstraintProvider.dll` are up-to-date. | ✅ Built with `--output_user_root=D:\b` workaround; binary copied to `bin/` |
+| 1a   | `npm run bridge:build -- -- --litert-lm-dir <path-to-LiteRT-LM>` → verify `bin/delfin_litert_bridge.exe` and `bin/libGemmaModelConstraintProvider.dll` are up-to-date. | ✅ Built with `--output_user_root=D:\b` workaround; binary copied to `bin/` |
 | 1b   | `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'` on the native Windows host with the rebuilt binary. Capture JSON + CSV in `results/`. | ✅ Completed; JSON + CSV written to `results/` |
 | 1c   | Record S1 TTFT, S1 throughput, S2 TTFT, S2 throughput, S3 throughput, and Turn 2+ TTFT (KV-cache reuse). Compare S1 baseline to previous run (`S1 TTFT 5433.9±83.6 ms`, throughput `20.4±0.9 tok/s`). | ✅ **S1** TTFT 5,414±66 ms / 22.0±1.3 tok/s (within 20% baseline); **S2** TTFT 10,639±104 ms / 20.3±0.6 tok/s; **S3** Turn 1 ~5,400 ms, Turn 2+ ~647 ms (KV-cache reuse confirmed) |
 
@@ -42,7 +42,7 @@ Per `native-windows-backend-research-spec.md` §A5, a passing Track A validation
 
 | Step | Check | Result |
 | ---- | ----- | ------ |
-| 2a   | `npm run dev:litert-cpp` starts without error; `GET /health` returns `{"backend":"litert-cpp","status":"ok"}`. | ✅ Proxy starts; health returns `{"status":"ok","backend":"litert-cpp","model":"..."}` |
+| 2a   | `npm run dev:backend` starts without error; `GET /health` returns `{"backend":"litert-cpp","status":"ok"}`. | ✅ Proxy starts; health returns `{"status":"ok","backend":"litert-cpp","model":"..."}` |
 | 2b   | Text turn: send a plain-text question; receive streamed tokens ending with `{type:"done"}`. | ✅ WebSocket text turn streams token `"Hello"` + `done` |
 | 2c   | Vision turn: capture a lecture slide screenshot; send with a "Explain this slide" prompt; receive a structured explanation referencing visual content. | ⚠️ Image decode path validated (base64 reaches decoder); full lecture-slide round deferred to Electron app test |
 | 2d   | KV-cache multi-turn: send three follow-up turns on the same session; Turn 2+ TTFT should be ≤ 700 ms (vs. ~5,300 ms without session reuse). | ✅ Benchmark S3 confirms Turn 2+ TTFT ~647 ms |
@@ -57,7 +57,7 @@ Per `native-windows-backend-research-spec.md` §Developer environment policy, ma
 
 | Step | Action |
 | ---- | ------ |
-| 3a   | On macOS arm64, run `npm run setup:litert-cpp` (or the lower-level `npm run build:litert-cpp-bridge -- -- --litert-lm-dir <path>`). |
+| 3a   | On macOS arm64, run `npm run setup:litert-cpp` (or the lower-level `npm run bridge:build -- -- --litert-lm-dir <path>`). |
 | 3b   | Verify `bin/delfin_litert_bridge` is produced and executable. |
 | 3c   | Run `node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s2,s3'`. Record numbers alongside the Windows results. |
 | 3d   | Run manual checks 2a–2g on macOS. |

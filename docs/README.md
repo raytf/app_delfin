@@ -47,6 +47,7 @@ Inference engines, native bridges, and benchmarking. Goal: a future-proof, cross
 | [`features/backend/litert-cpp-primary-backend-migration-spec.md`](features/backend/litert-cpp-primary-backend-migration-spec.md) | 🚧 In Progress | Umbrella for promoting the LiteRT C++ bridge to the default inference backend on all OSes. M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. |
 | [`features/backend/litert-cpp-bridge-build-dx-spec.md`](features/backend/litert-cpp-bridge-build-dx-spec.md)               | 🚧 In Progress | Build DX overhaul for the C++ bridge: split CI into a slow vendor-bundle producer + fast bridge compile, ship prebuilt LiteRT-LM bundles per `LITERT_LM_REF`, optional Bazel remote cache. Gate 1 — awaiting approval. |
 | [`features/backend/inference-benchmarking-spec.md`](features/backend/inference-benchmarking-spec.md)                       | ✅ Complete    | Standalone benchmark harness (`scripts/benchmark/`) comparing LiteRT-LM, LiteRT-CPP, and llamafile (TTFT, throughput, memory).                                               |
+| [`features/backend/litert-cpp-piper-daemon-spec.md`](features/backend/litert-cpp-piper-daemon-spec.md)                     | 🚧 In Progress | Long-lived Piper daemon for `litert-cpp-proxy.mjs` — keeps a single Piper subprocess alive across turns to eliminate per-turn Python/model cold-start. Gate 1 — awaiting approval. |
 
 ---
 
@@ -69,7 +70,8 @@ Persistent on-device knowledge that compounds across sessions.
 
 | File                                                                                                 | Status         | Description                                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`features/memory/memory-wiki-spec.md`](features/memory/memory-wiki-spec.md)                         | 🚧 In Progress | On-device LLM wiki (Karpathy pattern) maintained by Gemma 4 across sessions. Internal sub-phases M0 (E2B viability spike) → M3 (file ingest + runtime tools + lint). Migrated from former Phase 7. |
+| [`features/memory/memory-wiki-spec-v2.md`](features/memory/memory-wiki-spec-v2.md)                   | 🚧 In Progress | On-device knowledge base maintained by Gemma 4 across sessions, rebuilt on the Node.js proxy + C++ bridge stack. Hybrid storage (raw turn chunks + LLM-written summaries), EmbeddingGemma dense retrieval, seamless citations. Sub-phases M0 (spike) → M3 (retrieval into live turns). Gate 1 — awaiting approval. |
+| [`features/memory/memory-wiki-spec.md`](features/memory/memory-wiki-spec.md)                         | 📦 Archived    | v1 spec (Python-sidecar architecture). Superseded 2026-05-12 by `memory-wiki-spec-v2.md`. Retained for historical reference. |
 
 ---
 
@@ -95,7 +97,7 @@ These are not specs — they are evergreen "how does X work" technical write-ups
 | [`explanations/react-zustand-state-flow.md`](explanations/react-zustand-state-flow.md)                       | How React components read from and write to Zustand stores   |
 | [`explanations/screen-capture-and-window-filtering.md`](explanations/screen-capture-and-window-filtering.md) | How `desktopCapturer` selects the foreground window          |
 | [`explanations/session-overlay-state-machine.md`](explanations/session-overlay-state-machine.md)             | The overlay mode/variant state machine                       |
-| [`explanations/sidecar-flow.md`](explanations/sidecar-flow.md)                                               | Inside the FastAPI sidecar — turn lifecycle and tool calling |
+| [`explanations/sidecar-flow.md`](explanations/sidecar-flow.md)                                               | Inside the inference backend — litert-cpp-proxy + C++ bridge turn lifecycle, Piper TTS, and deprecated Python sidecar reference |
 | [`explanations/voice-audio-pipeline.md`](explanations/voice-audio-pipeline.md)                               | VAD, voice capture, TTS playback, and barge-in               |
 
 ---

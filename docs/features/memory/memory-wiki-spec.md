@@ -1,4 +1,6 @@
-# Memory System (LLM Wiki)
+# Memory System (LLM Wiki) — v1 (ARCHIVED)
+
+> 📦 **Archived 2026-05-12.** Superseded by [`memory-wiki-spec-v2.md`](memory-wiki-spec-v2.md), which rebuilds the same product feature on the Node.js proxy + C++ bridge stack (the Python sidecar this spec assumes is deprecated). The v2 spec also makes four design-fork decisions that this spec left open (storage model, retrieval strategy, source scope, citation UX). Retained here for historical reference; **do not implement against this spec.**
 
 > Migrated 2026-05-03 from the former `docs/phases/phase-7-memory.md` to `docs/features/memory/memory-wiki-spec.md` as part of the move from numbered hackathon phases to feature-area planning. Internal sub-phases below (M0–M3) are unchanged and remain the unit of work.
 

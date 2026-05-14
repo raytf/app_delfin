@@ -24,13 +24,13 @@
 
 The 2026-05-03 revision wired `scripts/litert-cpp-proxy.mjs` into the **packaged Windows** runtime only. The CI workflow `build-litert-cpp-bridge.yml` now produces validated native bridge binaries for **macOS arm64** and **Linux x64** as well. The unified C++ backend is now the packaged backend on all three OSes.
 
-The PyInstaller frozen Python sidecar (DP3 in `distribution-packaging-spec.md`) is **removed from the distribution MVP scope**. The Python sidecar (`sidecar/`) remains in the repository and continues to function as a **developer fallback** via `npm run dev:sidecar` (or `npm run dev:full`) — it is not present in any packaged installer.
+The PyInstaller frozen Python sidecar (DP3 in `distribution-packaging-spec.md`) is **removed from the distribution MVP scope**. The Python sidecar (`sidecar/`) remains in the repository and continues to function as a **developer fallback** via `npm run dev:sidecar` (or `npm run dev`) — it is not present in any packaged installer.
 
 | Track | 2026-05-03 scope | 2026-05-06 scope |
 |---|---|---|
 | **DM0** | Wire `litert-cpp-proxy.mjs` into packaged **Windows** startup | **Wire `litert-cpp-proxy.mjs` into packaged Windows x64, macOS arm64, and Linux x64 startup** |
 | **DM1** | `INFERENCE_BACKEND=litert-cpp` build-time value for Windows | **`INFERENCE_BACKEND=litert-cpp` for all three packaged builds** |
-| **DM2** | `npm run dev:litert-cpp` already exists for Windows | **Unchanged** — dev mode uses Python sidecar on macOS/Linux; `dev:litert-cpp` on Windows |
+| **DM2** | `npm run dev:backend` already exists for Windows | **Unchanged** — dev mode uses Python sidecar on macOS/Linux; `dev:backend` on Windows |
 | **DM3** | Piper selected for Windows packaged TTS | **Piper on all three packaged platforms** via `LITERT_CPP_TTS_BACKEND=piper` |
 
 ### Updated architecture (2026-05-06)
@@ -62,7 +62,7 @@ The llamafile integration path described in this spec (DM0 — llamafile WebSock
 |---|---|---|
 | **DM0** | New `scripts/llamafile-proxy.mjs` (~120 lines) | **Wire existing `scripts/litert-cpp-proxy.mjs` into packaged Windows startup via `INFERENCE_BACKEND=litert-cpp`** |
 | **DM1** | `INFERENCE_BACKEND` env-var selector in `src/main/index.ts` | Same — switch value `llamafile` → `litert-cpp` |
-| **DM2** | `npm run dev:llamafile` dev-mode script | `npm run dev:litert-cpp` (already exists) — no new script needed |
+| **DM2** | `npm run dev:llamafile` dev-mode script | `npm run dev:backend` (already exists) — no new script needed |
 | **DM3** | Investigate Piper TTS vs frozen kokoro-onnx | **Piper** selected — `LITERT_CPP_TTS_BACKEND=piper`; `npm run voice:install` provisions voices |
 
 The remaining implementation work for this spec is now: wiring `INFERENCE_BACKEND=litert-cpp` into the packaged Electron startup path and ensuring the bridge binary is resolved from `app.getPath('userData')` or the app resources directory in packaged mode.
@@ -282,7 +282,7 @@ Outbound (proxy → Electron, same as `wsInboundMessageSchema`):
 
 ## Acceptance criteria
 
-- [ ] `INFERENCE_BACKEND=litert-cpp npm run dev:litert-cpp` on Windows connects to the proxy and completes a text prompt end-to-end
+- [ ] `INFERENCE_BACKEND=litert-cpp npm run dev:backend` on Windows connects to the proxy and completes a text prompt end-to-end
 - [ ] `INFERENCE_BACKEND=litert-cpp` packaged app on macOS arm64 connects to the proxy and completes a text prompt end-to-end
 - [ ] `INFERENCE_BACKEND=litert-cpp` packaged app on Linux x64 connects to the proxy and completes a text prompt end-to-end
 - [ ] Vision prompt (screenshot attached) produces a valid multimodal response on all three platforms

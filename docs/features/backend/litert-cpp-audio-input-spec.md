@@ -96,7 +96,7 @@ Both are emitted as the existing `{"type":"error","message":"..."}` JSONL event 
 | #   | Criterion                                                                                                                                                       | Windows |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | AC1 | `delfin_litert_bridge` rebuilt from post-audio-fix source loads `gemma-4-E2B-it.litertlm` with `--audio_backend cpu` and reports `audio executor available` in startup log. | ✅ |
-| AC2 | A voice turn sent through `npm run dev:litert-cpp` (mic capture → renderer → proxy → bridge) produces a streamed response indistinguishable in shape from the Python sidecar (`token` / `done`). | ✅ |
+| AC2 | A voice turn sent through `npm run dev:backend` (mic capture → renderer → proxy → bridge) produces a streamed response indistinguishable in shape from the Python sidecar (`token` / `done`). | ✅ |
 | AC3 | Voice turn latency on Windows is within 25% of the Python sidecar baseline on the same hardware (measured manually; not added to the benchmark suite in this spec). | ✅ |
 | AC4 | Sending an `audio` blob against a model loaded **without** an audio executor returns `audio_executor_unavailable` and the renderer shows it as an inline chat error, not a crash. | ✅ |
 | AC5 | Sending an invalid base64 blob returns `audio_decode_failed` with the same inline error treatment.                                                              | ✅ |

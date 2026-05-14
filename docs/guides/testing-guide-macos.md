@@ -72,25 +72,27 @@ npm install
 
 ## Step 3 — Run setup
 
-This single command downloads the CI bridge artifact, downloads the model, and configures voice/TTS (Piper):
+This single command seeds `.env`, downloads the CI bridge artifact, downloads the model, configures voice/TTS (Piper), and validates env keys:
 
 ```bash
 # Run from inside app_delfin/
-npm run setup:litert-cpp
+npm run setup
 ```
 
-Backend developers can force a source build instead:
+Backend developers can force a source build instead (calls the underlying step directly):
 
 ```bash
 npm run setup:litert-cpp -- --source-build
 ```
 
 **What the script does for you:**
-1. **Stages the C++ bridge** from `delfin-litert-bridge-macos-arm64` into `bin/`.
-2. **Downloads the model** (`gemma-4-E2B-it.litertlm`) if missing.
-3. **Patches your `.env`** with `LITERT_CPP_BIN` and `LITERT_CPP_MODEL`.
-4. **Sets up Piper TTS**: it enables `VOICE_ENABLED=true`, sets `LITERT_CPP_TTS_BACKEND=piper`, and prompts to install the recommended `hfc_female` voice.
-5. Leaves the repo ready for `npm run dev:litert-cpp` and optional benchmarking.
+1. **Seeds `.env`** from `.env.example` if it does not already exist (`setup:env`).
+2. **Stages the C++ bridge** from `delfin-litert-bridge-macos-arm64` into `bin/`.
+3. **Downloads the model** (`gemma-4-E2B-it.litertlm`) if missing.
+4. **Patches your `.env`** with `LITERT_CPP_BIN` and `LITERT_CPP_MODEL`.
+5. **Sets up Piper TTS**: it enables `VOICE_ENABLED=true`, sets `LITERT_CPP_TTS_BACKEND=piper`, and prompts to install the recommended `hfc_female` voice.
+6. **Validates `.env`** has every key from `.env.example` (`check:env`).
+7. Leaves the repo ready for `npm run dev:backend` and optional benchmarking.
 
 Watch for `✅ Bridge staged from GitHub Actions artifact` to confirm the artifact was installed.
 
@@ -124,7 +126,7 @@ This step tests the complete user-facing experience with the C++ backend. Run it
 
 ```bash
 # Terminal 1 — start the C++ proxy (leave this running)
-npm run dev:litert-cpp
+npm run dev:backend
 
 # Terminal 2 — start Electron
 npm run dev
@@ -165,7 +167,7 @@ Work through each item and note ✅ pass / ❌ fail / ⚠️ partial in your rep
 If you skipped the voice install prompt or need to reinstall:
 ```bash
 npm run voice:install -- en/en_US/hfc_female/medium --use
-# then restart: npm run dev:litert-cpp
+# then restart: npm run dev:backend
 ```
 
 > **Note:** If Piper is disabled or its binary is missing, the proxy falls back to browser Web Speech automatically — this is the expected graceful-degradation path.

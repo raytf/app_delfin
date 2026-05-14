@@ -33,30 +33,33 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
               │
         WebSocket (localhost:8321/ws)
               │
-┌─────────────▼───────────────┐
-│  Python FastAPI Sidecar     │
-│  - LiteRT-LM Engine        │
-│  - Gemma 4 E2B / E4B       │
-│  - Tool calling (structured)│
-│  - Vision (base64 blobs)    │
-│  - TTS pipeline             │
-│  - Interrupt handler        │
-└─────────────────────────────┘
+┌─────────────▼────────────────┐   JSONL/stdio
+│  Node.js WebSocket Proxy     │◄──────────────►  delfin_litert_bridge (C++)
+│  scripts/litert-cpp-proxy.mjs│                  LiteRT-LM engine
+│  - Preset resolution         │                  Gemma 4 E2B / E4B
+│  - Piper TTS pipeline        │                  Vision + audio input
+│  - Session / interrupt mgmt  │                  KV-cache per session
+└──────────────────────────────┘
+
+  [Deprecated] Python FastAPI Sidecar (sidecar/server.py)
+    LiteRT-LM Python API · Kokoro/MLX TTS
+    Still reachable on the same ws://localhost:8321/ws endpoint
+    for developer reference; not used in packaged builds.
 ```
 
 ## Tech Stack
 
-| Layer             | Technology                                                             |
-| ----------------- | ---------------------------------------------------------------------- |
-| Desktop framework | Electron 34+ via electron-vite                                         |
-| Renderer          | React 19, TypeScript 5, Tailwind CSS 4                                 |
-| State management  | Zustand 5                                                              |
-| Validation        | Zod 3                                                                  |
-| Inference engine  | LiteRT-LM ≥ 0.10.1 (Python API)                                        |
-| Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                          |
-| API server        | FastAPI + uvicorn                                                      |
-| TTS               | kokoro-onnx (Linux/WSL2), mlx-audio (macOS), Web Speech API (fallback) |
-| WebSocket         | ws (Node.js client), FastAPI built-in (server)                         |
+| Layer             | Technology                                                                        |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Desktop framework | Electron 41+ via electron-vite                                                    |
+| Renderer          | React 19, TypeScript 6, Tailwind CSS 4                                            |
+| State management  | Zustand 5                                                                         |
+| Validation        | Zod 4                                                                             |
+| Inference engine  | LiteRT-LM C++ bridge (primary — all platforms); Python API (deprecated)           |
+| Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                                     |
+| API server        | Node.js WebSocket proxy (`litert-cpp-proxy.mjs`); FastAPI + uvicorn (deprecated)  |
+| TTS               | Piper TTS via litert-cpp-proxy (primary); Web Speech API (fallback)               |
+| WebSocket         | ws (Node.js client + proxy server)                                                |
 
 ## Active Work Map
 
@@ -110,12 +113,14 @@ These rules apply to every feature. The agent must follow them throughout.
 
 ## Environment Variables (.env)
 
-These are the supported configuration variables. `.env.example` must include all of them with documented defaults.
+`.env.example` is the authoritative reference for all configuration variables. Key variables are summarised here; see `.env.example` for full comments and the complete set.
 
 ```env
 # === Model ===
 MODEL_REPO=litert-community/gemma-4-E2B-it-litert-lm
+# MODEL_FILE is legacy — setup scripts use MODEL_REPO for HuggingFace downloads
 MODEL_FILE=gemma-4-E2B-it.litertlm
+# MODEL_REVISION pins the HuggingFace commit SHA — must be bumped with LITERT_LM_REF
 
 # === Sidecar ===
 SIDECAR_HOST=0.0.0.0
@@ -125,42 +130,40 @@ SIDECAR_PORT=8321
 SIDECAR_WS_URL=ws://localhost:8321/ws
 
 # === Inference ===
+# Dev default: litert (Python sidecar). M5a will flip to litert-cpp on all platforms.
+INFERENCE_BACKEND=litert
 LITERT_BACKEND=CPU
-LITERT_CACHE_DIR=/tmp/litert-cache
+LITERT_AUDIO_BACKEND=CPU
 VISION_TOKEN_BUDGET=280
 MAX_IMAGE_WIDTH=512
 
-# === LiteRT-LM C++ research backend ===
+# === Voice input ===
+VOICE_ENABLED=true
+
+# === LiteRT-LM C++ bridge (primary backend) ===
+# LITERT_CPP_BIN must point at delfin_litert_bridge[.exe] from native/litert-cpp-bridge/
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
-LITERT_CPP_BRIDGE_REPO=owner/repo
-LITERT_CPP_TTS_BACKEND=none
+LITERT_CPP_TTS_BACKEND=piper   # piper | none (none → renderer Web Speech fallback)
 LITERT_CPP_TTS_SOFT_MIN_CHARS=80
 LITERT_CPP_TTS_SOFT_MAX_CHARS=180
 PIPER_BIN=./bin/piper/venv/Scripts/piper.exe
 PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx
 PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json
-# Optional override; if omitted, the LiteRT C++ proxy reads audio.sample_rate
-# from PIPER_CONFIG. `npm run voice:use` writes this automatically.
-PIPER_SAMPLE_RATE=22050
+PIPER_SAMPLE_RATE=22050  # optional; proxy reads audio.sample_rate from PIPER_CONFIG when absent
 
-# LITERT_CPP_BIN must point at the Delfin JSONL/stdio bridge built from
-# native/litert-cpp-bridge/ (delfin_litert_bridge[.exe]). The upstream
-# litert_lm_main demo CLI is not a drop-in replacement — it does not speak
-# the Delfin JSONL protocol.
-#
-# For packaged Windows builds, LITERT_CPP_BIN points at the bundled prebuilt
-# delfin_litert_bridge.exe resource and LITERT_CPP_MODEL points at the user's
-# first-run-downloaded .litertlm model under app.getPath('userData').
-
-# === TTS ===
-TTS_ENABLED=false
-TTS_BACKEND=web-speech
+# === TTS (deprecated Python sidecar path only) ===
+TTS_ENABLED=true
+TTS_BACKEND=kokoro   # kokoro | mlx | web-speech
 KOKORO_VOICE=af_heart
 KOKORO_SPEED=1.1
 ```
 
-For `npm run dev:litert-cpp`, `TTS_BACKEND` does **not** control proxy speech output. Use `LITERT_CPP_TTS_BACKEND=piper` plus the `PIPER_*` paths to enable off-Python audio on the LiteRT C++ proxy. Piper audio is streamed as completed sentences arrive; for long text without punctuation, `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` allow conservative partial flushes before final `done`. `npm run setup:litert-cpp` is the one-shot setup path for Windows x64, macOS arm64, and Linux x64: it reuses existing `bin/` bridge files or downloads the matching CI workflow artifact (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, or `delfin-litert-bridge-linux-x64`) via `gh`, then provisions the model, repo-local Piper runtime, default voice, and `.env`. Source builds are reserved for backend developers via `--source-build` or `--bridge-source build`; default setup must not silently fall back to Bazel. `LITERT_CPP_BRIDGE_REPO` optionally overrides the GitHub repo used for artifact lookup when it cannot be inferred from `git remote origin`. The same setup command repairs missing runtime companion packages such as `pathvalidate`. `npm run voice:list`, `npm run voice:use -- <voice-name>`, and `npm run voice:install -- <hf-path> --use` remain available for voice management. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
+On `npm run dev:backend`, `TTS_BACKEND` and `TTS_ENABLED` have **no effect** — those variables control the deprecated Python sidecar. TTS for the C++ proxy is controlled by `LITERT_CPP_TTS_BACKEND`. Piper sentences flush on punctuation boundaries; `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` allow soft partial flushes for long text without punctuation.
+
+`npm run setup` is the canonical fresh-clone setup command for all platforms — it chains `setup:env` (seed `.env` from `.env.example`), `setup:litert-cpp` (download the CI-built bridge artifact or rebuild from source via `--source-build`, provision the Gemma 4 model, bootstrap the repo-local Piper runtime, install the default voice, patch `.env`), and `check:env` (validate `.env` keys). `LITERT_CPP_BRIDGE_REPO` overrides the GitHub repo for artifact lookup. Voice management: `npm run voice:list`, `voice:use -- <voice-name>`, `voice:install -- <hf-path> --use`. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
+
+`LITERT_LM_REF` (in `scripts/setup-litert-cpp.mjs`) and `MODEL_REVISION` must always be bumped together when upgrading the bridge. After bumping and waiting for CI to publish new artifacts, run `npm run setup:litert-cpp` — it reads `bin/bridge.version` (written on every successful download/build) and auto-detects stale local installs, replacing them with the new artifact. See `AGENTS.md` §Validated Technical Decisions (`LITERT_LM_REF pin`, `Bridge version tracking`) for the full procedure and `README.md` §Updating the LiteRT-LM bridge for a step-by-step.
 
 ## WebSocket Message Protocol
 
@@ -172,8 +175,9 @@ All messages between Electron and the sidecar are JSON. These types are the cont
 // Inference request
 interface WsOutboundMessage {
   image?: string; // base64 JPEG
-  text: string; // user question
+  text: string; // user question or VOICE_TURN_TEXT constant
   preset_id: string; // 'lecture-slide' | 'generic-screen'
+  audio?: string; // base64 WAV (voice turns only — 16 kHz, 16-bit mono)
 }
 
 // Interrupt
@@ -188,22 +192,15 @@ interface WsInterruptMessage {
 interface WsInboundMessage {
   type:
     | "token"
-    | "structured"
     | "audio_start"
     | "audio_chunk"
     | "audio_end"
     | "done"
     | "error";
   text?: string; // for 'token'
-  data?: {
-    // for 'structured'
-    summary: string;
-    answer: string;
-    key_points: string[];
-  };
   audio?: string; // for 'audio_chunk' — base64 int16 PCM
   sample_rate?: number; // for 'audio_start' — PCM sample rate
-  sentence_count?: number; // for 'audio_start' — optional sentence metadata (proxy may send 0 when unknown)
+  sentence_count?: number; // for 'audio_start' — proxy may send 0 when unknown
   index?: number; // for 'audio_chunk' — sentence index
   tts_time?: number; // for 'audio_end' — synthesis time in seconds
   message?: string; // for 'error'
@@ -217,6 +214,8 @@ token* → audio_start → audio_chunk* → audio_end → done
 ```
 
 This means `done` represents the end of the full turn, not just the end of token streaming.
+
+The `done` event from the proxy to Electron has no extra fields — `{"type":"done"}`. The proxy accumulates `streamedText` from token events and uses it for TTS and downstream logic; the bridge's internal `done` JSONL event does not echo text. See `AGENTS.md` §Validated Technical Decisions (Bridge-minimal design) for the rationale.
 
 ### IPC Channels (Electron Main ↔ Renderer)
 
@@ -235,7 +234,6 @@ This means `done` represents the end of the full turn, not just the end of token
 | Renderer → Main | `session:get-message-image` | `{ imagePath: string }`                                    |
 | Main → Renderer | `frame:captured`            | `CaptureFrame`                                             |
 | Main → Renderer | `sidecar:token`             | `{ text: string }`                                         |
-| Main → Renderer | `sidecar:structured`        | `{ summary, answer, key_points }`                          |
 | Main → Renderer | `sidecar:audio_start`       | `{ sampleRate: number, sentenceCount: number }`            |
 | Main → Renderer | `sidecar:audio_chunk`       | `{ audio: string, index?: number }`                        |
 | Main → Renderer | `sidecar:audio_end`         | `{ ttsTime: number }`                                      |
@@ -243,3 +241,21 @@ This means `done` represents the end of the full turn, not just the end of token
 | Main → Renderer | `overlay:error`             | `{ message: string }`                                      |
 | Main → Renderer | `sidecar:error`             | `{ message: string }`                                      |
 | Main → Renderer | `sidecar:status`            | `{ connected: boolean, backend?: string, model?: string }` |
+| Renderer → Main | `models:get-status`         | —                                                          |
+| Renderer → Main | `models:download`           | `{ assets?: ModelAssetId[] }`                              |
+| Main → Renderer | `models:status`             | `ModelStatus`                                              |
+| Main → Renderer | `models:download-progress`  | `DownloadProgress`                                         |
+| Main → Renderer | `models:download-complete`  | `{ asset: ModelAssetId }`                                  |
+| Main → Renderer | `models:download-error`     | `{ asset?: ModelAssetId, message: string }`                |
+
+`ModelAssetId = 'litert-cpp-model' | 'piper-bin' | 'piper-voice'`. `ModelStatus = { ready: boolean, missing: ModelAssetId[], downloadInProgress: boolean }`. `DownloadProgress = { asset: ModelAssetId, receivedBytes: number, totalBytes?: number, percent?: number }`. These channels drive the first-run asset download flow (`SetupScreen.tsx`, `modelHandlers.ts`).
+
+## HTTP Endpoints
+
+The Node WebSocket proxy (`scripts/litert-cpp-proxy.mjs`) exposes one HTTP endpoint on the same port (8321):
+
+| Method | Path      | Response                                                            |
+| ------ | --------- | ------------------------------------------------------------------- |
+| `GET`  | `/health` | `{ status: "ok", backend: string, model: string }` (200) or error object (500) |
+
+`src/main/sidecar/healthCheck.ts` polls this endpoint after spawn to confirm the bridge is ready before the renderer is shown. The deprecated Python FastAPI sidecar exposes the same `/health` path with an extended payload (`model_loaded`, vision token budget, etc.).

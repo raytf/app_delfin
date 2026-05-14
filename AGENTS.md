@@ -8,7 +8,7 @@
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
-Current app runtime is Electron → Python FastAPI sidecar → LiteRT-LM on macOS / Linux / WSL2, and Electron → Node WebSocket proxy → LiteRT-LM C++ bridge on native Windows. The legacy llamafile / `llama-server` path is **deprecated** — kept only for benchmark comparison (`scripts/benchmark/`); it is no longer the desktop distribution target.
+Current app runtime is **Electron → Node WebSocket proxy (`litert-cpp-proxy.mjs`) → LiteRT-LM C++ bridge (`delfin_litert_bridge`)** on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar/server.py`) is **deprecated** — retained for developer reference only. The legacy llamafile / `llama-server` path is also **deprecated** — kept only for benchmark comparison under `scripts/benchmark/`.
 
 ---
 
@@ -62,7 +62,8 @@ docs/
 │   │   ├── litert-cpp-audio-input-spec.md             ← ✅ Complete (Windows, 2026-05-03) — AC1–AC7 validated; macOS/Linux audio pending M4 cross-platform builds.
 │   │   ├── litert-cpp-primary-backend-migration-spec.md ← 🚧 M1 (audio) ✅, M3 (Piper TTS) ✅; M2 (tool-calling) + M4 (macOS/Linux builds) pending. Gate 1 active.
 │   │   ├── litert-cpp-bridge-build-dx-spec.md         ← 🚧 Build DX: vendored prebuilt LiteRT-LM bundle + CI workflow split + optional Bazel remote cache. Gate 1 — awaiting approval.
-│   │   └── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
+│   │   ├── inference-benchmarking-spec.md             ← ✅ Benchmark harness (LiteRT / LiteRT-CPP / llamafile); script lives in scripts/benchmark
+│   │   └── litert-cpp-piper-daemon-spec.md            ← 🚧 Long-lived Piper daemon to eliminate per-turn cold-start; Gate 1 — awaiting approval
 │   ├── distribution/                ← Packaging, installers, code signing, CI/CD
 │   │   ├── desktop-distribution-mvp-spec.md           ← 🚧 Decision record (revised 2026-05-06): LiteRT-LM C++ bridge on Windows x64 / macOS arm64 / Linux x64; Python sidecar deprecated for distribution. Gate 1 approved.
 │   │   ├── distribution-backend-migration-spec.md     ← 🚧 Wire `litert-cpp-proxy.mjs` into packaged runtime on all 3 OSes. Revised 2026-05-06. Gate 1 — awaiting approval.
@@ -233,43 +234,44 @@ git push && git push --tags
 ## Development Commands
 
 ```bash
-# Start EVERYTHING from one command (Electron + Vite dev server + Python sidecar)
-npm run dev:full
-
-# Electron + Vite only (when running sidecar separately or using mock)
+# Start EVERYTHING — full stack (C++ backend proxy + Electron/Vite) — primary workflow
 npm run dev
 
-# Mock sidecar (use while building Electron UI — no model needed)
-node scripts/mock-sidecar.js
+# Frontend only (when running backend in a separate terminal)
+npm run dev:frontend
 
-# Real sidecar only (from repo root, inside a venv)
-cd sidecar
-pip install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8321
+# Backend only — LiteRT C++ proxy with Piper TTS (run `npm run setup` first)
+npm run dev:backend
+
+# Mock backend + frontend (UI development, no model needed)
+npm run dev:mock
+
+# Deprecated: TypeScript session sidecar + frontend (no inference backend)
+npm run dev:sidecar
+
+# First-time setup
+npm run setup                  # full setup: env + litert-cpp + env check
+npm run setup:litert-cpp       # download prebuilt bridge artifacts + model + Piper voice
 
 # Environment check
-bash scripts/setup-check.sh
+bash scripts/setup-check.sh    # macOS / Linux
+npm run check:windows          # Windows (PowerShell)
 
-# Piper voice management for the LiteRT C++ proxy path
+# Piper voice management
 npm run voice:list
 npm run voice:use -- en_US-hfc_female-medium
 npm run voice:install -- en/en_US/hfc_female/medium --use
 
-# Test WebSocket sidecar manually (install wscat: npm i -g wscat)
+# Test WebSocket backend manually (install wscat: npm i -g wscat)
 wscat -c ws://localhost:8321/ws
 # then type: {"text": "Summarize this slide", "preset_id": "lecture-slide"}
 
-# Benchmark dependencies (install into the active Python env for the shell you are using)
-pip install -r scripts/benchmark/requirements.txt
+# Benchmarks (install deps first: pip install -r scripts/benchmark/requirements.txt)
+npm run benchmark:litert-cpp   # LiteRT C++ bridge benchmark (5 runs)
+npm run benchmark:litert-py    # Python LiteRT sidecar benchmark — deprecated comparison only
 
-# Benchmark current LiteRT sidecar (run from WSL2 with npm run dev:sidecar already running)
-python scripts/benchmark/run.py --backend litert --sidecar-pid <PID> --runs 5 --scenarios s1,s2,s3
-
-# Benchmark llamafile / llama-server (run natively with server already listening on localhost:8080)
-python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --runs 5 --scenarios s1,s2,s3
-
-# Optional: let the benchmark launch llama-server / llamafile and track its PID automatically
-python scripts/benchmark/run.py --backend llamafile --llamafile-bin <path-to-llama-server> --llamafile-model <path-to-gemma-gguf>
+# Build C++ bridge from source (slow — requires Bazel + LiteRT-LM dep tree)
+npm run bridge:build
 ```
 
 Benchmark output is written to `results/`. Commit `results/.gitkeep` only; do **not** commit generated benchmark JSON/CSV files.
@@ -281,11 +283,15 @@ Benchmark output is written to `results/`. Commit `results/.gitkeep` only; do **
 ```
 Electron Renderer (React/Zustand)
         ↕ contextBridge (IPC)
-Electron Main (Node.js)  ←→  WebSocket ws://localhost:8321/ws  ←→  Python FastAPI sidecar
-                                                                      └── LiteRT-LM + Gemma 4 E2B
+Electron Main (Node.js)  ←→  WebSocket ws://localhost:8321/ws  ←→  litert-cpp-proxy.mjs (Node.js)
+                                                                      ├── delfin_litert_bridge[.exe] (C++)
+                                                                      │     └── LiteRT-LM + Gemma 4 E2B
+                                                                      └── piper (TTS subprocess)
 ```
 
 All inference I/O flows over **WebSocket** (not HTTP POST / SSE). See `docs/SPEC.md` §WebSocket Message Protocol for the full JSON contract.
+
+The C++ bridge is a thin inference kernel (JSONL over stdio). The Node.js proxy is the application layer: WebSocket server, preset resolution, TTS orchestration, health endpoint, session state. See `docs/explanations/sidecar-flow.md` §Why the Proxy Exists for the full boundary map.
 
 ---
 
@@ -304,14 +310,16 @@ These are confirmed facts — do not revisit without good reason:
 | **Voice turn text field**         | For pure voice turns, `text` is set to the constant `VOICE_TURN_TEXT = "Please respond to what the user just asked."`. Empty string is not used because `sessionHandlers.ts` has an empty-text guard; the fixed instruction also gives the model explicit context about its role.                                                                                                                                                                       |
 | **Audio backend**                 | `audio_backend` in `litert_lm.Engine` is always CPU (GPU audio not supported). Exposed as `LITERT_AUDIO_BACKEND` env var but defaults to `CPU`. The engine already has `audio_backend=litert_lm.Backend.CPU` in both GPU-attempt and CPU-fallback paths.                                                                                                                                                                                                |
 | **Web Speech fallback cleanup**  | When the renderer falls back to `SpeechSynthesisUtterance`, it must clear the assistant-speaking state on `onend` / `onerror`. If that state is left `true`, the VAD auto-mute effect never releases and later voice turns appear dead even though `vad-web` is still mounted.                                                                                                                                                                         |
-| **LiteRT C++ proxy TTS**         | `npm run dev:litert-cpp` bypasses `sidecar/tts.py`. Off-Python speech on that path is controlled by `LITERT_CPP_TTS_BACKEND`; with `piper`, `scripts/litert-cpp-proxy.mjs` emits `audio_start` / `audio_chunk` / `audio_end` before final `done` as completed sentences arrive, plus conservative long partial chunks controlled by `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS`. **Dev mode:** `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime under `bin/piper/venv`, repairs missing companion packages such as `pathvalidate`, installs/activates the default Piper voice, and writes the required `PIPER_*` values automatically. **Packaged app:** Piper is NOT bundled in the installer. `assetManager.ts` downloads a standalone Piper binary (GitHub releases, platform-specific zip/tar.gz) and the voice ONNX+config from HuggingFace into `app.getPath('userData')` on first run — Python is not required on the end-user's machine. `backendProcess.ts` resolves `PIPER_BIN`/`PIPER_MODEL`/`PIPER_CONFIG` from `userData` paths. If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes and the renderer falls back to browser Web Speech.                                                                 |
+| **LiteRT C++ proxy TTS**         | `npm run dev:backend` bypasses `sidecar/tts.py`. Off-Python speech on that path is controlled by `LITERT_CPP_TTS_BACKEND`; with `piper`, `scripts/litert-cpp-proxy.mjs` emits `audio_start` / `audio_chunk` / `audio_end` before final `done` as completed sentences arrive, plus conservative long partial chunks controlled by `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS`. **Dev mode:** `npm run setup:litert-cpp` bootstraps a repo-local pinned `piper-tts` Python runtime under `bin/piper/venv`, repairs missing companion packages such as `pathvalidate`, installs/activates the default Piper voice, and writes the required `PIPER_*` values automatically. **Packaged app:** Piper is NOT bundled in the installer. `assetManager.ts` downloads a standalone Piper binary (GitHub releases, platform-specific zip/tar.gz) and the voice ONNX+config from HuggingFace into `app.getPath('userData')` on first run — Python is not required on the end-user's machine. `backendProcess.ts` resolves `PIPER_BIN`/`PIPER_MODEL`/`PIPER_CONFIG` from `userData` paths. If Piper is disabled, misconfigured, or fails mid-turn, the proxy still completes and the renderer falls back to browser Web Speech.                                                                 |
 | **Barge-in protection**           | Two-layer: (1) raise Silero `positiveSpeechThreshold` from 0.50 → 0.92 while AI is speaking; (2) 800 ms grace period after `audio_start` during which `onSpeechStart` is silently ignored, preventing the mic from picking up the AI's own voice.                                                                                                                                                                                                       |
 | **WSL2 espeak-ng fix**            | `espeakng_loader` can ship a Linux `.so` with a hardcoded CI data path. On WSL2/Linux, patch the baked-in share path to a short symlink (currently `/tmp/espk`) that points at the packaged `espeak-ng-data` directory before using `kokoro-onnx`.                                                                                                                                                                                                      |
 | **Benchmark harness**             | `scripts/benchmark/run.py` compares the current LiteRT sidecar over WebSocket with llamafile/`llama-server` over OpenAI-compatible REST streaming. It measures TTFT, throughput, total turn time, approximate/exact output token count, peak RSS when a PID is available, and system metadata.                                                                                                                                                          |
 | **Benchmark outputs**             | Benchmark runs write JSON plus an append-friendly daily CSV under `results/`. Keep `results/.gitkeep`; generated result files are runtime artifacts and should stay gitignored.                                                                                                                                                                                                                                                                         |
 | **One-shot LiteRT C++ setup**     | `npm run setup:litert-cpp` is artifact-first on supported hosts: existing `bin/` bridge files → matching CI workflow artifact via `gh` (`delfin-litert-bridge-windows-x64`, `delfin-litert-bridge-macos-arm64`, `delfin-litert-bridge-linux-x64`) → model + Piper runtime/voice + `.env`. It must not silently fall back to Bazel/source builds. Backend developers use `--source-build` (or compatibility `--bridge-source build`) to clone/use LiteRT-LM and build locally. Use `--wsl2-instructions` to print the older WSL2 guidance. macOS is arm64 only (Intel Macs out of scope).                   |
-| **LITERT_LM_REF pin**             | The constant `LITERT_LM_REF` in `scripts/setup-litert-cpp.mjs` (default `v0.10.2`, overridable via the env var of the same name) is the single source of truth for which upstream LiteRT-LM commit both the local setup script and the CI matrix workflow clone and build against. Update it there; the CI workflow reads it at runtime via `node -e`. **Always bump `MODEL_REVISION` in the same commit** — the two constants must stay in sync so the downloaded model's ABI matches the bridge. Bump procedure: (1) update `LITERT_LM_REF` to the new tag; (2) find the matching HuggingFace commit SHA from `https://huggingface.co/api/models/<MODEL_REPO>/commits/main`; (3) set `MODEL_REVISION` to that SHA; (4) push — CI rebuilds the bridge artifacts automatically. |
+| **LITERT_LM_REF pin**             | The constant `LITERT_LM_REF` in `scripts/setup-litert-cpp.mjs` (overridable via the env var of the same name) is the single source of truth for which upstream LiteRT-LM tag both the local setup script and the CI matrix workflow clone and build against. The CI workflow reads it at runtime via `node -e`. **Always bump `MODEL_REVISION` in the same commit** — the two constants must stay in sync so the downloaded model's ABI matches the bridge. Bump procedure: (1) update `LITERT_LM_REF` to the new tag; (2) find the matching HuggingFace commit SHA from `https://huggingface.co/api/models/<MODEL_REPO>/commits/main`; (3) set `MODEL_REVISION` to that SHA; (4) commit and push — CI rebuilds the bridge artifacts automatically; (5) wait for the CI run to succeed, then run `npm run setup:litert-cpp` locally — it reads `bin/bridge.version` and re-downloads when the installed ref doesn't match the new pin (no `--bridge-source artifact` flag needed). |
+| **Bridge version tracking**       | `scripts/setup-litert-cpp.mjs` writes `bin/bridge.version` (gitignored, runtime-only) containing the `LITERT_LM_REF` string after every successful bridge download or source build. `resolveBridgePlan()` reads it on subsequent runs: if the file is missing or its contents don't match the pinned `LITERT_LM_REF`, the plan switches from `existing` to `artifact` (a download) automatically and logs `Bridge version mismatch: installed X, required Y — re-downloading`. This is what makes the bump procedure above "just work" without extra flags. |
 | **CI bridge binary workflow**     | `.github/workflows/build-litert-cpp-bridge.yml` owns native bridge binary production for all three platforms (windows-x64, macos-arm64, linux-x64). It triggers on push/PR to `main`, on `release.published`, and on `workflow_dispatch`. It uploads per-platform archives as workflow artifacts and attaches them to GitHub Releases. The full `dist.yml` electron-builder packaging matrix (Track DC1) should consume these artifacts rather than rebuilding the bridge inline. |
+| **Bridge-minimal design**         | The C++ bridge (`native/litert-cpp-bridge/delfin_litert_bridge.cc`) is a thin inference kernel — it loads the model, streams tokens, manages per-session KV-cache, and handles interrupts. Nothing else. All application-layer concerns (WebSocket server, TTS, preset resolution, health endpoint, per-connection session state, error formatting) live in `scripts/litert-cpp-proxy.mjs`. **A new Delfin feature belongs in the proxy by default.** It only touches the bridge if it requires a new LiteRT-LM API call, a new hardware backend, or a new content modality. This keeps bridge rebuilds rare (Bazel + full LiteRT-LM dep tree is slow). The bridge's `done` event carries only `{"type":"done","requestId":"..."}` — no text echo; the proxy uses its own accumulated `streamedText` for TTS and downstream use. See `docs/explanations/sidecar-flow.md` §Why the Proxy Exists for the full boundary map. |
 
 ---
 

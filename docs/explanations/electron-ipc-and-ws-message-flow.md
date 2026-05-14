@@ -2,16 +2,16 @@
 
 ## The Problem to Solve
 
-React runs in a sandboxed renderer process. The model runs in a Python process. They cannot talk to each other directly. Every prompt has to travel through three processes (renderer → Electron main → Python sidecar) and the response has to come back the same way.
+React runs in a sandboxed renderer process. The model runs in a separate Node.js proxy process (which itself drives a native C++ binary). They cannot talk to each other directly. Every prompt has to travel through three processes (renderer → Electron main → inference backend) and the response has to come back the same way.
 
 ---
 
 ## The Three Processes
 
 ```
-[Renderer process]          [Main process]           [Python sidecar]
- React + Zustand             Node.js                  FastAPI + Gemma 4
-      ↕ contextBridge IPC         ↕ WebSocket
+[Renderer process]          [Main process]           [Inference backend]
+ React + Zustand             Node.js                  litert-cpp-proxy.mjs
+      ↕ contextBridge IPC         ↕ WebSocket            + delfin_litert_bridge (C++)
 ```
 
 The renderer is isolated for security — it has no direct access to the filesystem, OS APIs, or the network. The main process is the broker that owns both the WebSocket connection and the OS-level APIs.
@@ -64,32 +64,32 @@ socket.send(JSON.stringify({ image: "<base64 JPEG>", text: "...", preset_id: "le
 
 The `socket` is a persistent `ws.WebSocket` instance opened at app startup. If it's not connected, `sendToSidecar` throws, which propagates back to the renderer as an error.
 
-### 5. Sidecar receives and processes (`sidecar/server.py`)
+### 5. Backend receives and processes (`scripts/litert-cpp-proxy.mjs`)
 
-The single `receiver()` coroutine puts the message on a queue. The main loop picks it up and calls `handle_turn()`:
+The proxy receives the WebSocket message and forwards it to the C++ bridge over stdin as a JSONL `generate` request, including the stable `sessionId` for KV-cache continuity and the resolved system prompt for the `preset_id`.
 
-```
-image blob → resize_image_blob()
-content = [{"type":"image","blob":...}, {"type":"text","text":"..."}]
-conversation.send_message_async(content)  ← runs the model in a thread executor
-```
+The C++ bridge streams tokens back over stdout one per line:
 
-Tokens come out of the model one at a time. Each one is sent immediately:
-
-```python
-await ws.send_json({"type": "token", "text": chunk})
+```json
+{"type":"token","requestId":"...","text":"The "}
 ```
 
-When the stream ends, the sidecar may optionally emit server-side TTS messages before the final `done`:
+The proxy forwards each token to Electron immediately:
 
-```python
-await ws.send_json({"type": "audio_start", "sample_rate": 24000})
-await ws.send_json({"type": "audio_chunk", "audio": "...", "index": 0})
-await ws.send_json({"type": "audio_end", "tts_time": 0.72})
-await ws.send_json({"type": "done"})
+```json
+{"type":"token","text":"The "}
 ```
 
-The bridge defaults `sentence_count` to `0` on the renderer side when the sidecar doesn't include it.
+While tokens accumulate, the proxy feeds complete sentences to Piper TTS. After the bridge signals `done` and all TTS audio has been sent, the proxy emits the full audio sequence followed by `done`:
+
+```json
+{"type":"audio_start","sample_rate":22050,"sentence_count":0}
+{"type":"audio_chunk","audio":"...","index":0}
+{"type":"audio_end","tts_time":0.72}
+{"type":"done"}
+```
+
+The renderer defaults `sentence_count` to `0` when the proxy omits it. If Piper is disabled, the audio messages are skipped and only `token*` → `done` is sent.
 
 ---
 
@@ -162,7 +162,7 @@ When `done` arrives, `finishAssistantResponse()` sets `isSubmitting: false` and 
 ## Complete Flow Diagram
 
 ```
-[Renderer]                  [Main process]              [Sidecar]
+[Renderer]                  [Main process]              [litert-cpp-proxy]
 handleSubmitPrompt()
   messageId = randomUUID()
   beginPromptSubmission({messageId,prompt})   (adds placeholder bubble)
@@ -171,8 +171,8 @@ handleSubmitPrompt()
                                                            captureForegroundWindow()
                                                            recordUserPrompt() → disk
                                                            sendToSidecar() ────→ ws.send()
-                                                                                  handle_turn()
-                                                                                  ↓ tokens
+                                                                                  bridge.generate()
+                                                                                  ↓ tokens (stdio)
                           ←─ webContents.send ──────────── sidecarBridge        ←─ ws.on('message')
   onSidecarToken fires                                     appendAssistantToken() → disk
   appendAssistantText()

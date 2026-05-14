@@ -18,11 +18,24 @@ export const LITERT_LM_REPO = 'https://github.com/google-ai-edge/LiteRT-LM.git'
 // Pinned upstream LiteRT-LM ref. Both this script and the CI workflow at
 // .github/workflows/build-litert-cpp-bridge.yml consume this constant — keep
 // them in sync. Bump only after revalidating the bridge against the new ref.
-export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.10.2'
+export const LITERT_LM_REF = process.env.LITERT_LM_REF ?? 'v0.11.0'
 // Pinned HuggingFace model revision that matches LITERT_LM_REF above.
 // Must be bumped together with LITERT_LM_REF whenever the bridge is updated.
 // Use the exact commit SHA from huggingface.co/<repo>/commits/main.
-export const MODEL_REVISION = process.env.MODEL_REVISION ?? '84b6978eff6e4eea02825bc2ee4ea48579f13109'
+export const MODEL_REVISION = process.env.MODEL_REVISION ?? '6e5c4f1e395deb959c494953478fa5cec4b8008f'
+// Records the LITERT_LM_REF used when the bridge was last downloaded or built.
+// Written to bin/ alongside the binary; read by resolveBridgePlan to detect stale installs.
+export const BRIDGE_VERSION_FILE = join(rootDir, 'bin', 'bridge.version')
+
+function readInstalledBridgeRef() {
+  try { return readFileSync(BRIDGE_VERSION_FILE, 'utf8').trim() } catch { return null }
+}
+
+function writeBridgeVersion(ref = LITERT_LM_REF) {
+  mkdirSync(join(rootDir, 'bin'), { recursive: true })
+  writeFileSync(BRIDGE_VERSION_FILE, ref + '\n', 'utf8')
+}
+
 const DEFAULT_PIPER_VOICE = 'en/en_US/hfc_female/medium'
 const HF_BASE = 'https://huggingface.co'
 const BRIDGE_WORKFLOW_NAME = 'build-litert-cpp-bridge.yml'
@@ -121,15 +134,15 @@ function resolveGitHubRepo(opts, env = process.env) {
   return parseGitHubRepoFromRemote(result.stdout)
 }
 
-export function resolveBridgePlan(opts, platform = process.platform, filesPresent = bridgeFilesPresent(platform), arch = process.arch) {
+export function resolveBridgePlan(opts, platform = process.platform, filesPresent = bridgeFilesPresent(platform), arch = process.arch, installedRef = readInstalledBridgeRef()) {
   if (opts.skipBuild) return { source: 'skip', needsLiteRtLm: false }
   if (opts.bridgeSource === 'existing') return { source: 'existing', needsLiteRtLm: false }
   if (opts.sourceBuild || opts.bridgeSource === 'build') return { source: 'build', needsLiteRtLm: true }
   if (opts.bridgeSource === 'release') return { source: 'release', needsLiteRtLm: false }
   if (opts.bridgeSource === 'artifact') return { source: 'artifact', needsLiteRtLm: false }
-  if (filesPresent) return { source: 'existing', needsLiteRtLm: false }
+  if (filesPresent && installedRef === LITERT_LM_REF) return { source: 'existing', needsLiteRtLm: false }
   if (!defaultBridgeArtifactName(platform, arch)) return { source: 'unsupported', needsLiteRtLm: false }
-  return { source: 'artifact', needsLiteRtLm: false }
+  return { source: 'artifact', needsLiteRtLm: false, stale: filesPresent }
 }
 
 async function fetchJson(url) {
@@ -402,6 +415,7 @@ async function downloadReleaseBridge(opts) {
     })
     if (process.platform !== 'win32' && file === bridgeExecutableName()) chmodSync(join(rootDir, 'bin', file), 0o755)
   }
+  writeBridgeVersion()
   console.log('[setup-litert-cpp] ✅ Bridge staged from latest GitHub Release.')
 }
 
@@ -450,6 +464,7 @@ function stageBridgeArtifact(tempDir, platform = process.platform) {
   if (!bridgeFilesPresent(platform)) {
     throw new Error('Workflow artifact download completed but required bridge files are still missing from bin/.')
   }
+  writeBridgeVersion()
 }
 
 async function downloadWorkflowBridge(opts) {
@@ -494,6 +509,7 @@ async function buildBridgeFromSource(litertLmDir, opts) {
   }
   await stepClone(litertLmDir, opts)
   await stepBuild(litertLmDir, opts)
+  writeBridgeVersion()
 }
 
 async function stepBridge(litertLmDir, opts, bridgePlan) {
@@ -508,6 +524,9 @@ async function stepBridge(litertLmDir, opts, bridgePlan) {
     }
     console.log('[setup-litert-cpp] ✅ Bridge already present in bin/ — skipping provisioning.')
     return
+  }
+  if (bridgePlan.stale) {
+    console.log(`[setup-litert-cpp] ⚠️  Bridge version mismatch: installed ${readInstalledBridgeRef() ?? 'unknown'}, required ${LITERT_LM_REF} — re-downloading.`)
   }
   if (opts.dryRun) {
     console.log(`[setup-litert-cpp] [dry-run] Bridge strategy: ${bridgePlan.source}`)
