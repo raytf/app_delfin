@@ -27,10 +27,7 @@ Rules:
 - Keep explanations short and clear, but detailed enough to help
 `.trim();
 
-const PRESETS: Record<string, string> = {
-  'lecture-slide': lectureSlidePrompt,
-  'generic-screen': genericScreenPrompt,
+export const PRESETS: Record<string, string> = {
+  "lecture-slide": lectureSlidePrompt,
+  "generic-screen": genericScreenPrompt,
 };
-
-export const resolvePresetPrompt = (presetId: string): string =>
-  PRESETS[presetId] ?? PRESETS['generic-screen'];

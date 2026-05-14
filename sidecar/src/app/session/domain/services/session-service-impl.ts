@@ -9,6 +9,7 @@ import { Session } from "../entities/session";
 import { SessionMessage } from "../entities/session-message";
 import { SessionAggregate as SessionAggregateClass } from "../aggregates/session-aggregate";
 import { NotFoundException } from "../../../../shared/exceptions/not-found-exception";
+import { resolvePresetPrompt } from "../../../../shared/utils/common";
 
 export class SessionServiceImpl implements SessionService {
   constructor(
@@ -23,12 +24,14 @@ export class SessionServiceImpl implements SessionService {
     });
     await this.inferenceEngine.createConversation({
       conversationId: session.id,
-      systemPrompt: session.presetId,
+      systemPrompt: resolvePresetPrompt(session.presetId),
     });
     try {
       return await this.sessionRepository.create(session);
     } catch (error) {
-      await this.inferenceEngine.dropConversation(session.id).catch(() => undefined);
+      await this.inferenceEngine
+        .dropConversation(session.id)
+        .catch(() => undefined);
       throw error;
     }
   }
@@ -80,7 +83,9 @@ export class SessionServiceImpl implements SessionService {
   }
 
   async deleteById(sessionId: string): Promise<void> {
-    await this.inferenceEngine.dropConversation(sessionId).catch(() => undefined);
+    await this.inferenceEngine
+      .dropConversation(sessionId)
+      .catch(() => undefined);
     await this.sessionRepository.deleteById(sessionId);
   }
 
