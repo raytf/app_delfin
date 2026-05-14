@@ -1,12 +1,12 @@
 /**
- * Runs scripts/benchmark/run.py using the sidecar virtualenv Python so that
+ * Runs scripts/benchmark/run.py using the sidecar-old virtualenv Python so that
  * benchmark dependencies (httpx, psutil, etc.) are always available without
  * a separate install step.
  *
  * Usage:
  *   node scripts/run-benchmark.mjs [run.py args...]
- *   npm run benchmark:litert
- *   npm run benchmark:llamafile
+ *   npm run benchmark:litert-cpp
+ *   npm run benchmark:litert-py
  */
 
 import { spawn } from 'node:child_process'
@@ -15,7 +15,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const sidecarDir = join(rootDir, 'sidecar')
+// The deprecated Python sidecar lives in sidecar-old/ (sidecar/ is the TypeScript sidecar).
+const sidecarDir = join(rootDir, 'sidecar-old')
 const venvPython = process.platform === 'win32'
   ? join(sidecarDir, '.venv', 'Scripts', 'python.exe')
   : join(sidecarDir, '.venv', 'bin', 'python')

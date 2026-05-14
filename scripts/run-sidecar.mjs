@@ -6,7 +6,8 @@ import { config as dotenvConfig } from 'dotenv'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 dotenvConfig({ path: join(rootDir, '.env') })
-const sidecarDir = join(rootDir, 'sidecar')
+// The deprecated Python sidecar lives in sidecar-old/ (sidecar/ is the TypeScript sidecar).
+const sidecarDir = join(rootDir, 'sidecar-old')
 const venvPython = process.platform === 'win32'
   ? join(sidecarDir, '.venv', 'Scripts', 'python.exe')
   : join(sidecarDir, '.venv', 'bin', 'python')
