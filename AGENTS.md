@@ -266,9 +266,10 @@ npm run voice:install -- en/en_US/hfc_female/medium --use
 wscat -c ws://localhost:8321/ws
 # then type: {"text": "Summarize this slide", "preset_id": "lecture-slide"}
 
-# Benchmarks (install deps first: pip install -r scripts/benchmark/requirements.txt)
+# Benchmarks (run-benchmark.mjs auto-provisions scripts/benchmark/.venv)
 npm run benchmark:litert-cpp   # LiteRT C++ bridge benchmark (5 runs)
 npm run benchmark:litert-py    # Python LiteRT sidecar benchmark — deprecated comparison only
+npm run benchmark:sweep        # auto-sweep LITERT_BACKEND=CPU,GPU — spawns the sidecar per config
 
 # Build C++ bridge from source (slow — requires Bazel + LiteRT-LM dep tree)
 npm run bridge:build

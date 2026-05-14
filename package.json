@@ -30,6 +30,7 @@
     "voice:install": "node scripts/piper-voice.mjs install",
     "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
     "benchmark:litert-py": "node scripts/run-benchmark.mjs --backend litert --runs 5",
+    "benchmark:sweep": "node scripts/benchmark-sweep.mjs",
     "test:bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\test-ci-bridge.ps1",
     "test": "vitest run",
     "dist": "npm run build && electron-builder",

@@ -40,5 +40,6 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 - `npm run check:windows` or `bash scripts/setup-check.sh` — environment check.
 - `npm run benchmark:litert-cpp` — LiteRT-CPP benchmark.
 - `npm run benchmark:litert-py` — Python LiteRT benchmark (deprecated comparison only).
+- `npm run benchmark:sweep` — auto-sweep `LITERT_BACKEND` (CPU/GPU): spawns the sidecar per config, benchmarks, tears down.
 
 Benchmark outputs go under `results/`; commit `results/.gitkeep` only, not generated JSON/CSV files.

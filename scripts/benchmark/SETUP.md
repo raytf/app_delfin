@@ -115,6 +115,31 @@ them, and pivot by `device_label` × `litert_backend` × `scenario`.
 > **Tip:** the per-run JSON embeds the full `sysinfo` block (CPU model, core
 > counts, RAM, GPU) under `meta.system` if you need more detail than the CSV.
 
+### Automated sweep (one command, CPU vs GPU)
+
+`npm run benchmark:sweep` automates the per-config loop on a single machine.
+It spawns the TypeScript sidecar once per `LITERT_BACKEND` value, waits for the
+model to load, benchmarks it, and tears the sidecar down before the next config
+— so one command produces a full CPU-vs-GPU comparison without editing `.env`
+or restarting anything by hand.
+
+```bash
+npm run benchmark:sweep                                    # CPU then GPU, defaults
+npm run benchmark:sweep -- --litert-backends CPU,GPU \
+  --runs 5 --scenarios s1,s2,s3 --device-label ryzen-5800x
+```
+
+The sidecar must **not** already be running — the sweep owns the sidecar
+lifecycle so it can control `LITERT_BACKEND` per config. Each config's rows
+land in the shared `results/summary-<date>.csv` tagged with its
+`litert_backend`. A config that fails to start (e.g. `GPU` on a machine without
+a supported GPU) is reported and skipped; the sweep continues.
+
+Options: `--litert-backends`, `--runs`, `--scenarios`, `--device-label`,
+`--model-name`, `--ready-timeout` (default 180s for model load). RSS is not
+auto-tracked in sweep mode — use Part 1's `--sidecar-pid` against a manually
+started sidecar if you need peak memory.
+
 ---
 
 ## Part 3 — litert benchmark (deprecated Python sidecar)
@@ -227,11 +252,12 @@ platform, cpu, ram_gb, gpu, model, scenario, …metrics…`.
 
 ## npm convenience scripts
 
-| Command                        | Equivalent                                       |
-| ------------------------------ | ------------------------------------------------ |
-| `npm run benchmark:litert-cpp` | `run-benchmark.mjs --backend litert-cpp --runs 5` |
-| `npm run benchmark:litert-py`  | `run-benchmark.mjs --backend litert --runs 5`     |
-| llamafile / custom flags       | `node scripts/run-benchmark.mjs --backend … `     |
+| Command                        | Equivalent                                                  |
+| ------------------------------ | ----------------------------------------------------------- |
+| `npm run benchmark:litert-cpp` | `run-benchmark.mjs --backend litert-cpp --runs 5`           |
+| `npm run benchmark:litert-py`  | `run-benchmark.mjs --backend litert --runs 5`               |
+| `npm run benchmark:sweep`      | `benchmark-sweep.mjs` — auto-sweep `LITERT_BACKEND` (Part 2) |
+| llamafile / custom flags       | `node scripts/run-benchmark.mjs --backend … `               |
 
 `run-benchmark.mjs` auto-provisions `scripts/benchmark/.venv` and loads `.env`.
 
@@ -239,13 +265,16 @@ platform, cpu, ram_gb, gpu, model, scenario, …metrics…`.
 
 ## Troubleshooting
 
-| Symptom                            | Fix                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| `Backend unreachable`              | Confirm the sidecar/server is running and `--litert-host` matches          |
-| Benchmark venv fails to bootstrap  | Ensure Python 3.10+ is on PATH, then retry `npm run benchmark:litert-cpp`   |
-| `RSS shows N/A`                    | Pass `--sidecar-pid` (for litert-cpp, the `delfin_litert_bridge` PID)       |
-| `litert_backend` column is blank   | `LITERT_BACKEND` is unset in `.env` — set `CPU` or `GPU`                    |
-| Mismatched CSV columns mid-day     | Delete that day's `results/summary-*.csv`; it is append-only               |
-| Very low tok/s on Windows          | Expected for CPU inference; close other heavy processes                    |
-| `Binary not found` (llamafile)     | Download the binary manually (Part 4.1)                                    |
-| Port conflict on 8080              | Pass `--llamafile-host localhost:<other>`                                  |
+| Symptom                                       | Fix                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| `Backend unreachable`                         | Confirm the sidecar/server is running and `--litert-host` matches          |
+| `Sidecar error: sessionId is required`        | The `bin/` bridge binary is **stale** (pre-refactor). Rebuild it: `npm run download:bridge:windows` or `npm run bridge:build`. The new bridge uses `conversationId`. |
+| Benchmark venv fails to bootstrap             | Ensure Python 3.10+ is on PATH, then retry `npm run benchmark:litert-cpp`   |
+| Sweep: `A backend is already responding`      | Stop your running sidecar — the sweep manages its own                      |
+| Sweep: `sidecar did not become ready`         | Model load exceeded `--ready-timeout`; raise it, or check the dumped log    |
+| `RSS shows N/A`                               | Pass `--sidecar-pid` (for litert-cpp, the `delfin_litert_bridge` PID)       |
+| `litert_backend` column is blank              | `LITERT_BACKEND` is unset in `.env` — set `CPU` or `GPU`                    |
+| Mismatched CSV columns mid-day                | Delete that day's `results/summary-*.csv`; it is append-only               |
+| Very low tok/s on Windows                     | Expected for CPU inference; close other heavy processes                    |
+| `Binary not found` (llamafile)                | Download the binary manually (Part 4.1)                                    |
+| Port conflict on 8080                         | Pass `--llamafile-host localhost:<other>`                                  |

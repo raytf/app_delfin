@@ -224,7 +224,8 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 
 | File / Item                                | Status | Notes                                                                                               |
 | ------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------- |
-| `scripts/run-benchmark.mjs`                | ✅     | Node wrapper that runs benchmark/run.py using the deprecated `sidecar-old/` venv Python              |
+| `scripts/run-benchmark.mjs`                | ✅     | Node wrapper that runs benchmark/run.py in a dedicated, auto-bootstrapped `scripts/benchmark/.venv` (independent of `sidecar-old/`); loads `.env` for backend tagging |
+| `scripts/benchmark-sweep.mjs`              | ✅     | Auto-sweep orchestrator: spawns the TS sidecar once per `LITERT_BACKEND` value, health-gates it, runs run-benchmark.mjs, tears it down between configs (`npm run benchmark:sweep`) |
 | `scripts/benchmark/run.py`                 | ✅     | CLI benchmark entry point — `--backend litert\|litert-cpp\|llamafile`, all scenarios, JSON+CSV output |
 | `scripts/benchmark/backends/litert.py`     | ✅     | LiteRT adapter over WebSocket                                                                        |
 | `scripts/benchmark/backends/litert_cpp.py` | ✅     | LiteRT C++ adapter over the Delfin WebSocket sidecar protocol (drives the TypeScript sidecar)        |
