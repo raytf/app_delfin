@@ -136,9 +136,9 @@ The backend receives a WebSocket message shaped like:
 { "text": "Please respond to what the user just asked.", "image": "<base64 JPEG>", "audio": "<base64 WAV>" }
 ```
 
-**LiteRT C++ proxy (primary):** `scripts/litert-cpp-proxy.mjs` packs this into a JSONL `generate` request and writes it to `delfin_litert_bridge`'s stdin. The bridge forwards image, audio, and text to Gemma 4 in a single multimodal forward pass — no external speech-to-text step needed.
+**LiteRT C++ bridge (primary):** the TypeScript sidecar (`sidecar/src/`) packs this into a JSONL `generate` request and writes it to `delfin_litert_bridge`'s stdin. The bridge forwards image, audio, and text to Gemma 4 in a single multimodal forward pass — no external speech-to-text step needed.
 
-**Python sidecar (deprecated):** `handle_turn` in `sidecar/server.py` assembles `[audio blob] + [image blob] + [text instruction]` for the LiteRT-LM Python API.
+**Python sidecar (deprecated):** `handle_turn` in `sidecar-old/server.py` assembles `[audio blob] + [image blob] + [text instruction]` for the LiteRT-LM Python API.
 
 Gemma 4 is a **multimodal** model that processes audio and images natively in the same forward pass — the model understands what the user said *and* sees their screen simultaneously.
 
@@ -150,7 +150,7 @@ Tokens stream back as `{"type": "token", "text": "..."}` followed by `{"type": "
 
 After the final `done` token, the TTS pipeline produces audio (when enabled).
 
-**LiteRT C++ proxy (primary):** TTS is controlled by `LITERT_CPP_TTS_BACKEND`. When set to `piper`, the proxy starts Piper on the first sentence boundary and streams `audio_*` events before `done` arrives — so audio can start while tokens are still generating. `TTS_ENABLED` / `TTS_BACKEND` have no effect on this path.
+**LiteRT C++ bridge (primary):** TTS is controlled by `TTS_BACKEND` (`piper` | `none`). When set to `piper`, the sidecar starts Piper on the first sentence boundary and streams `audio_*` events before `done` arrives — so audio can start while tokens are still generating. `TTS_ENABLED` and the `kokoro` / `mlx` values of `TTS_BACKEND` apply only to the deprecated Python path.
 
 **Python sidecar (deprecated):** TTS is controlled by `TTS_ENABLED=true` and `TTS_BACKEND=kokoro`.
 
@@ -169,7 +169,7 @@ The message sequence over WebSocket looks like:
 {"type": "audio_end", "tts_time": 0.72}
 ```
 
-(`sentence_count` is optional in the WebSocket contract — the deprecated Python sidecar never sent it, but the LiteRT C++ proxy may. The renderer IPC bridge normalises it to `0` when absent.)
+(`sentence_count` is optional in the WebSocket contract — the deprecated Python sidecar never sent it, but the TypeScript sidecar may. The renderer IPC bridge normalises it to `0` when absent.)
 
 **Sentence-by-sentence streaming** means the first sentence starts playing before the last one is even synthesised — low perceived latency.
 
@@ -178,17 +178,17 @@ The message sequence over WebSocket looks like:
 | Backend | When used | Notes |
 |---|---|---|
 | `kokoro` | `TTS_BACKEND=kokoro` | kokoro-onnx, Linux/WSL2, best quality |
-| `piper` | `LITERT_CPP_TTS_BACKEND=piper` on `npm run dev:backend` | Native CLI TTS for the LiteRT C++ proxy; emits the same `audio_*` protocol without Python |
+| `piper` | `TTS_BACKEND=piper` on `npm run dev:backend` | Native CLI TTS driven by the TypeScript sidecar; emits the same `audio_*` protocol without Python |
 | `mlx` | `TTS_BACKEND=mlx` | macOS only, not yet implemented |
 | `web-speech` | default or any other value | Browser's built-in `speechSynthesis`, zero setup |
 
 When `TTS_BACKEND=web-speech`, the sidecar sends **no audio messages at all** — the renderer's `App.tsx` detects that no `audio_start` arrived within 500 ms of `done` and falls back to `speechSynthesis.speak(responseText)`.
 
-On `npm run dev:backend`, the Python sidecar is not involved at all — `TTS_BACKEND=kokoro` in `sidecar/tts.py` has no effect. Instead, the LiteRT C++ proxy emits `audio_start` / `audio_chunk` / `audio_end` directly when `LITERT_CPP_TTS_BACKEND=piper` is set.
+On `npm run dev:backend`, the deprecated Python sidecar is not involved at all — `sidecar-old/tts.py` and its `kokoro` / `mlx` backends are unused. Instead, the TypeScript sidecar emits `audio_start` / `audio_chunk` / `audio_end` directly when `TTS_BACKEND=piper` is set.
 
-The proxy starts Piper on the first non-empty token, buffers streamed text, and flushes completed sentences into Piper stdin as soon as punctuation closes them. That lets `audio_start` arrive before bridge `done` while later tokens are still streaming. If Piper is disabled, misconfigured, interrupted, or fails mid-turn, the renderer fallback still covers the response.
+The sidecar starts Piper on the first non-empty token, buffers streamed text, and flushes completed sentences into Piper stdin as soon as punctuation closes them. That lets `audio_start` arrive before bridge `done` while later tokens are still streaming. If Piper is disabled, misconfigured, interrupted, or fails mid-turn, the renderer fallback still covers the response.
 
-Local Piper voices are managed with `scripts/piper-voice.mjs` (`npm run voice:list`, `npm run voice:use -- <voice-name>`, `npm run voice:install -- <hf-path> --use`). The helper downloads official `rhasspy/piper-voices` `.onnx` / `.onnx.json` pairs, reads `audio.sample_rate`, and updates `.env`; the proxy also reads `audio.sample_rate` from `PIPER_CONFIG` when `PIPER_SAMPLE_RATE` is omitted.
+Local Piper voices are managed with `scripts/piper-voice.mjs` (`npm run voice:list`, `npm run voice:use -- <voice-name>`, `npm run voice:install -- <hf-path> --use`). The helper downloads official `rhasspy/piper-voices` `.onnx` / `.onnx.json` pairs, reads `audio.sample_rate`, and updates `.env`; the sidecar also reads `audio.sample_rate` from `PIPER_CONFIG` when `PIPER_SAMPLE_RATE` is omitted.
 
 ---
 

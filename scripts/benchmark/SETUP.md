@@ -1,228 +1,280 @@
 # Benchmark Setup Guide
 
-This guide walks through setting up the benchmark backends and running them on
-your Windows machine (WSL2 for LiteRT, native PowerShell for native backends).
+The benchmark harness measures TTFT, throughput, total turn time, and peak RSS
+across inference backends. It writes a JSON file per run plus an append-friendly
+CSV, so runs from different backends **and different devices** land in one file
+for comparison.
+
+## Backends
+
+| Backend      | What it measures                                         | Status          |
+| ------------ | -------------------------------------------------------- | --------------- |
+| `litert-cpp` | TypeScript sidecar (`sidecar/src/`) + LiteRT-LM C++ bridge | **Primary**     |
+| `litert`     | Deprecated Python FastAPI sidecar (`sidecar-old/`)       | Comparison only |
+| `llamafile`  | llamafile / llama-server over its OpenAI-compatible API  | Comparison only |
+
+## The harness venv
+
+`node scripts/run-benchmark.mjs` (and the `npm run benchmark:*` scripts)
+auto-create a dedicated `scripts/benchmark/.venv` from
+`scripts/benchmark/requirements.txt` on first run — the harness no longer
+depends on the deprecated `sidecar-old/` Python environment. You only need
+Python 3.10+ on PATH for that one-time bootstrap. To provision it by hand:
+
+```bash
+python -m venv scripts/benchmark/.venv
+scripts/benchmark/.venv/bin/pip install -r scripts/benchmark/requirements.txt        # Unix
+scripts\benchmark\.venv\Scripts\pip install -r scripts\benchmark\requirements.txt    # Windows
+```
 
 ---
 
-## Overview
+## Part 1 — litert-cpp benchmark (primary)
 
-| Backend                 | Where to run                       | Setup command                                                                                       |
-| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **LiteRT-LM**           | WSL2 Ubuntu terminal               | `npm run setup` (existing sidecar)                                                                  |
-| **LiteRT-LM C++ proxy** | Native Windows PowerShell          | `npm run setup:litert-cpp` (builds bridge, installs Piper voice, copies/downloads model)            |
-| **llamafile**           | Windows PowerShell or any platform | Download manually (see Part 2). `npm run setup:llamafile` was **removed** 2026-05-03.              |
-
-Run each backend in its own environment, then compare the CSV output files.
-
----
-
-## Part 1 — LiteRT-LM benchmark (WSL2)
+The production stack: the TypeScript sidecar driving the `delfin_litert_bridge`
+C++ kernel.
 
 ### 1.1 Start the sidecar
 
-In a WSL2 Ubuntu terminal:
+In one terminal (keep it open):
 
 ```bash
-cd /path/to/app_delfin
-npm run dev:sidecar
+npm run dev:backend
 ```
 
-Leave this terminal open. The sidecar listens on `0.0.0.0:8321` and is
-reachable from WSL2 at `localhost:8321`.
+It listens on `localhost:8321` and exposes `/health` + `/ws`.
 
-### 1.2 Find the sidecar PID (for memory tracking)
+### 1.2 (Optional) Find the bridge PID for RSS tracking
 
-In a second WSL2 terminal:
+Model memory lives in the `delfin_litert_bridge` C++ child process, not the
+Node sidecar:
 
 ```bash
-pgrep -f "uvicorn" -a
-# or
-pgrep -f "server.py" -a
+pgrep -f delfin_litert_bridge       # Linux / macOS
+Get-Process delfin_litert_bridge    # Windows PowerShell
 ```
-
-Note the PID — pass it via `--sidecar-pid` for RSS memory tracking.
 
 ### 1.3 Run the benchmark
 
-The npm script uses the sidecar virtualenv automatically — no separate `pip install` needed:
+```bash
+npm run benchmark:litert-cpp
+```
+
+To pass extra flags (RSS tracking, scenario subset, device label):
+
+```bash
+node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 \
+  --sidecar-pid <BRIDGE_PID> --device-label my-laptop
+```
+
+Results: `results/benchmark-litert-cpp-<platform>-<model>-<timestamp>.json` plus
+one appended row per scenario in `results/summary-<date>.csv`.
+
+---
+
+## Part 2 — Cross-device performance runbook
+
+To compare inference performance across machines — or across CPU vs GPU on one
+machine — run the same scenarios on each target and let the shared CSV collect
+everything.
+
+### What gets tagged on every row
+
+`run-benchmark.mjs` loads `.env`, so each row in `summary-<date>.csv` carries:
+
+| Column                                | Source                                          |
+| -------------------------------------- | ----------------------------------------------- |
+| `device_label`                         | `--device-label` (defaults to the hostname)     |
+| `platform` / `cpu` / `ram_gb` / `gpu`  | auto-detected (`sysinfo.py`)                     |
+| `litert_backend`                       | `LITERT_BACKEND` from `.env` (`CPU` / `GPU`)     |
+| `model`                                | derived from `MODEL_REPO` (E2B / E4B)            |
+| `backend`                              | `litert-cpp` / `litert` / `llamafile`            |
+
+### Procedure
+
+On **each device**, for **each config** you want to compare:
+
+1. Set the config in `.env` — e.g. `LITERT_BACKEND=CPU` (or `GPU`), and
+   `MODEL_REPO` for the model variant under test.
+2. Start the sidecar: `npm run dev:backend`.
+3. Run with a consistent, descriptive label:
+
+   ```bash
+   node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 \
+     --device-label "m1-mbp" --scenarios s1,s2,s3
+   ```
+
+4. For the next config (e.g. `LITERT_BACKEND=GPU`), update `.env`, **restart**
+   the sidecar so it picks up the change, and run again with the **same**
+   `--device-label` — the `litert_backend` column keeps the rows distinct.
+
+Keep `--runs` and `--scenarios` identical across devices so the numbers are
+comparable. Collect each machine's `results/summary-<date>.csv`, concatenate
+them, and pivot by `device_label` × `litert_backend` × `scenario`.
+
+> **Tip:** the per-run JSON embeds the full `sysinfo` block (CPU model, core
+> counts, RAM, GPU) under `meta.system` if you need more detail than the CSV.
+
+### Automated sweep (one command, CPU vs GPU)
+
+`npm run benchmark:sweep` automates the per-config loop on a single machine.
+It spawns the TypeScript sidecar once per `LITERT_BACKEND` value, waits for the
+model to load, benchmarks it, and tears the sidecar down before the next config
+— so one command produces a full CPU-vs-GPU comparison without editing `.env`
+or restarting anything by hand.
+
+```bash
+npm run benchmark:sweep                                    # CPU then GPU, defaults
+npm run benchmark:sweep -- --litert-backends CPU,GPU \
+  --runs 5 --scenarios s1,s2,s3 --device-label ryzen-5800x
+```
+
+The sidecar must **not** already be running — the sweep owns the sidecar
+lifecycle so it can control `LITERT_BACKEND` per config. Each config's rows
+land in the shared `results/summary-<date>.csv` tagged with its
+`litert_backend`. A config that fails to start (e.g. `GPU` on a machine without
+a supported GPU) is reported and skipped; the sweep continues.
+
+Options: `--litert-backends`, `--runs`, `--scenarios`, `--device-label`,
+`--model-name`, `--ready-timeout` (default 180s for model load). RSS is not
+auto-tracked in sweep mode — use Part 1's `--sidecar-pid` against a manually
+started sidecar if you need peak memory.
+
+---
+
+## Part 3 — litert benchmark (deprecated Python sidecar)
+
+> The Python sidecar (`sidecar-old/`) is deprecated. Benchmark it only for
+> historical comparison against the litert-cpp stack.
+
+### 3.1 Start the deprecated sidecar
+
+```bash
+npm run dev:sidecar-old
+```
+
+Requires the Python sidecar venv — `npm run setup:sidecar` provisions
+`sidecar-old/.venv`. It listens on `localhost:8321`.
+
+### 3.2 Find the sidecar PID (optional, for RSS tracking)
+
+```bash
+pgrep -f server.py     # Linux / macOS
+Get-Process python     # Windows PowerShell
+```
+
+### 3.3 Run the benchmark
 
 ```bash
 npm run benchmark:litert-py
 ```
 
-To pass extra flags (e.g. `--sidecar-pid` for RSS tracking):
-
-```bash
-node scripts/run-benchmark.mjs --backend litert --sidecar-pid <PID_FROM_STEP_1.2> --runs 5
-```
-
-Results are written to `results/benchmark-litert-linux-gemma-4-e2b-litert-<timestamp>.json`
-and appended to `results/summary-<date>.csv`.
-
 ---
 
-## Part 2 — llamafile benchmark
+## Part 4 — llamafile benchmark (comparison only)
 
-> **Note (2026-05-03):** The `npm run setup:llamafile`, `npm run dev:llamafile`, and `npm run benchmark:llamafile` convenience scripts have been **removed**. llamafile is retained only for benchmark comparison via the Python harness. Follow the manual steps below.
+> **Note (2026-05-03):** The `setup:llamafile`, `dev:llamafile`, and
+> `benchmark:llamafile` convenience scripts were **removed**. llamafile is
+> retained only for comparison via the harness below.
 
-### 2.1 Download the binary and model (one-time, manual)
-
-Download llamafile and the GGUF model manually:
+### 4.1 Download the binary and model (one-time, manual)
 
 ```powershell
-# PowerShell — download llamafile 0.10.1 (example; adjust version as needed)
+# PowerShell — download llamafile (example version)
 Invoke-WebRequest -Uri "https://github.com/mozilla-ai/llamafile/releases/download/0.10.1/llamafile-0.10.1.exe" -OutFile "llamafile\bin\llamafile-0.10.1.exe"
-
-# Download Gemma 4 E2B GGUF model from HuggingFace (~3 GB)
+# Gemma 4 E2B GGUF (~3 GB):
 # https://huggingface.co/bartowski/google_gemma-4-E2B-it-GGUF/resolve/main/google_gemma-4-E2B-it-IQ4_NL.gguf
 ```
 
-### 2.2 Start the llamafile server
-
-In one terminal window (keep it open):
+### 4.2 Connect to a running server
 
 ```powershell
 .\llamafile\bin\llamafile-0.10.1.exe --server --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-mmap -m llamafile\models\google_gemma-4-E2B-it-IQ4_NL.gguf
 ```
 
-Wait for the message: `llama server listening at http://127.0.0.1:8080`
-
-Model loading typically takes 15–60 seconds on first run.
-
-### 2.3 Find the llamafile PID (for memory tracking)
-
-```powershell
-# Windows PowerShell
-Get-Process llamafile | Select-Object Id, Name
-```
-
-Note the PID — pass it via `--sidecar-pid`.
-
-### 2.4 Run the benchmark
+Then, in another terminal:
 
 ```bash
-python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080 --sidecar-pid <PID_FROM_STEP_2.3> --runs 5 --scenarios s1,s2,s3
+node scripts/run-benchmark.mjs --backend llamafile --llamafile-host localhost:8080 --runs 5
 ```
 
-Results are written to `results/benchmark-llamafile-<platform>-gemma-4-e2b-IQ4_NL-<timestamp>.json`
-and appended to `results/summary-<date>.csv`.
+For RSS tracking, pass `--sidecar-pid` (`Get-Process llamafile`).
 
----
+### 4.3 Auto-launch mode
 
-## Part 3 — LiteRT-LM C++ proxy benchmark (research)
-
-The LiteRT C++ benchmark talks to the same Delfin sidecar WebSocket protocol as
-the Python sidecar. Start `scripts/litert-cpp-proxy.mjs` first; it expects
-`LITERT_CPP_BIN` to point at a JSONL/stdio bridge built on top of the LiteRT-LM
-C++ Conversation API. The upstream `litert_lm_main` demo binary is useful for
-build smoke tests but is not a drop-in Delfin bridge by itself.
-
-```powershell
-$Env:LITERT_CPP_BIN = "D:\path\to\delfin_litert_bridge.exe"
-$Env:LITERT_CPP_MODEL = "D:\path\to\gemma-4-E2B-it.litertlm"
-npm run dev:backend
-```
-
-In another terminal:
-
-```powershell
-npm run benchmark:litert-cpp
-```
-
-Current native C++ bridge status: text-only scenarios are validated, but S2
-vision is blocked until `delfin_litert_bridge.exe` translates Delfin's base64
-image blobs into LiteRT-LM C++ image inputs. Until that lands, run only S1/S3:
-
-```powershell
-node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios 's1,s3'
-```
-
-To pass extra flags:
-
-```powershell
-node scripts/run-benchmark.mjs --backend litert-cpp --runs 5 --scenarios s1,s2,s3
-```
-
-Results are written to `results/benchmark-litert-cpp-<platform>-gemma-4-e2b-litert-cpp-<timestamp>.json`
-and appended to `results/summary-<date>.csv`.
-
----
-
-## Part 4 — Auto-launch mode (optional)
-
-Instead of starting the llamafile server manually, the benchmark can manage the server process itself. In auto-launch mode `--sidecar-pid` is unnecessary — the benchmark tracks the spawned process's PID automatically.
+The harness can manage the server process itself — `--sidecar-pid` is then
+unnecessary:
 
 ```bash
-python scripts/benchmark/run.py \
-  --backend llamafile \
+node scripts/run-benchmark.mjs --backend llamafile \
   --llamafile-bin llamafile/bin/llamafile-0.10.1.exe \
   --llamafile-model llamafile/models/google_gemma-4-E2B-it-IQ4_NL.gguf \
-  --runs 5 \
-  --scenarios s1,s2,s3
+  --runs 5 --scenarios s1,s2,s3
 ```
 
-On Linux/macOS, omit the `.exe` extension from the binary name.
+On Linux/macOS, omit the `.exe` extension.
 
 ---
 
-## Part 5 — Reading the results
+## Reading the results
 
-### Console output (during run)
+### Console output
 
 ```
 ── Scenario s1: text-only ──
   [warmup]   TTFT=430ms  22.1tok/s  total=3200ms  tokens=~64 (excluded from stats)
   [run  1]   TTFT=310ms  24.3tok/s  total=2800ms  tokens=~68
-  [run  2]   TTFT=295ms  25.1tok/s  total=2750ms  tokens=~71
   ...
 
 Summary (mean ± std, warmup excluded):
 Scenario               TTFT (ms)        Tok/s          Total (ms)       RSS (MB)
-──────────────────────────────────────────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────────
 s1: text-only          305.0±8.2        24.7±0.4       2775.0±25.1      3950.0±30.2
-s2: vision-slide       890.0±15.0       21.3±0.6       4100.0±40.0      4020.0±18.5
-s3: multi-turn-text    320.0±12.0       23.8±0.5       2900.0±35.0      3960.0±22.0
 ```
 
 ### JSON output
 
-One file per run: `results/benchmark-<backend>-<platform>-<model>-<timestamp>.json`
-
-Contains raw per-run data, per-turn breakdown for S3, and computed stats.
+One file per run: `results/benchmark-<backend>-<platform>-<model>-<timestamp>.json`.
+Contains raw per-run data, the per-turn breakdown for S3, computed stats, and a
+`meta` block with `device_label`, `backend`, `litert_backend`, and the full
+`system` (sysinfo) block.
 
 ### CSV output
 
-`results/summary-<date>.csv` — one row per backend × scenario. Run the LiteRT
-benchmark and the llamafile benchmark on the same day and they land in the
-same CSV file for easy side-by-side comparison in Excel or Google Sheets.
+`results/summary-<date>.csv` — one row per device × backend × config × scenario,
+appended across runs. Columns: `device_label, backend, litert_backend,
+platform, cpu, ram_gb, gpu, model, scenario, …metrics…`.
+
+> The CSV is append-only and won't rewrite its header. If you change config or
+> the harness adds columns mid-day, delete that day's `summary-*.csv` first.
 
 ---
 
 ## npm convenience scripts
 
-> **Note (2026-05-03):** `npm run setup:llamafile`, `npm run dev:llamafile`, and `npm run benchmark:llamafile` have been **removed**. Use the Python harness directly for llamafile benchmarks (see Part 2).
+| Command                        | Equivalent                                                  |
+| ------------------------------ | ----------------------------------------------------------- |
+| `npm run benchmark:litert-cpp` | `run-benchmark.mjs --backend litert-cpp --runs 5`           |
+| `npm run benchmark:litert-py`  | `run-benchmark.mjs --backend litert --runs 5`               |
+| `npm run benchmark:sweep`      | `benchmark-sweep.mjs` — auto-sweep `LITERT_BACKEND` (Part 2) |
+| llamafile / custom flags       | `node scripts/run-benchmark.mjs --backend … `               |
 
-| Command                        | Equivalent                             |
-| ------------------------------ | -------------------------------------- |
-| `npm run benchmark:litert-py`  | `run.py --backend litert --runs 5`     |
-| `npm run benchmark:litert-cpp` | `run.py --backend litert-cpp --runs 5` |
-| llamafile (manual)             | See Part 2 — run `run.py --backend llamafile --llamafile-host localhost:8080 ...` directly |
+`run-benchmark.mjs` auto-provisions `scripts/benchmark/.venv` and loads `.env`.
 
 ---
 
 ## Troubleshooting
 
-| Symptom                                                  | Fix                                                                                  |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `Backend unreachable`                                    | Check the server is running; confirm host:port matches                               |
-| `Binary not found`                                       | Download the llamafile binary manually (see Part 2.1)                                |
-| `Model not found`                                        | Download the GGUF model manually (see Part 2.1)                                      |
-| `Raw litert_lm_main is not yet a drop-in Delfin sidecar` | Point `LITERT_CPP_BIN` at the Delfin JSONL bridge, not the upstream demo CLI         |
-| Slow download (~3 GB)                                    | Normal for first run; script resumes if interrupted (atomic .part file)              |
-| Gemma 4 not supported                                    | The llamafile binary version is too old — download a newer release manually          |
-| RSS shows N/A                                            | Pass `--sidecar-pid` with the correct PID                                            |
-| Very low tok/s on Windows                                | Expected for CPU inference; check no other heavy process is running                  |
-| S2 vision scenario fails with llamafile                  | Ensure the GGUF model includes the vision encoder (multimodal GGUF)                  |
-| S2 vision scenario fails with LiteRT C++                 | Expected until C++ bridge image/blob support lands; use `--scenarios 's1,s3'`        |
-| Port conflict on 8080                                    | Set `LLAMAFILE_PORT=<other>` in `.env` and pass `--llamafile-host localhost:<other>` |
+| Symptom                                       | Fix                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| `Backend unreachable`                         | Confirm the sidecar/server is running and `--litert-host` matches          |
+| `Sidecar error: sessionId is required`        | The `bin/` bridge binary is **stale** (pre-refactor). Rebuild it: `npm run download:bridge:windows` or `npm run bridge:build`. The new bridge uses `conversationId`. |
+| Benchmark venv fails to bootstrap             | Ensure Python 3.10+ is on PATH, then retry `npm run benchmark:litert-cpp`   |
+| Sweep: `A backend is already responding`      | Stop your running sidecar — the sweep manages its own                      |
+| Sweep: `sidecar did not become ready`         | Model load exceeded `--ready-timeout`; raise it, or check the dumped log    |
+| `RSS shows N/A`                               | Pass `--sidecar-pid` (for litert-cpp, the `delfin_litert_bridge` PID)       |
+| `litert_backend` column is blank              | `LITERT_BACKEND` is unset in `.env` — set `CPU` or `GPU`                    |
+| Mismatched CSV columns mid-day                | Delete that day's `results/summary-*.csv`; it is append-only               |
+| Very low tok/s on Windows                     | Expected for CPU inference; close other heavy processes                    |
+| `Binary not found` (llamafile)                | Download the binary manually (Part 4.1)                                    |
+| Port conflict on 8080                         | Pass `--llamafile-host localhost:<other>`                                  |

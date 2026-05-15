@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const sidecarDir = join(rootDir, 'sidecar')
+// The deprecated Python sidecar lives in sidecar-old/ (sidecar/ is the TypeScript sidecar).
+const sidecarDir = join(rootDir, 'sidecar-old')
 
 const pythonCandidates = process.platform === 'win32'
   ? [

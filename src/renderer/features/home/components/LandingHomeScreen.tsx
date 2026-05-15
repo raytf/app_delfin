@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { SessionListItem } from '../../../../shared/types'
 import delfinLogo from '../../../assets/logo.png'
-import SessionHistoryCard from '../../../components/SessionHistoryCard'
+import { Session } from '../../../../shared'
+import SessionHistoryCard from '../../../components/session/SessionHistoryCard'
 
 interface HomeScreenProps {
   onDeleteSession: (sessionId: string) => void
   onStartSession: (sessionName: string) => void
   onSelectSession: (sessionId: string) => void
   onViewAllSessions: () => void
-  sessions: SessionListItem[]
+  sessions: Session[]
   userName: string | null
 }
 

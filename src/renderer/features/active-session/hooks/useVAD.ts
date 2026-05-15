@@ -30,11 +30,6 @@ const POSITIVE_SPEECH_THRESHOLD_BARGE_IN = 0.92
 // Silero authors recommend negativeSpeechThreshold = positiveSpeechThreshold − 0.15
 const NEGATIVE_DELTA = 0.15
 const BARGE_IN_GRACE_MS = 800
-const MIC_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  autoGainControl: true,
-  echoCancellation: true,
-  noiseSuppression: true,
-}
 
 function getVadRuntimeBaseUrl(): string {
   return new URL('./vad-runtime/', document.baseURI).href
@@ -167,23 +162,6 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
 
     let destroyed = false
 
-    const requestMicStream = async (): Promise<MediaStream> =>
-      await navigator.mediaDevices.getUserMedia({ audio: MIC_AUDIO_CONSTRAINTS })
-
-    const attachMicStream = (stream: MediaStream): void => {
-      const audioContext = audioContextRef.current
-      const analyser = analyserRef.current
-      if (audioContext === null || analyser === null) return
-
-      if (micSourceRef.current !== null) {
-        micSourceRef.current.disconnect()
-      }
-
-      const micSource = audioContext.createMediaStreamSource(stream)
-      micSource.connect(analyser)
-      micSourceRef.current = micSource
-    }
-
     const cleanupAudioResources = (): void => {
       stopUserLevelLoop()
       resetUserWaveform()
@@ -214,7 +192,13 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         }
 
         const runtimeBaseUrl = getVadRuntimeBaseUrl()
-        const micStream = await requestMicStream()
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            autoGainControl: true,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        })
         const audioContext = new AudioContext()
         if (audioContext.state === 'suspended') {
           await audioContext.resume().catch(() => undefined)
@@ -223,28 +207,16 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
         analyser.fftSize = 256
         analyser.smoothingTimeConstant = 0.76
 
+        const micSource = audioContext.createMediaStreamSource(micStream)
+        micSource.connect(analyser)
+
         micStreamRef.current = micStream
         audioContextRef.current = audioContext
         analyserRef.current = analyser
-        attachMicStream(micStream)
-
-        const pauseMicStream = async (stream: MediaStream): Promise<void> => {
-          for (const track of stream.getTracks()) {
-            track.stop()
-          }
-        }
-
-        const resumeMicStream = async (): Promise<MediaStream> => {
-          const replacementStream = await requestMicStream()
-          micStreamRef.current = replacementStream
-          attachMicStream(replacementStream)
-          return replacementStream
-        }
+        micSourceRef.current = micSource
 
         const vad = await vadRuntime.MicVAD.new({
           getStream: async () => micStream,
-          pauseStream: pauseMicStream,
-          resumeStream: resumeMicStream,
           model: 'v5',
           // Follow the upstream browser contract closely: serve the VAD worklet,
           // ONNX model, and ORT wasm/mjs files from one absolute base URL. Using
@@ -318,18 +290,10 @@ export function useVAD({ enabled, onSpeechEnd, onSpeechStart }: UseVADOptions): 
           stopUserLevelLoop()
           setIsUserSpeaking(false)
           resetUserWaveform()
-          void vadRef.current.pause().catch((error: unknown) => {
-            console.error('[useVAD] Failed to pause MicVAD:', error)
-          })
+          void vadRef.current.pause()
         } else {
-          void vadRef.current
-            .start()
-            .then(() => {
-              startUserLevelLoop()
-            })
-            .catch((error: unknown) => {
-              console.error('[useVAD] Failed to resume MicVAD:', error)
-            })
+          void vadRef.current.start()
+          startUserLevelLoop()
         }
       }
       return next

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  type ChatMessage,
   type EndedSessionSnapshot,
-  MAIN_TO_RENDERER_CHANNELS,
   type OverlayMode,
 } from '../../../../shared/types'
+import type { SessionMessage } from '../../../../shared/entities/session'
+import { PresetId } from '../../../../shared/enums/presetId'
+import { MAIN_TO_RENDERER_CHANNELS } from '../../../../shared/constants'
 import { VOICE_TURN_TEXT } from '../../../../shared/constants'
 import { useOverlayState } from '../../../hooks/useOverlayState'
 import { useSessionStore } from '../../../stores/sessionStore'
@@ -28,7 +29,9 @@ let lastAudioChunkPromise: Promise<void> = Promise.resolve()
 
 const MINIMIZED_VOICE_COLLAPSE_DELAY_MS = 1200
 
-function getLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
+function getLatestAssistantMessage(
+  messages: SessionMessage[],
+): SessionMessage | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'assistant') {
       return messages[index]
@@ -57,7 +60,7 @@ interface ActiveSession {
   isMuted: boolean
   isSubmitting: boolean
   latestResponseText: string | null
-  messages: ChatMessage[]
+  messages: SessionMessage[]
   toggleVadListening: () => void
   vadListeningEnabled: boolean
   waveformState: WaveformVisualState
@@ -82,7 +85,8 @@ export function useActiveSession({
   const appendAssistantText = useSessionStore((state) => state.appendAssistantText)
   const finishAssistantResponse = useSessionStore((state) => state.finishAssistantResponse)
   const failAssistantResponse = useSessionStore((state) => state.failAssistantResponse)
-  const setUserMessageImagePath = useSessionStore((state) => state.setUserMessageImagePath)
+  const setUserMessageMedia = useSessionStore((state) => state.setUserMessageMedia)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const errorMessage = useSessionStore((state) => state.errorMessage)
   const isSubmitting = useSessionStore((state) => state.isSubmitting)
   const messages = useSessionStore((state) => state.messages)
@@ -117,6 +121,7 @@ export function useActiveSession({
   const ignoreCurrentTurnOutputRef = useRef(false)
   const aiStreamingStartedRef = useRef(false)
   const audioStartedForTurnRef = useRef(false)
+  const activeRequestIdRef = useRef<string | null>(null)
   const assistantLevelAnimationFrameRef = useRef<number | null>(null)
   const assistantWaveformBarsRef = useRef(createWaveformBars())
   const assistantWaveformFrequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
@@ -265,12 +270,9 @@ export function useActiveSession({
     lowerThresholdRef.current?.()
   }, [setAudioPlayingState])
 
-  const finishFallbackSpeechPlayback = useCallback(() => {
-    aiStreamingStartedRef.current = false
-    finishAudioPlayback()
-  }, [finishAudioPlayback])
-
   const cancelCurrentAssistantTurn = useCallback(() => {
+    const requestId = activeRequestIdRef.current
+    activeRequestIdRef.current = null
     ignoreCurrentTurnOutputRef.current = true
     ignoreIncomingSidecarAudioRef.current = true
     aiStreamingStartedRef.current = false
@@ -284,10 +286,12 @@ export function useActiveSession({
     finishAudioPlayback()
     finishAssistantResponse()
 
-    try {
-      window.api.sidecarInterrupt()
-    } catch (error) {
-      console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+    if (requestId !== null) {
+      try {
+        window.api.sidecarInterrupt(requestId)
+      } catch (error) {
+        console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+      }
     }
   }, [
     cancelSpeechSynthesis,
@@ -302,8 +306,10 @@ export function useActiveSession({
 
   const submitVoiceTurn = useCallback(
     (wavBase64: string) => {
+      const requestId = crypto.randomUUID()
       const messageId = crypto.randomUUID()
 
+      activeRequestIdRef.current = requestId
       ignoreCurrentTurnOutputRef.current = false
       ignoreIncomingSidecarAudioRef.current = false
       aiStreamingStartedRef.current = false
@@ -312,20 +318,32 @@ export function useActiveSession({
       clearFallbackSpeechTimer()
       beginVoiceTurn({ messageId })
 
+      if (activeSessionId === null) {
+        activeRequestIdRef.current = null
+        failAssistantResponse('Session is not active.')
+        return
+      }
+
       void window.api
         .submitSessionPrompt({
+          requestId,
+          sessionId: activeSessionId,
           messageId,
           text: VOICE_TURN_TEXT,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
           audio: wavBase64,
         })
         .then((response) => {
-          setUserMessageImagePath({
-            imagePath: response.imagePath,
+          setUserMessageMedia({
+            imageDataUrl: response.imageDataUrl,
             messageId: response.messageId,
           })
         })
         .catch((error: unknown) => {
+          if (activeRequestIdRef.current !== requestId) {
+            return
+          }
+          activeRequestIdRef.current = null
           failAssistantResponse(error instanceof Error ? error.message : 'Voice turn failed.')
         })
     },
@@ -334,7 +352,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 
@@ -443,10 +462,10 @@ export function useActiveSession({
           raiseThreshold()
         }
         utterance.onend = () => {
-          finishFallbackSpeechPlayback()
+          finishAudioPlayback()
         }
         utterance.onerror = () => {
-          finishFallbackSpeechPlayback()
+          finishAudioPlayback()
         }
 
         window.speechSynthesis.speak(utterance)
@@ -455,7 +474,6 @@ export function useActiveSession({
     [
       cancelSpeechSynthesis,
       clearFallbackSpeechTimer,
-      finishFallbackSpeechPlayback,
       finishAudioPlayback,
       raiseThreshold,
       setAudioPlayingState,
@@ -517,9 +535,7 @@ export function useActiveSession({
 
     clearMinimizedVoiceCollapseTimer()
 
-    // Only auto-collapse after audio has played and stopped. When TTS is
-    // disabled the response text should stay visible until the user acts.
-    if (nextMode === null || !audioStartedForTurnRef.current) {
+    if (nextMode === null) {
       return
     }
 
@@ -548,6 +564,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarToken((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         return
       }
@@ -557,6 +577,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioStart((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreIncomingSidecarAudioRef.current = true
         return
@@ -579,6 +603,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioChunk((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreIncomingSidecarAudioRef.current) {
         return
       }
@@ -618,6 +646,10 @@ export function useActiveSession({
     })
 
     window.api.onSidecarAudioEnd((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         audioStreamActiveRef.current = false
         return
@@ -637,7 +669,12 @@ export function useActiveSession({
       }
     })
 
-    window.api.onSidecarDone(() => {
+    window.api.onSidecarDone((data) => {
+      if (data.requestId !== activeRequestIdRef.current) {
+        return
+      }
+      activeRequestIdRef.current = null
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreCurrentTurnOutputRef.current = false
         ignoreIncomingSidecarAudioRef.current = false
@@ -650,12 +687,30 @@ export function useActiveSession({
       aiStreamingStartedRef.current = false
       finishAssistantResponse()
 
+      if (data.interrupted) {
+        return
+      }
+
       const latestAssistantText =
         getLatestAssistantMessage(useSessionStore.getState().messages)?.content ?? ''
       speakWithWebSpeech(latestAssistantText)
     })
 
     window.api.onSidecarError((data) => {
+      if (
+        data.requestId !== undefined &&
+        data.requestId !== activeRequestIdRef.current
+      ) {
+        return
+      }
+
+      if (
+        data.requestId === undefined ||
+        data.requestId === activeRequestIdRef.current
+      ) {
+        activeRequestIdRef.current = null
+      }
+
       if (ignoreCurrentTurnOutputRef.current) {
         ignoreCurrentTurnOutputRef.current = false
         ignoreIncomingSidecarAudioRef.current = false
@@ -782,14 +837,22 @@ export function useActiveSession({
     assistantGainNodeRef.current = null
     assistantAnalyserRef.current = null
 
-    try {
-      window.api.sidecarInterrupt()
-    } catch (error) {
-      console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+    const requestId = activeRequestIdRef.current
+    activeRequestIdRef.current = null
+    if (requestId !== null) {
+      try {
+        window.api.sidecarInterrupt(requestId)
+      } catch (error) {
+        console.error('[useActiveSession] Failed to interrupt sidecar:', error)
+      }
     }
 
     try {
-      await window.api.stopSession()
+      if (activeSessionId === null) {
+        throw new Error('No active session id.')
+      }
+
+      await window.api.stopSession({ sessionId: activeSessionId })
 
       clearConversation()
       onSessionEndCommitted(nextEndedSessionData)
@@ -812,6 +875,7 @@ export function useActiveSession({
     sessionStartTime,
     stopAssistantWaveformLoop,
     stopScheduledAudioSources,
+    activeSessionId,
   ])
 
   const handleSubmitPrompt = useCallback(
@@ -821,6 +885,7 @@ export function useActiveSession({
         return
       }
 
+      const requestId = crypto.randomUUID()
       const messageId = crypto.randomUUID()
 
       ignoreCurrentTurnOutputRef.current = false
@@ -841,23 +906,34 @@ export function useActiveSession({
         ignoreIncomingSidecarAudioRef.current = false
       }
 
+      activeRequestIdRef.current = requestId
       beginPromptSubmission({
         messageId,
         prompt: trimmedText,
       })
 
       try {
+        if (activeSessionId === null) {
+          throw new Error('Session is not active.')
+        }
+
         const response = await window.api.submitSessionPrompt({
+          requestId,
+          sessionId: activeSessionId,
           messageId,
           text: trimmedText,
-          presetId: 'lecture-slide',
+          presetId: PresetId.LectureSlide,
         })
 
-        setUserMessageImagePath({
-          imagePath: response.imagePath,
+        setUserMessageMedia({
+          imageDataUrl: response.imageDataUrl,
           messageId: response.messageId,
         })
       } catch (error) {
+        if (activeRequestIdRef.current !== requestId) {
+          return
+        }
+        activeRequestIdRef.current = null
         failAssistantResponse(error instanceof Error ? error.message : 'Failed to submit prompt.')
       }
     },
@@ -867,7 +943,8 @@ export function useActiveSession({
       clearFallbackSpeechTimer,
       clearMinimizedVoiceCollapseTimer,
       failAssistantResponse,
-      setUserMessageImagePath,
+      setUserMessageMedia,
+      activeSessionId,
     ],
   )
 

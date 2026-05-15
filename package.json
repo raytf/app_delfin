@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "electron-vite dev",
-    "dev:backend": "node scripts/litert-cpp-proxy.mjs",
+    "dev:backend": "tsx watch sidecar/src/index.ts",
     "dev:mock": "concurrently --names \"mock,frontend\" --prefix-colors \"yellow,magenta\" \"node scripts/mock-sidecar.js\" \"npm run dev:frontend\"",
     "dev:sidecar": "tsx watch sidecar/src/index.ts",
-    "build": "npm run build:frontend && npm run build:backend",
+    "dev:sidecar-old": "cd sidecar-old && uvicorn server:app --host 0.0.0.0 --port 8321",
+    "build": "npm run build:frontend && npm run build:sidecar",
     "build:frontend": "electron-vite build",
-    "build:backend": "npx esbuild scripts/litert-cpp-proxy.mjs --bundle --platform=node --format=esm --outfile=dist/electron/main/litert-cpp-proxy.mjs --external:electron --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "build:sidecar": "tsc -p sidecar/tsconfig.json",
     "postbuild": "npm run check:vad-runtime",
     "preview": "electron-vite preview",
@@ -30,6 +30,7 @@
     "voice:install": "node scripts/piper-voice.mjs install",
     "benchmark:litert-cpp": "node scripts/run-benchmark.mjs --backend litert-cpp --runs 5",
     "benchmark:litert-py": "node scripts/run-benchmark.mjs --backend litert --runs 5",
+    "benchmark:sweep": "node scripts/benchmark-sweep.mjs",
     "test:bridge:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\test-ci-bridge.ps1",
     "test": "vitest run",
     "dist": "npm run build && electron-builder",
@@ -45,12 +46,7 @@
       "dist/electron/**/*",
       "dist/sidecar/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "dist/electron/main/litert-cpp-proxy.mjs",
-        "to": "litert-cpp-proxy.mjs"
-      }
-    ],
+    "extraResources": [],
     "mac": {
       "target": [
         {

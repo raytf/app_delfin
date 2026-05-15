@@ -14,58 +14,27 @@ import { join } from "node:path";
 import { config } from "dotenv";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createOverlayWindow, setOverlayMode } from "./overlay/overlayWindow";
-import { SessionPersistenceService } from "./session/sessionPersistenceService";
-import { disconnectFromSidecar, getSidecarStatus } from "./sidecar/wsClient";
-import { spawnBackend, killBackend } from "./sidecar/backendProcess";
-import { startHealthPolling, stopHealthPolling } from "./sidecar/healthCheck";
-import { getModelStatus } from "./sidecar/assetManager";
-import { validateEnv } from "./envValidation";
-import { FileSessionStorage } from "./storage/fileSessionStorage";
-import {
-  MAIN_TO_RENDERER_CHANNELS,
-  type OverlayMode,
-  type OverlayState,
-} from "../shared/types";
+import { SidecarSessionClient } from "./sidecar/session/api";
+import { disconnectFromSidecar } from "./sidecar/session/ws";
+import { killBackend, spawnBackend } from "./sidecar/backendProcess";
+import { ConfigService } from "./config/config-service";
+import type { OverlayMode, OverlayState } from "../shared/types";
 
-// Only load the repo's dev .env in development. In a packaged build, reading
-// .env from process.cwd() (which is wherever Delfin.exe was launched from)
-// leaks dev-only relative paths like ./bin/... into process.env, which then
-// override the absolute paths backendProcess.ts derives from
-// process.resourcesPath / app.getPath('userData').
-if (!app.isPackaged) {
-  config(); // load .env from repo root in dev only
-}
-validateEnv(); // warn on missing / invalid env vars — never throws
+config(); // load .env from repo root
+const configService = new ConfigService();
 
 app.setName("Delfin");
 
-// Single-instance lock: prevent a second Delfin window from being launched if
-// the user (or a misbehaving child process) re-runs the executable. Without
-// this guard, packaging bugs that re-spawn the Electron binary can cascade
-// into an unbounded chain of new windows.
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-  process.exit(0);
-}
-
 let mainWindow: BrowserWindow | null = null;
 let overlayMode: OverlayMode = "expanded";
-let sessionPersistence: SessionPersistenceService | null = null;
-
-app.on("second-instance", () => {
-  if (mainWindow !== null && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
-});
 
 function createWindow(mode: OverlayMode): BrowserWindow {
-  const window = createOverlayWindow(mode);
+  const window = createOverlayWindow(
+    mode,
+    configService.runtime.electronRendererUrl,
+  );
   overlayMode = mode;
   mainWindow = window;
-  window.webContents.once("did-finish-load", () => {
-    window.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS, getSidecarStatus());
-  });
   window.on("closed", () => {
     if (mainWindow === window) {
       mainWindow = null;
@@ -94,15 +63,10 @@ async function switchOverlayMode(mode: OverlayMode): Promise<void> {
 
 app.whenReady().then(() => {
   console.log("Delfin started");
-
-  const modelStatus = getModelStatus();
-  if (modelStatus.ready) {
-    spawnBackend();
-    startHealthPolling(() => mainWindow);
-  }
+  spawnBackend(configService.childProcessEnv);
 
   // Set app icon for the macOS dock (and window title bar on other platforms)
-  const isDev = !!process.env["ELECTRON_RENDERER_URL"];
+  const isDev = configService.runtime.isDev;
   const iconPath = isDev
     ? join(app.getAppPath(), "src/renderer/assets/logo.png")
     : join(__dirname, "../renderer/assets/logo.png");
@@ -158,14 +122,13 @@ app.whenReady().then(() => {
     },
   );
 
-  sessionPersistence = new SessionPersistenceService(
-    new FileSessionStorage(join(app.getPath("userData"), "storage")),
-  );
+  const sidecarWsUrl = configService.runtime.sidecarWsUrl;
+  const sidecarUrl = configService.runtime.sidecarUrl;
   registerIpcHandlers({
     getOverlayState,
     getMainWindow: () => mainWindow,
-    sessionPersistence,
-    sidecarWsUrl: process.env.SIDECAR_WS_URL ?? "ws://localhost:8321/ws",
+    sidecarSessionClient: new SidecarSessionClient(sidecarUrl),
+    sidecarWsUrl,
     switchOverlayMode,
   });
 
@@ -181,7 +144,6 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   mainWindow = null;
   disconnectFromSidecar();
-  stopHealthPolling();
   killBackend();
 
   if (process.platform !== "darwin") {

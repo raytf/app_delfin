@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { SessionRepository } from '../domain/abstractions/session-repository';
 import { Session } from '../domain/entities/session';
@@ -47,8 +47,12 @@ export class FileSessionRepository implements SessionRepository {
     const jsonFiles = files.filter((file) => file.endsWith('.json')).sort();
     const sessions: Session[] = [];
     for (const file of jsonFiles) {
-      const record = await this.readSessionRecordByPath(join(this.storageRoot, file));
-      sessions.push(this.toEntity(record));
+      try {
+        const record = await this.readSessionRecordByPath(join(this.storageRoot, file));
+        sessions.push(this.toEntity(record));
+      } catch {
+        console.warn(`[FileSessionRepository] Skipping corrupted session file: ${file}`);
+      }
     }
     return sessions;
   }
@@ -178,7 +182,10 @@ export class FileSessionRepository implements SessionRepository {
   private async writeSessionRecord(record: SessionRecord): Promise<void> {
     const filePath = this.sessionFilePath(record.id);
     await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, JSON.stringify(record, null, 2), 'utf-8');
+    // Write to a temp file then rename for atomic replacement (avoids partial writes on Windows).
+    const tmpPath = `${filePath}.tmp`;
+    await writeFile(tmpPath, JSON.stringify(record, null, 2), 'utf-8');
+    await rename(tmpPath, filePath);
   }
 
   private toRecord(session: Session, messages: SessionRecord['messages']): SessionRecord {

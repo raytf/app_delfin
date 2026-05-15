@@ -119,11 +119,11 @@ else
   ok "Piper voice already configured in .env"
 fi
 
-# ── Start proxy ─────────────────────────────────────────────────────────────
-echo ""; echo "=== Starting litert-cpp proxy (model load can take 1–2 min on first run) ==="
-node "$ROOT/scripts/litert-cpp-proxy.mjs" &
-PROXY_PID=$!
-trap "echo ''; echo '→ Stopping proxy (PID $PROXY_PID)…'; kill $PROXY_PID 2>/dev/null || true" EXIT
+# ── Start sidecar ───────────────────────────────────────────────────────────
+echo ""; echo "=== Starting Node sidecar (model load can take 1–2 min on first run) ==="
+npm --prefix "$ROOT" run dev:sidecar &
+SIDECAR_PID=$!
+trap "echo ''; echo '→ Stopping sidecar (PID $SIDECAR_PID)…'; kill $SIDECAR_PID 2>/dev/null || true" EXIT
 
 SIDECAR_PORT="${SIDECAR_PORT:-8321}"
 echo -n "   Waiting for bridge ready on :$SIDECAR_PORT"
@@ -132,7 +132,7 @@ until curl -sf "http://localhost:$SIDECAR_PORT/health" >/dev/null 2>&1; do
   sleep 3; ELAPSED=$((ELAPSED + 3)); echo -n "."
   if [[ $ELAPSED -ge 150 ]]; then
     echo ""
-    err "Timed out (150 s) waiting for proxy. Check LITERT_CPP_BIN and LITERT_CPP_MODEL in .env."
+    err "Timed out (150 s) waiting for sidecar. Check LITERT_CPP_BIN and LITERT_CPP_MODEL in .env."
     exit 1
   fi
 done
@@ -143,7 +143,7 @@ curl -s "http://localhost:$SIDECAR_PORT/health" | python3 -m json.tool 2>/dev/nu
 echo ""; echo "=== Benchmark: S1 (text) · S2 (vision) · S3 (multi-turn KV-cache) ==="
 node "$ROOT/scripts/run-benchmark.mjs" \
   --backend litert-cpp --runs 5 --scenarios s1,s2,s3 \
-  --sidecar-pid "$PROXY_PID"
+  --sidecar-pid "$SIDECAR_PID"
 
 echo ""
 ok "Done — results saved to: $ROOT/results/"

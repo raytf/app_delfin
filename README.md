@@ -15,7 +15,7 @@ git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
 npm run setup   # seeds .env, downloads bridge artifact + Gemma 4 model, bootstraps Piper TTS, validates .env
-npm run dev     # full stack: C++ backend proxy + Electron/Vite
+npm run dev     # full stack: TypeScript sidecar + Electron/Vite
 ```
 
 **Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (dev mode: repo-local Piper TTS), [GitHub CLI](https://cli.github.com/) + `gh auth login`. Windows has extra optional requirements for source builds — see [Windows setup](#windows-x64) below.
@@ -116,9 +116,9 @@ Full guide: [Windows](docs/guides/testing-guide-windows.md)
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | **Primary.** Full stack — C++ backend proxy + Electron/Vite; run `npm run setup` first |
+| `npm run dev` | **Primary.** Full stack — TypeScript sidecar + Electron/Vite; run `npm run setup` first |
 | `npm run dev:frontend` | Electron + Vite only — use when `dev:backend` is already running in another terminal |
-| `npm run dev:backend` | C++ backend proxy only (port 8321) |
+| `npm run dev:backend` | TypeScript sidecar only (port 8321) |
 | `npm run dev:mock` | Mock sidecar + Electron (UI dev, no inference needed) |
 
 ### Piper voice management (dev only)
@@ -146,10 +146,10 @@ npm run check:windows              # full env check (Windows)
 | `LITERT_BACKEND` | `CPU` | Set to `GPU` (OpenCL on Linux, Metal on macOS) |
 | `MODEL_REPO` | `litert-community/gemma-4-E2B-it-litert-lm` | Switch to the E4B variant on 32 GB machines |
 | `VOICE_ENABLED` | `true` | Disable always-on VAD for text-only prompts |
-| `LITERT_CPP_TTS_BACKEND` | `piper` | Set to `none` to disable Piper and use Web Speech fallback |
-| `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
+| `TTS_BACKEND` | `piper` | Sidecar TTS; set to `none` to disable Piper and use the Web Speech fallback |
+| `TTS_SOFT_MIN_CHARS` / `TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
 | `PIPER_MODEL` | _(set by setup)_ | Managed by `npm run voice:use`; written automatically by `npm run setup` |
-| `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | _Deprecated Python path._ Replace `localhost` with WSL2 IP if needed |
+| `SIDECAR_URL` | `http://localhost:8321` | Sidecar base URL; the WebSocket endpoint is derived from it. On WSL2, replace `localhost` with the WSL2 IP |
 
 See [`.env.example`](.env.example) for the full reference.
 
@@ -216,12 +216,12 @@ Procedure when LiteRT-LM ships a new release:
 
 ## Architecture
 
-Delfin runs Gemma 4 via the **LiteRT-LM C++ bridge** on all supported platforms (Windows x64, macOS arm64, Linux x64). The C++ bridge is a thin inference kernel (JSONL over stdio); the Node.js proxy is the application layer. The Python FastAPI sidecar (`sidecar/server.py`) is deprecated and retained for developer reference only.
+Delfin runs Gemma 4 via the **LiteRT-LM C++ bridge** on all supported platforms (Windows x64, macOS arm64, Linux x64). The C++ bridge is a thin inference kernel (JSONL over stdio); the TypeScript sidecar (`sidecar/src/`) is the application layer that spawns the bridge and Piper, manages sessions, and serves the WebSocket protocol. The Python FastAPI sidecar (`sidecar-old/server.py`) is deprecated and retained for developer reference only.
 
 ```text
 Electron Renderer (React / Zustand)
         ↕  contextBridge (IPC)
-Electron Main (Node.js)  ←→  WebSocket :8321  ←→  litert-cpp-proxy.mjs (Node.js)
+Electron Main (Node.js)  ←→  WebSocket :8321  ←→  TypeScript sidecar (sidecar/src/)
                                                       ├── delfin_litert_bridge[.exe] (C++)
                                                       │     └── LiteRT-LM + Gemma 4 E2B/E4B
                                                       └── piper (TTS subprocess)
@@ -232,8 +232,8 @@ Electron Main (Node.js)  ←→  WebSocket :8321  ←→  litert-cpp-proxy.mjs (
 | Desktop framework | Electron 41+ via electron-vite |
 | Renderer | React 19, TypeScript, Tailwind CSS 4 |
 | State / Validation | Zustand 5 / Zod 4 |
-| Inference — primary | LiteRT-LM C++ bridge + Node.js proxy (all platforms) |
-| Inference — deprecated | LiteRT-LM Python sidecar (`sidecar/server.py`) |
+| Inference — primary | LiteRT-LM C++ bridge + TypeScript sidecar (all platforms) |
+| Inference — deprecated | LiteRT-LM Python sidecar (`sidecar-old/server.py`) |
 | Model | Gemma 4 E2B (default); E4B for 32 GB machines |
 | TTS | Piper (primary) / Web Speech (fallback); Kokoro/MLX (deprecated Python path) |
 | Voice input | `@ricky0123/vad-web` (Silero ONNX in renderer) |
@@ -248,13 +248,13 @@ src/
 ├── preload/       # contextBridge
 ├── renderer/      # React UI, hooks, stores, waveform/audio utilities
 └── shared/        # types, schemas, constants
-native/
-└── litert-cpp-bridge/  # C++ JSONL bridge source (primary backend)
-sidecar/                # deprecated Python sidecar (dev reference)
+litert-cpp-bridge/     # C++ JSONL bridge source (primary backend)
+sidecar/
+└── src/               # TypeScript sidecar — WebSocket server + bridge/TTS orchestration
+sidecar-old/           # deprecated Python sidecar (dev reference)
 scripts/
-├── litert-cpp-proxy.mjs   # Node WebSocket proxy (application layer)
-└── windows/               # PowerShell helpers
-docs/                      # SPEC, feature specs, explanation docs
+└── windows/           # PowerShell helpers
+docs/                  # SPEC, feature specs, explanation docs
 ```
 
 ---

@@ -2,8 +2,8 @@ import { ipcMain } from 'electron'
 import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
-  type OverlayMode,
-} from '../../shared/types'
+} from '../../shared/constants'
+import type { OverlayMode } from '../../shared/types'
 import type { RegisterIpcHandlersOptions } from './types'
 
 function forwardOverlayError(options: RegisterIpcHandlersOptions, message: string): void {

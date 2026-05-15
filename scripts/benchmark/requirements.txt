@@ -1,8 +1,10 @@
-# Benchmark dependencies — install into your active Python environment:
-#   pip install -r scripts/benchmark/requirements.txt
+# Benchmark dependencies for the self-contained harness venv.
 #
-# On WSL2 (for LiteRT benchmarks):  uses the sidecar's .venv is fine, just add httpx/psutil
-# On Windows (for llamafile benchmarks):  standard Python 3.10+ with pip
+# `npm run benchmark:*` (scripts/run-benchmark.mjs) auto-creates and installs
+# scripts/benchmark/.venv from this file on first run — no manual setup needed.
+# To provision or refresh it by hand: python -m venv scripts/benchmark/.venv
+# then scripts/benchmark/.venv/bin/pip install -r scripts/benchmark/requirements.txt
+# Requires Python 3.10+.
 
 websockets>=12.0        # LiteRT WebSocket adapter
 httpx>=0.27.0           # llamafile HTTP/SSE adapter

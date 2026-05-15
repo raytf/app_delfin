@@ -1,18 +1,14 @@
 import { ipcMain } from "electron";
 import {
-  wsInterruptMessageSchema,
-  wsOutboundMessageSchema,
-} from "../../shared/schemas";
-import {
   MAIN_TO_RENDERER_CHANNELS,
   RENDERER_TO_MAIN_CHANNELS,
-} from "../../shared/types";
+} from "../../shared/constants";
 import {
   connectToSidecar,
   onSidecarMessage,
-  onSidecarStatus,
   sendToSidecar,
-} from "../sidecar/wsClient";
+} from "../sidecar/session/ws";
+import type { SidecarSessionStreamMessage } from "../../shared/schemas/sidecar";
 import type { RegisterIpcHandlersOptions } from "./types";
 
 export function registerSidecarBridge(
@@ -20,41 +16,31 @@ export function registerSidecarBridge(
 ): void {
   connectToSidecar(options.sidecarWsUrl);
 
-  ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_SEND, (_event, message) => {
-    try {
-      const parsed = wsOutboundMessageSchema.parse(message);
-      sendToSidecar(parsed);
-    } catch (error) {
-      const mainWindow = options.getMainWindow();
-      if (mainWindow !== null && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to send message to sidecar.",
-        });
+  ipcMain.on(
+    RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT,
+    (_event, request?: { requestId?: string }) => {
+      const requestId = request?.requestId;
+      if (typeof requestId !== "string" || requestId.trim().length === 0) {
+        return;
       }
-    }
-  });
 
-  ipcMain.on(RENDERER_TO_MAIN_CHANNELS.SIDECAR_INTERRUPT, () => {
-    try {
-      const parsed = wsInterruptMessageSchema.parse({ type: "interrupt" });
-      sendToSidecar(parsed);
-    } catch (error) {
-      const mainWindow = options.getMainWindow();
-      if (mainWindow !== null && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to interrupt sidecar.",
-        });
+      try {
+        sendToSidecar({ type: "interrupt", requestId });
+      } catch (error) {
+        const mainWindow = options.getMainWindow();
+        if (mainWindow !== null && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to interrupt sidecar.",
+          });
+        }
       }
-    }
-  });
+    },
+  );
 
-  onSidecarMessage(async (message) => {
+  onSidecarMessage(async (message: SidecarSessionStreamMessage) => {
     const mainWindow = options.getMainWindow();
 
     if (mainWindow === null || mainWindow.isDestroyed()) {
@@ -64,10 +50,8 @@ export function registerSidecarBridge(
     try {
       switch (message.type) {
         case "token":
-          await options.sessionPersistence.appendAssistantToken(
-            message.text ?? "",
-          );
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_TOKEN, {
+            requestId: message.requestId ?? "",
             text: message.text ?? "",
           });
           return;
@@ -75,6 +59,7 @@ export function registerSidecarBridge(
           mainWindow.webContents.send(
             MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_START,
             {
+              requestId: message.requestId ?? "",
               sampleRate: message.sample_rate ?? 24_000,
               sentenceCount: message.sentence_count ?? 0,
             },
@@ -84,47 +69,43 @@ export function registerSidecarBridge(
           if (message.audio !== undefined) {
             mainWindow.webContents.send(
               MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_CHUNK,
-              { audio: message.audio, index: message.index },
+              {
+                requestId: message.requestId ?? "",
+                audio: message.audio,
+                index: message.index,
+              },
             );
           }
           return;
         case "audio_end":
           mainWindow.webContents.send(
             MAIN_TO_RENDERER_CHANNELS.SIDECAR_AUDIO_END,
-            { ttsTime: message.tts_time ?? 0 },
+            {
+              requestId: message.requestId ?? "",
+              ttsTime: message.tts_time ?? 0,
+            },
           );
           return;
         case "done":
-          await options.sessionPersistence.finishAssistantResponse();
-          mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE);
+          mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_DONE, {
+            requestId: message.requestId ?? "",
+            interrupted: message.interrupted ?? false,
+          });
           return;
         case "error":
-          await options.sessionPersistence.failAssistantResponse(
-            message.message ?? "Unknown error",
-          );
           mainWindow.webContents.send(MAIN_TO_RENDERER_CHANNELS.SIDECAR_ERROR, {
+            ...(message.requestId !== undefined
+              ? { requestId: message.requestId }
+              : {}),
             message: message.message ?? "Unknown error",
           });
           return;
       }
     } catch (error) {
       console.error(
-        "[sidecarBridge] Failed to persist sidecar message:",
+        "[sidecarBridge] Failed to forward sidecar message:",
         error,
       );
     }
-  });
-
-  onSidecarStatus((status) => {
-    const mainWindow = options.getMainWindow();
-
-    if (mainWindow === null || mainWindow.isDestroyed()) {
-      return;
-    }
-
-    mainWindow.webContents.send(
-      MAIN_TO_RENDERER_CHANNELS.SIDECAR_STATUS,
-      status,
-    );
   });
 }

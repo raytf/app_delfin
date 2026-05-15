@@ -34,14 +34,15 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
         WebSocket (localhost:8321/ws)
               │
 ┌─────────────▼────────────────┐   JSONL/stdio
-│  Node.js WebSocket Proxy     │◄──────────────►  delfin_litert_bridge (C++)
-│  scripts/litert-cpp-proxy.mjs│                  LiteRT-LM engine
-│  - Preset resolution         │                  Gemma 4 E2B / E4B
+│  TypeScript Sidecar          │◄──────────────►  delfin_litert_bridge (C++)
+│  sidecar/src/                │                  LiteRT-LM engine
+│  - Session + turn services   │                  Gemma 4 E2B / E4B
 │  - Piper TTS pipeline        │                  Vision + audio input
-│  - Session / interrupt mgmt  │                  KV-cache per session
+│  - Preset resolution         │                  KV-cache per session
 └──────────────────────────────┘
+   (spawns the C++ bridge from litert-cpp-bridge/ build output)
 
-  [Deprecated] Python FastAPI Sidecar (sidecar/server.py)
+  [Deprecated] Python FastAPI Sidecar (sidecar-old/server.py)
     LiteRT-LM Python API · Kokoro/MLX TTS
     Still reachable on the same ws://localhost:8321/ws endpoint
     for developer reference; not used in packaged builds.
@@ -55,11 +56,11 @@ A desktop AI sidebar that captures your screen, sends the image to a local LLM (
 | Renderer          | React 19, TypeScript 6, Tailwind CSS 4                                            |
 | State management  | Zustand 5                                                                         |
 | Validation        | Zod 4                                                                             |
-| Inference engine  | LiteRT-LM C++ bridge (primary — all platforms); Python API (deprecated)           |
+| Inference engine  | LiteRT-LM C++ bridge (`litert-cpp-bridge/`, primary — all platforms); Python API (deprecated) |
 | Model             | Gemma 4 E2B (default) or E4B (32 GB machines)                                     |
-| API server        | Node.js WebSocket proxy (`litert-cpp-proxy.mjs`); FastAPI + uvicorn (deprecated)  |
-| TTS               | Piper TTS via litert-cpp-proxy (primary); Web Speech API (fallback)               |
-| WebSocket         | ws (Node.js client + proxy server)                                                |
+| API server        | TypeScript sidecar (`sidecar/src/`); FastAPI + uvicorn (deprecated)               |
+| TTS               | Piper TTS via the TypeScript sidecar (primary); Web Speech API (fallback)          |
+| WebSocket         | ws (Node.js client + sidecar server)                                              |
 
 ## Active Work Map
 
@@ -81,8 +82,8 @@ These rules apply to every feature. The agent must follow them throughout.
 
 ### Code Style
 
-- TypeScript for all Electron code (strict mode)
-- Python 3.12+ for all sidecar code
+- TypeScript for all Electron and sidecar code (strict mode)
+- Python 3.12+ for the deprecated `sidecar-old/` reference code
 - Use ES modules in TypeScript, standard Python imports
 - No `any` types in TypeScript — use proper types or `unknown`
 - All WebSocket message types defined in `src/shared/types.ts` and validated with Zod schemas in `src/shared/schemas.ts`
@@ -98,7 +99,7 @@ These rules apply to every feature. The agent must follow them throughout.
 
 - All machine-specific values come from `.env` (never hardcoded)
 - `.env.example` is committed; `.env` is gitignored
-- Python reads `.env` via `python-dotenv`; Electron reads via `dotenv` package
+- Python (`sidecar-old/`) reads `.env` via `python-dotenv`; Electron and the TypeScript sidecar read via the `dotenv` package
 
 ### Error Handling
 
@@ -127,11 +128,11 @@ SIDECAR_HOST=0.0.0.0
 SIDECAR_PORT=8321
 
 # === Electron ===
-SIDECAR_WS_URL=ws://localhost:8321/ws
+# Single source of truth for the sidecar location; the WebSocket endpoint
+# (ws://…/ws) is derived from this by the Electron main config service.
+SIDECAR_URL=http://localhost:8321
 
 # === Inference ===
-# Dev default: litert (Python sidecar). M5a will flip to litert-cpp on all platforms.
-INFERENCE_BACKEND=litert
 LITERT_BACKEND=CPU
 LITERT_AUDIO_BACKEND=CPU
 VISION_TOKEN_BUDGET=280
@@ -140,26 +141,25 @@ MAX_IMAGE_WIDTH=512
 # === Voice input ===
 VOICE_ENABLED=true
 
-# === LiteRT-LM C++ bridge (primary backend) ===
-# LITERT_CPP_BIN must point at delfin_litert_bridge[.exe] from native/litert-cpp-bridge/
+# === LiteRT-LM C++ bridge (the inference backend) ===
+# LITERT_CPP_BIN must point at delfin_litert_bridge[.exe] built from litert-cpp-bridge/
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
-LITERT_CPP_TTS_BACKEND=piper   # piper | none (none → renderer Web Speech fallback)
-LITERT_CPP_TTS_SOFT_MIN_CHARS=80
-LITERT_CPP_TTS_SOFT_MAX_CHARS=180
+
+# === TTS ===
+TTS_BACKEND=piper   # piper (default) | none (renderer Web Speech fallback)
+TTS_ENABLED=true    # renderer TTS playback on/off (read by the Electron main)
+TTS_SOFT_MIN_CHARS=80
+TTS_SOFT_MAX_CHARS=180
 PIPER_BIN=./bin/piper/venv/Scripts/piper.exe
 PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx
 PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json
-PIPER_SAMPLE_RATE=22050  # optional; proxy reads audio.sample_rate from PIPER_CONFIG when absent
-
-# === TTS (deprecated Python sidecar path only) ===
-TTS_ENABLED=true
-TTS_BACKEND=kokoro   # kokoro | mlx | web-speech
-KOKORO_VOICE=af_heart
-KOKORO_SPEED=1.1
+PIPER_SAMPLE_RATE=22050  # optional; the sidecar reads audio.sample_rate from PIPER_CONFIG when absent
+# Deprecated Python sidecar (sidecar-old/) only: TTS_BACKEND there also accepts
+# kokoro|mlx|web-speech, plus KOKORO_VOICE / KOKORO_SPEED.
 ```
 
-On `npm run dev:backend`, `TTS_BACKEND` and `TTS_ENABLED` have **no effect** — those variables control the deprecated Python sidecar. TTS for the C++ proxy is controlled by `LITERT_CPP_TTS_BACKEND`. Piper sentences flush on punctuation boundaries; `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `LITERT_CPP_TTS_SOFT_MAX_CHARS` allow soft partial flushes for long text without punctuation.
+`npm run dev:backend` runs the TypeScript sidecar. Its TTS backend is `TTS_BACKEND` — `piper` (the default; the sidecar emits `audio_*` events) or any other value (treated as `none`, leaving the renderer to fall back to browser Web Speech). The `TTS_BACKEND` name is **shared** with the deprecated `sidecar-old/` Python path, where it also takes `kokoro` / `mlx` / `web-speech`; the TypeScript sidecar tolerates those values (treating them as `none`) rather than failing, so one `.env` works for both. `TTS_ENABLED`, read by the Electron main process, toggles renderer TTS playback. Piper sentences flush on punctuation boundaries; `TTS_SOFT_MIN_CHARS` / `TTS_SOFT_MAX_CHARS` allow soft partial flushes for long text without punctuation.
 
 `npm run setup` is the canonical fresh-clone setup command for all platforms — it chains `setup:env` (seed `.env` from `.env.example`), `setup:litert-cpp` (download the CI-built bridge artifact or rebuild from source via `--source-build`, provision the Gemma 4 model, bootstrap the repo-local Piper runtime, install the default voice, patch `.env`), and `check:env` (validate `.env` keys). `LITERT_CPP_BRIDGE_REPO` overrides the GitHub repo for artifact lookup. Voice management: `npm run voice:list`, `voice:use -- <voice-name>`, `voice:install -- <hf-path> --use`. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
 
@@ -207,7 +207,7 @@ interface WsInboundMessage {
 }
 ```
 
-For turns with server-side TTS (Python sidecar or Piper-backed LiteRT C++ proxy), message ordering is:
+For turns with server-side TTS (Piper-backed TypeScript sidecar, or the deprecated Python sidecar), message ordering is:
 
 ```text
 token* → audio_start → audio_chunk* → audio_end → done
@@ -215,7 +215,7 @@ token* → audio_start → audio_chunk* → audio_end → done
 
 This means `done` represents the end of the full turn, not just the end of token streaming.
 
-The `done` event from the proxy to Electron has no extra fields — `{"type":"done"}`. The proxy accumulates `streamedText` from token events and uses it for TTS and downstream logic; the bridge's internal `done` JSONL event does not echo text. See `AGENTS.md` §Validated Technical Decisions (Bridge-minimal design) for the rationale.
+The `done` event from the sidecar to Electron has no extra fields — `{"type":"done"}`. The sidecar accumulates `streamedText` from token events and uses it for TTS and downstream logic; the bridge's internal `done` JSONL event does not echo text. See `AGENTS.md` §Validated Technical Decisions (Bridge-minimal design) for the rationale.
 
 ### IPC Channels (Electron Main ↔ Renderer)
 
@@ -252,7 +252,7 @@ The `done` event from the proxy to Electron has no extra fields — `{"type":"do
 
 ## HTTP Endpoints
 
-The Node WebSocket proxy (`scripts/litert-cpp-proxy.mjs`) exposes one HTTP endpoint on the same port (8321):
+The TypeScript sidecar (`sidecar/src/`) exposes one HTTP endpoint on the same port (8321):
 
 | Method | Path      | Response                                                            |
 | ------ | --------- | ------------------------------------------------------------------- |

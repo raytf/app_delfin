@@ -2,7 +2,7 @@
 
 ## The Problem to Solve
 
-React runs in a sandboxed renderer process. The model runs in a separate Node.js proxy process (which itself drives a native C++ binary). They cannot talk to each other directly. Every prompt has to travel through three processes (renderer → Electron main → inference backend) and the response has to come back the same way.
+React runs in a sandboxed renderer process. The model runs in a separate TypeScript sidecar process (which itself drives a native C++ binary). They cannot talk to each other directly. Every prompt has to travel through three processes (renderer → Electron main → inference backend) and the response has to come back the same way.
 
 ---
 
@@ -10,7 +10,7 @@ React runs in a sandboxed renderer process. The model runs in a separate Node.js
 
 ```
 [Renderer process]          [Main process]           [Inference backend]
- React + Zustand             Node.js                  litert-cpp-proxy.mjs
+ React + Zustand             Node.js                  sidecar/src/ (TypeScript)
       ↕ contextBridge IPC         ↕ WebSocket            + delfin_litert_bridge (C++)
 ```
 
@@ -64,9 +64,9 @@ socket.send(JSON.stringify({ image: "<base64 JPEG>", text: "...", preset_id: "le
 
 The `socket` is a persistent `ws.WebSocket` instance opened at app startup. If it's not connected, `sendToSidecar` throws, which propagates back to the renderer as an error.
 
-### 5. Backend receives and processes (`scripts/litert-cpp-proxy.mjs`)
+### 5. Backend receives and processes (`sidecar/src/`)
 
-The proxy receives the WebSocket message and forwards it to the C++ bridge over stdin as a JSONL `generate` request, including the stable `sessionId` for KV-cache continuity and the resolved system prompt for the `preset_id`.
+The sidecar receives the WebSocket message and forwards it to the C++ bridge over stdin as a JSONL `generate` request, including the stable `sessionId` for KV-cache continuity and the resolved system prompt for the `preset_id`.
 
 The C++ bridge streams tokens back over stdout one per line:
 
@@ -74,13 +74,13 @@ The C++ bridge streams tokens back over stdout one per line:
 {"type":"token","requestId":"...","text":"The "}
 ```
 
-The proxy forwards each token to Electron immediately:
+The sidecar forwards each token to Electron immediately:
 
 ```json
 {"type":"token","text":"The "}
 ```
 
-While tokens accumulate, the proxy feeds complete sentences to Piper TTS. After the bridge signals `done` and all TTS audio has been sent, the proxy emits the full audio sequence followed by `done`:
+While tokens accumulate, the sidecar feeds complete sentences to Piper TTS. After the bridge signals `done` and all TTS audio has been sent, the sidecar emits the full audio sequence followed by `done`:
 
 ```json
 {"type":"audio_start","sample_rate":22050,"sentence_count":0}
@@ -89,7 +89,7 @@ While tokens accumulate, the proxy feeds complete sentences to Piper TTS. After 
 {"type":"done"}
 ```
 
-The renderer defaults `sentence_count` to `0` when the proxy omits it. If Piper is disabled, the audio messages are skipped and only `token*` → `done` is sent.
+The renderer defaults `sentence_count` to `0` when the sidecar omits it. If Piper is disabled, the audio messages are skipped and only `token*` → `done` is sent.
 
 ---
 
@@ -162,7 +162,7 @@ When `done` arrives, `finishAssistantResponse()` sets `isSubmitting: false` and 
 ## Complete Flow Diagram
 
 ```
-[Renderer]                  [Main process]              [litert-cpp-proxy]
+[Renderer]                  [Main process]              [TypeScript sidecar]
 handleSubmitPrompt()
   messageId = randomUUID()
   beginPromptSubmission({messageId,prompt})   (adds placeholder bubble)

@@ -1,8 +1,10 @@
-"""LiteRT-LM backend adapter.
+"""LiteRT-LM backend adapter — the deprecated Python FastAPI sidecar.
 
-Connects to the existing Delfin FastAPI sidecar over WebSocket.
+Connects to the Python sidecar (sidecar-old/server.py) over WebSocket. Retained
+for comparison only; the primary backend is litert_cpp.py (the TypeScript
+sidecar + C++ bridge). The /ws protocol below is shared by both.
 
-Protocol (from sidecar/server.py):
+Protocol (from sidecar-old/server.py):
   → send JSON: {"text": "...", "image": "<base64>", "preset_id": "..."}
   ← recv JSON: {"type": "token", "text": "..."}  (streaming)
   ← recv JSON: {"type": "done"}                   (generation complete)
@@ -20,6 +22,7 @@ import asyncio
 import base64
 import json
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -66,26 +69,54 @@ class LiteRTBackend(BaseBackend):
     # Scenario execution
     # ------------------------------------------------------------------
 
-    async def run_scenario(self, scenario: Scenario) -> list[dict]:
-        """Open one WebSocket connection and run all turns sequentially."""
-        pid = self.sidecar_pid
-        results: list[dict] = []
+    def _build_turn_message(self, turn, request_id: str, session_id: str) -> dict:
+        """Outbound turn message for the deprecated Python sidecar.
 
-        async with websockets.connect(self.url, open_timeout=15) as ws:
-            for turn in scenario.turns:
-                result = await self._run_turn(ws, turn, pid)
-                result["turn_text_preview"] = turn.text[:80]
-                results.append(result)
-
-        return results
-
-    async def _run_turn(self, ws, turn, pid: int | None) -> dict:
-        """Send one message and collect streaming metrics."""
-        # Build the outbound message
+        Overridden by LiteRTCppBackend for the TypeScript sidecar's schema.
+        The Python sidecar ignores request_id / session_id.
+        """
         msg: dict = {"text": turn.text, "preset_id": "generic-screen"}
         if turn.image_path is not None:
             raw = Path(turn.image_path).read_bytes()
             msg["image"] = base64.b64encode(raw).decode("ascii")
+        return msg
+
+    async def _acquire_session_id(self) -> str:
+        """Session identifier for one scenario run.
+
+        The Python sidecar tracks conversation context per WebSocket
+        connection, so a throwaway UUID is fine here. LiteRTCppBackend
+        overrides this to create a real session via the TypeScript sidecar's
+        REST API.
+        """
+        return str(uuid.uuid4())
+
+    async def _release_session(self, session_id: str) -> None:
+        """Cleanup hook — no-op for the Python sidecar. LiteRTCppBackend
+        overrides it to delete the session it created."""
+        return None
+
+    async def run_scenario(self, scenario: Scenario) -> list[dict]:
+        """Open one WebSocket connection and run all turns sequentially."""
+        pid = self.sidecar_pid
+        # Stable per connection so multi-turn (S3) shares conversation context.
+        session_id = await self._acquire_session_id()
+        results: list[dict] = []
+
+        try:
+            async with websockets.connect(self.url, open_timeout=15) as ws:
+                for turn in scenario.turns:
+                    result = await self._run_turn(ws, turn, pid, session_id)
+                    result["turn_text_preview"] = turn.text[:80]
+                    results.append(result)
+        finally:
+            await self._release_session(session_id)
+
+        return results
+
+    async def _run_turn(self, ws, turn, pid: int | None, session_id: str) -> dict:
+        """Send one message and collect streaming metrics."""
+        msg = self._build_turn_message(turn, str(uuid.uuid4()), session_id)
 
         poller = MemoryPoller(pid) if pid else None
         tokens: list[str] = []

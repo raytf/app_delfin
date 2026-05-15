@@ -3,7 +3,6 @@ export const ROUTES = {
   home: '/',
   sessionEnded: '/session-ended',
   sessions: '/sessions',
-  setup: '/setup',
 } as const
 
 export function buildSessionDetailPath(sessionId: string): `/sessions/${string}` {

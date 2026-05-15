@@ -30,3 +30,6 @@ native/litert-cpp-bridge/build/
 # Benchmark results — written at runtime, not committed
 results/*
 !results/.gitkeep
+
+# Local LiteRT-LM checkout for source bridge builds
+litert-cpp-bridge/deps/LiteRT-LM/

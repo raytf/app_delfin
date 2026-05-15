@@ -26,14 +26,63 @@ export const MODEL_REVISION = process.env.MODEL_REVISION ?? '6e5c4f1e395deb959c4
 // Records the LITERT_LM_REF used when the bridge was last downloaded or built.
 // Written to bin/ alongside the binary; read by resolveBridgePlan to detect stale installs.
 export const BRIDGE_VERSION_FILE = join(rootDir, 'bin', 'bridge.version')
+// Records the git commit the bridge binary was built from — the CI run's
+// headSha for downloads, local HEAD for source builds. Lets setup detect a
+// stale binary when the Delfin bridge SOURCE moved even though LITERT_LM_REF
+// did not (e.g. a bridge refactor against the same upstream ref).
+export const BRIDGE_COMMIT_FILE = join(rootDir, 'bin', 'bridge.commit')
+
+// Paths whose changes invalidate a built bridge binary. Forward slashes are
+// intentional — git accepts them as pathspecs on every platform.
+const BRIDGE_SOURCE_PATHS = ['litert-cpp-bridge', 'scripts/build-litert-cpp-bridge.mjs']
 
 function readInstalledBridgeRef() {
   try { return readFileSync(BRIDGE_VERSION_FILE, 'utf8').trim() } catch { return null }
 }
 
+function readInstalledBridgeCommit() {
+  try { return readFileSync(BRIDGE_COMMIT_FILE, 'utf8').trim() || null } catch { return null }
+}
+
 function writeBridgeVersion(ref = LITERT_LM_REF) {
   mkdirSync(join(rootDir, 'bin'), { recursive: true })
   writeFileSync(BRIDGE_VERSION_FILE, ref + '\n', 'utf8')
+}
+
+// Records (or clears, when commit is falsy) the commit the bridge was built from.
+function writeBridgeCommit(commit) {
+  mkdirSync(join(rootDir, 'bin'), { recursive: true })
+  if (!commit) {
+    rmSync(BRIDGE_COMMIT_FILE, { force: true })
+    return
+  }
+  writeFileSync(BRIDGE_COMMIT_FILE, String(commit).trim() + '\n', 'utf8')
+}
+
+function currentGitCommit() {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: rootDir, encoding: 'utf8', shell: process.platform === 'win32',
+  })
+  return result.status === 0 ? result.stdout.trim() : null
+}
+
+/**
+ * Tri-state: has the Delfin bridge source moved since the installed binary
+ * was built?
+ *   true  — source unchanged; the binary is current
+ *   false — source changed; the binary is stale
+ *   null  — cannot determine (no commit recorded, git unavailable, or the
+ *           commit is not in this checkout) — callers fall back to the
+ *           LITERT_LM_REF check.
+ */
+export function isBridgeSourceCurrent(installedCommit = readInstalledBridgeCommit()) {
+  if (!installedCommit || !/^[0-9a-f]{7,40}$/i.test(installedCommit)) return null
+  const diff = spawnSync('git', ['diff', '--quiet', installedCommit, '--', ...BRIDGE_SOURCE_PATHS], {
+    cwd: rootDir, shell: process.platform === 'win32',
+  })
+  if (diff.status === 0) return true
+  if (diff.status === 1) return false
+  return null
 }
 
 const DEFAULT_PIPER_VOICE = 'en/en_US/hfc_female/medium'
@@ -134,15 +183,31 @@ function resolveGitHubRepo(opts, env = process.env) {
   return parseGitHubRepoFromRemote(result.stdout)
 }
 
-export function resolveBridgePlan(opts, platform = process.platform, filesPresent = bridgeFilesPresent(platform), arch = process.arch, installedRef = readInstalledBridgeRef()) {
+export function resolveBridgePlan(
+  opts,
+  platform = process.platform,
+  filesPresent = bridgeFilesPresent(platform),
+  arch = process.arch,
+  installedRef = readInstalledBridgeRef(),
+  bridgeSourceCurrent = isBridgeSourceCurrent(),
+) {
   if (opts.skipBuild) return { source: 'skip', needsLiteRtLm: false }
   if (opts.bridgeSource === 'existing') return { source: 'existing', needsLiteRtLm: false }
   if (opts.sourceBuild || opts.bridgeSource === 'build') return { source: 'build', needsLiteRtLm: true }
   if (opts.bridgeSource === 'release') return { source: 'release', needsLiteRtLm: false }
   if (opts.bridgeSource === 'artifact') return { source: 'artifact', needsLiteRtLm: false }
-  if (filesPresent && installedRef === LITERT_LM_REF) return { source: 'existing', needsLiteRtLm: false }
+  if (filesPresent && installedRef === LITERT_LM_REF) {
+    // The upstream ref matches — but did the Delfin bridge source itself move
+    // since this binary was built? `false` means definitely stale; `null`
+    // (cannot determine) falls back to trusting the ref match.
+    if (bridgeSourceCurrent === false) {
+      if (!defaultBridgeArtifactName(platform, arch)) return { source: 'unsupported', needsLiteRtLm: false }
+      return { source: 'artifact', needsLiteRtLm: false, stale: true, staleReason: 'source' }
+    }
+    return { source: 'existing', needsLiteRtLm: false }
+  }
   if (!defaultBridgeArtifactName(platform, arch)) return { source: 'unsupported', needsLiteRtLm: false }
-  return { source: 'artifact', needsLiteRtLm: false, stale: filesPresent }
+  return { source: 'artifact', needsLiteRtLm: false, stale: filesPresent, staleReason: filesPresent ? 'ref' : undefined }
 }
 
 async function fetchJson(url) {
@@ -169,7 +234,7 @@ developers and require --source-build or --bridge-source build.
 
 Options:
   --litert-lm-dir <path>   LiteRT-LM checkout path
-                           (default: <parent folder of project>/LiteRT-LM)
+                           (default: litert-cpp-bridge/deps/LiteRT-LM)
   --native-windows         Force the native Windows flow. This is now the
                            default when running on a Windows host.
                            Only valid on Windows.
@@ -338,7 +403,7 @@ async function stepPrereqs(opts, bridgePlan) {
 function resolveLitertLmDir(opts) {
   if (opts.litertLmDir) return resolve(opts.litertLmDir)
   if (process.env.LITERT_LM_DIR) return resolve(process.env.LITERT_LM_DIR)
-  return join(dirname(rootDir), 'LiteRT-LM')
+  return join(rootDir, 'litert-cpp-bridge', 'deps', 'LiteRT-LM')
 }
 
 async function stepClone(litertLmDir, opts) {
@@ -416,6 +481,9 @@ async function downloadReleaseBridge(opts) {
     if (process.platform !== 'win32' && file === bridgeExecutableName()) chmodSync(join(rootDir, 'bin', file), 0o755)
   }
   writeBridgeVersion()
+  // GitHub Release assets aren't traced to a build commit — clear any stale
+  // bridge.commit so the source-aware check falls back to the ref check.
+  writeBridgeCommit(null)
   console.log('[setup-litert-cpp] ✅ Bridge staged from latest GitHub Release.')
 }
 
@@ -433,14 +501,14 @@ function findFileRecursive(dir, fileName) {
   return null
 }
 
-function latestSuccessfulBridgeRunId(repo) {
+function latestSuccessfulBridgeRun(repo) {
   const output = runCommandCapture('gh', [
     'run', 'list',
     '--repo', repo,
     '--workflow', BRIDGE_WORKFLOW_NAME,
     '--status', 'success',
     '--limit', '1',
-    '--json', 'databaseId,displayTitle,headBranch,updatedAt',
+    '--json', 'databaseId,displayTitle,headBranch,headSha,updatedAt',
   ], rootDir)
   const runs = JSON.parse(output || '[]')
   if (!Array.isArray(runs) || runs.length < 1) {
@@ -448,10 +516,23 @@ function latestSuccessfulBridgeRunId(repo) {
   }
   const run = runs[0]
   console.log(`[setup-litert-cpp] Using latest successful ${BRIDGE_WORKFLOW_NAME} run ${run.databaseId} (${run.headBranch}, ${run.updatedAt}).`)
-  return String(run.databaseId)
+  return { runId: String(run.databaseId), headSha: run.headSha ?? null }
 }
 
-function stageBridgeArtifact(tempDir, platform = process.platform) {
+// Resolves the build commit (headSha) for an explicitly-specified CI run.
+// Best-effort — a failure just means bridge.commit is not recorded.
+function bridgeRunHeadSha(repo, runId) {
+  try {
+    const output = runCommandCapture('gh', [
+      'run', 'view', String(runId), '--repo', repo, '--json', 'headSha',
+    ], rootDir)
+    return JSON.parse(output || '{}').headSha ?? null
+  } catch {
+    return null
+  }
+}
+
+function stageBridgeArtifact(tempDir, platform = process.platform, builtFromCommit = null) {
   const binDir = join(rootDir, 'bin')
   mkdirSync(binDir, { recursive: true })
   for (const file of bridgeRequiredFiles(platform)) {
@@ -465,6 +546,7 @@ function stageBridgeArtifact(tempDir, platform = process.platform) {
     throw new Error('Workflow artifact download completed but required bridge files are still missing from bin/.')
   }
   writeBridgeVersion()
+  writeBridgeCommit(builtFromCommit)
 }
 
 async function downloadWorkflowBridge(opts) {
@@ -479,7 +561,14 @@ async function downloadWorkflowBridge(opts) {
   if (!artifactName) {
     throw new Error(`No default bridge artifact is defined for ${process.platform}/${process.arch}. Use --source-build on supported backend-development machines.`)
   }
-  const runId = opts.ciRunId ?? latestSuccessfulBridgeRunId(repo)
+  let runId
+  let headSha
+  if (opts.ciRunId) {
+    runId = opts.ciRunId
+    headSha = bridgeRunHeadSha(repo, runId)
+  } else {
+    ({ runId, headSha } = latestSuccessfulBridgeRun(repo))
+  }
   const tempDir = join(tmpdir(), `delfin-${artifactName}-${process.pid}`)
 
   console.log(`[setup-litert-cpp] Downloading GitHub Actions bridge artifact: ${artifactName}`)
@@ -492,7 +581,7 @@ async function downloadWorkflowBridge(opts) {
       '--name', artifactName,
       '--dir', tempDir,
     ], rootDir)
-    stageBridgeArtifact(tempDir)
+    stageBridgeArtifact(tempDir, process.platform, headSha)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
@@ -510,6 +599,7 @@ async function buildBridgeFromSource(litertLmDir, opts) {
   await stepClone(litertLmDir, opts)
   await stepBuild(litertLmDir, opts)
   writeBridgeVersion()
+  writeBridgeCommit(currentGitCommit())
 }
 
 async function stepBridge(litertLmDir, opts, bridgePlan) {
@@ -526,7 +616,10 @@ async function stepBridge(litertLmDir, opts, bridgePlan) {
     return
   }
   if (bridgePlan.stale) {
-    console.log(`[setup-litert-cpp] ⚠️  Bridge version mismatch: installed ${readInstalledBridgeRef() ?? 'unknown'}, required ${LITERT_LM_REF} — re-downloading.`)
+    const detail = bridgePlan.staleReason === 'source'
+      ? `Delfin bridge source changed since the binary was built (commit ${(readInstalledBridgeCommit() ?? 'unknown').slice(0, 12)})`
+      : `version mismatch — installed ${readInstalledBridgeRef() ?? 'unknown'}, required ${LITERT_LM_REF}`
+    console.log(`[setup-litert-cpp] ⚠️  Bridge stale: ${detail} — re-downloading.`)
   }
   if (opts.dryRun) {
     console.log(`[setup-litert-cpp] [dry-run] Bridge strategy: ${bridgePlan.source}`)
@@ -626,20 +719,7 @@ async function stepModel(opts, env) {
     return
   }
 
-  // Prefer copying from the Python sidecar directory if the file is already there.
-  const sidecarPath = join(rootDir, 'sidecar', modelFile)
-  if (existsSync(sidecarPath)) {
-    if (opts.dryRun) {
-      console.log(`[setup-litert-cpp] [dry-run] Would copy model from sidecar/ → ${destPath}`)
-      return
-    }
-    mkdirSync(destDir, { recursive: true })
-    copyFileSync(sidecarPath, destPath)
-    console.log(`[setup-litert-cpp] ✅ Model copied from sidecar/:\n   ${destPath}`)
-    return
-  }
-
-  // Fall back to downloading from HuggingFace.
+  // Download from HuggingFace.
   const modelRevision = process.env.MODEL_REVISION ?? MODEL_REVISION
   const url = `${HF_BASE}/${modelRepo}/resolve/${modelRevision}/${modelFile}`
   console.log(`[setup-litert-cpp] Model revision: ${modelRevision}`)
@@ -676,7 +756,7 @@ function printSummary(litertLmDir, opts) {
   console.log(`  .env               : ${envPath} ${existsSync(envPath) ? '✅' : '⚠️  (missing)'}`)
   if (!opts.dryRun) {
     console.log('\n  Start the C++ backend:')
-    console.log('    npm run dev:litert-cpp\n')
+    console.log('    npm run dev:backend\n')
   }
 }
 

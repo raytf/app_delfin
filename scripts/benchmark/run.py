@@ -3,24 +3,32 @@
 Delfin Inference Benchmark
 ==========================
 
-Measures TTFT, throughput, total turn time, and peak RSS for the LiteRT-LM
-sidecar, LiteRT-LM C++ proxy, and llamafile/llama-server backends. Results are
-written to JSON and an append-friendly CSV so separate backend runs land in the
-same file.
+Measures TTFT, throughput, total turn time, and peak RSS across inference
+backends. Results are written to JSON and an append-friendly CSV so runs from
+different backends and devices land in the same file for comparison.
+
+Backends:
+  litert-cpp  Primary — the TypeScript sidecar (sidecar/src/) + LiteRT-LM C++
+              bridge. This is the production stack.
+  litert      Deprecated — the Python FastAPI sidecar (sidecar-old/). Retained
+              for comparison only.
+  llamafile   Comparison only — llamafile / llama-server over its OpenAI API.
 
 Quick start — see scripts/benchmark/SETUP.md for full setup instructions.
+`node scripts/run-benchmark.mjs` (and the npm scripts) auto-provision the
+harness venv; invoking run.py directly requires scripts/benchmark/.venv.
 
-LiteRT (run from WSL2 with sidecar already running):
-    python scripts/benchmark/run.py --backend litert
+litert-cpp (primary — run with `npm run dev:backend` already running):
+    npm run benchmark:litert-cpp
 
-LiteRT C++ proxy (run with scripts/litert-cpp-proxy.mjs already running):
-    python scripts/benchmark/run.py --backend litert-cpp
+litert (deprecated Python sidecar — run with `npm run dev:sidecar-old` running):
+    npm run benchmark:litert-py
 
-llamafile (run from Windows PowerShell with server already running):
-    python scripts/benchmark/run.py --backend llamafile --llamafile-host localhost:8080
+llamafile (server already running — pass args through run-benchmark.mjs):
+    node scripts/run-benchmark.mjs --backend llamafile --llamafile-host localhost:8080
 
 llamafile (auto-launch — benchmark manages the server process):
-    python scripts/benchmark/run.py --backend llamafile \\
+    node scripts/run-benchmark.mjs --backend llamafile \\
         --llamafile-bin C:\\tools\\llama-server.exe \\
         --llamafile-model C:\\models\\gemma-4-E2B-it-IQ4_NL.gguf
 """
@@ -29,11 +37,19 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
+import socket
 import sys
 from pathlib import Path
 
 # Ensure the benchmark package root is on sys.path when run as a script
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Windows terminals default to cp1252; the console output uses box-drawing
+# characters, so force UTF-8 to avoid UnicodeEncodeError.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -48,21 +64,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument(
         "--backend", required=True, choices=["litert", "litert-cpp", "llamafile"],
-        help="Which inference backend to benchmark.",
+        help="Backend to benchmark: litert-cpp (primary — TypeScript sidecar + "
+             "C++ bridge), litert (deprecated Python sidecar), llamafile "
+             "(comparison only).",
     )
 
     # LiteRT options
-    g_lr = p.add_argument_group("LiteRT options (--backend litert)")
+    g_lr = p.add_argument_group("LiteRT options (--backend litert / litert-cpp)")
     g_lr.add_argument(
         "--litert-host", default="localhost:8321", metavar="HOST:PORT",
-        help="Host:port of the running LiteRT-compatible sidecar WebSocket server. "
+        help="Host:port of the running Delfin sidecar WebSocket server. "
              "Used by both litert and litert-cpp. Default: localhost:8321",
     )
     g_lr.add_argument(
         "--sidecar-pid", type=int, default=None, metavar="PID",
-        help="PID of the sidecar/proxy process for RSS memory tracking. "
-             "Find it with: pgrep -f server.py  (Linux/Mac) or "
-             "Get-Process python (PowerShell).",
+        help="PID to track for peak RSS. For litert-cpp the model memory lives "
+             "in the delfin_litert_bridge child process — find it with "
+             "`pgrep -f delfin_litert_bridge` (Linux/macOS) or "
+             "`Get-Process delfin_litert_bridge` (PowerShell). For the "
+             "deprecated Python sidecar use `pgrep -f server.py`.",
     )
 
     # llamafile options
@@ -91,8 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
     g_c.add_argument(
         "--model-name", default=None, metavar="NAME",
         help="Model label written to output files "
-             "(e.g. gemma-4-e2b-litert, gemma-4-e2b-q4). "
-             "Auto-detected from --llamafile-model filename if omitted.",
+             "(e.g. gemma-4-e2b-litert-cpp, gemma-4-e2b-q4). For litert / "
+             "litert-cpp it is derived from the MODEL_REPO env var; for "
+             "llamafile from the --llamafile-model filename.",
     )
     g_c.add_argument(
         "--runs", type=int, default=5, metavar="N",
@@ -107,6 +128,12 @@ def build_parser() -> argparse.ArgumentParser:
     g_c.add_argument(
         "--output", default="results", metavar="DIR",
         help="Directory for output files. Created if absent. Default: results/",
+    )
+    g_c.add_argument(
+        "--device-label", default=None, metavar="LABEL",
+        help="Human-friendly device identifier tagged onto every result row "
+             "for cross-device comparison (e.g. m1-mbp, ryzen-5800x, "
+             "thinkpad-gpu). Defaults to the machine hostname.",
     )
 
     return p
@@ -132,10 +159,15 @@ async def main(args: argparse.Namespace) -> None:
     print()
     print("Collecting system info …")
     sysinfo = collect_sysinfo()
+    device_label = args.device_label or socket.gethostname()
+    litert_backend = os.environ.get("LITERT_BACKEND", "").strip()
+    print(f"  Device   : {device_label}")
     print(f"  Platform : {sysinfo['platform']} {sysinfo.get('machine', '')}")
     print(f"  CPU      : {sysinfo['cpu']}")
     print(f"  RAM      : {sysinfo['ram_total_gb']} GB")
     print(f"  GPU      : {sysinfo.get('gpu', 'N/A')}")
+    if litert_backend:
+        print(f"  LiteRT   : {litert_backend}  (LITERT_BACKEND)")
     print()
 
     # --- Scenario setup ---
@@ -148,10 +180,10 @@ async def main(args: argparse.Namespace) -> None:
     # --- Model name ---
     model_name = args.model_name
     if model_name is None:
-        if args.backend == "litert":
-            model_name = "gemma-4-e2b-litert"
-        elif args.backend == "litert-cpp":
-            model_name = "gemma-4-e2b-litert-cpp"
+        if args.backend in ("litert", "litert-cpp"):
+            repo = os.environ.get("MODEL_REPO", "")
+            variant = "e4b" if "e4b" in repo.lower() else "e2b"
+            model_name = f"gemma-4-{variant}-{args.backend}"
         elif args.llamafile_model:
             model_name = Path(args.llamafile_model).stem[:40]
         else:
@@ -184,6 +216,8 @@ async def main(args: argparse.Namespace) -> None:
         model_name=model_name,
         runs_per_scenario=args.runs,
         sysinfo=sysinfo,
+        device_label=device_label,
+        litert_backend=litert_backend,
     )
 
     async with backend:

@@ -1,10 +1,10 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { readPiperSampleRate } from "./litert-cpp-proxy.mjs";
 import {
   ensurePiperRuntime,
   installVoice,
@@ -16,6 +16,15 @@ import {
   useVoice,
   voiceNameFromPath,
 } from "./piper-voice.mjs";
+
+function readPiperSampleRate(configPath, env = process.env) {
+  const envSampleRateRaw = env.PIPER_SAMPLE_RATE;
+  if (envSampleRateRaw && Number(envSampleRateRaw) > 0) {
+    return Number(envSampleRateRaw);
+  }
+  const configText = readFileSync(configPath, "utf8");
+  return readSampleRateFromConfigText(configText) ?? 22050;
+}
 
 function piperConfig(sampleRate) {
   return JSON.stringify({ audio: { sample_rate: sampleRate }, espeak: { voice: "en-us" } });
@@ -194,7 +203,7 @@ describe("piper voice helper", () => {
     expect(commands[0][1]).toEqual(expect.arrayContaining(["pathvalidate>=3,<4"]));
   });
 
-  it("lets the proxy infer PIPER_SAMPLE_RATE from PIPER_CONFIG when env is unset", async () => {
+  it("lets the sidecar infer PIPER_SAMPLE_RATE from PIPER_CONFIG when env is unset", async () => {
     const { modelsDir } = await createTempRoot();
     const configPath = join(modelsDir, "voice.onnx.json");
     await writeFile(configPath, piperConfig(16000));

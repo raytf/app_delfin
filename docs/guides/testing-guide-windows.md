@@ -46,7 +46,7 @@ npm install
 npm run dev
 ```
 
-If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` and set `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws` in the Windows-side `.env`.
+If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` and set `SIDECAR_URL=http://<WSL2-IP>:8321` in the Windows-side `.env`.
 
 ---
 
@@ -229,4 +229,4 @@ Use Developer Mode or an Administrator VS Developer shell, keep `output_user_roo
 
 **Electron cannot connect to the WSL2 sidecar**
 
-Set `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws` on the Windows side.
+Set `SIDECAR_URL=http://<WSL2-IP>:8321` on the Windows side.

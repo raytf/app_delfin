@@ -8,7 +8,7 @@
 
 The LiteRT-LM C++ bridge (`delfin_litert_bridge`) replaces the Python sidecar with a single native binary. The acceptance criteria are in [`litert-cpp-bridge-runtime-validation-spec.md`](../features/backend/litert-cpp-bridge-runtime-validation-spec.md). Default setup downloads the CI-built `delfin-litert-bridge-linux-x64` artifact; source builds are reserved for backend developers using `--source-build`.
 
-> **WSL2 note:** If you are on Windows with WSL2 Ubuntu, these instructions work as-is. The benchmark will run inside WSL2. The Electron app must still be started from the Windows side; connect it to the WSL2 proxy via `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws`.
+> **WSL2 note:** If you are on Windows with WSL2 Ubuntu, these instructions work as-is. The benchmark will run inside WSL2. The Electron app must still be started from the Windows side; connect it to the WSL2 sidecar via `SIDECAR_URL=http://<WSL2-IP>:8321`.
 
 ---
 
@@ -153,7 +153,7 @@ npm run dev:backend
 npm run dev
 ```
 
-> **WSL2:** The proxy runs in WSL2. Start the Electron app from a Windows terminal in the same repo directory (`npm run dev`). Ensure `SIDECAR_WS_URL=ws://<WSL2-IP>:8321/ws` in `.env` on the Windows side.
+> **WSL2:** The proxy runs in WSL2. Start the Electron app from a Windows terminal in the same repo directory (`npm run dev`). Ensure `SIDECAR_URL=http://<WSL2-IP>:8321` in `.env` on the Windows side.
 
 ### Checklist
 
@@ -224,7 +224,7 @@ Get the WSL2 IP and update `.env`:
 ```bash
 hostname -I | awk '{print $1}'  # e.g. 172.20.x.x
 # In .env on the Windows side:
-# SIDECAR_WS_URL=ws://172.20.x.x:8321/ws
+# SIDECAR_URL=http://172.20.x.x:8321
 ```
 
 **S2 (vision) fails or returns empty**

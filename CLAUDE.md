@@ -20,10 +20,10 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 
 ## Project-Specific Reminders
 
-- Current app runtime: Electron + React renderer, Electron main IPC bridge. **Primary inference backend is the LiteRT-LM C++ bridge** (`scripts/litert-cpp-proxy.mjs` Node proxy + `delfin_litert_bridge` native binary) on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar/server.py`) is **deprecated** and retained for developer reference only.
+- Current app runtime: Electron + React renderer, Electron main IPC bridge. **The inference backend is the TypeScript sidecar** (`sidecar/src/`) **driving the LiteRT-LM C++ kernel** (`litert-cpp-bridge/` → `delfin_litert_bridge` native binary) on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar-old/server.py`) is **deprecated** and retained for developer reference only.
 - The legacy llamafile / `llama-server` backend is **deprecated** and retained only for benchmark comparison under `scripts/benchmark/`. Do not introduce new app-runtime code paths that depend on it.
-- `npm run dev:backend` starts the Node proxy with Piper TTS enabled (if configured). The proxy streams `audio_*` events for sentence-level TTS; if Piper is absent or disabled (`LITERT_CPP_TTS_BACKEND=none`), the renderer falls back to Web Speech automatically.
-- `npm run dev` starts the full stack (backend proxy + Electron/Vite). Use `npm run dev:frontend` / `npm run dev:backend` to run each layer independently.
+- `npm run dev:backend` starts the TypeScript sidecar with Piper TTS — the default (`TTS_BACKEND=piper`). The sidecar streams `audio_*` events for sentence-level TTS; if Piper is disabled (`TTS_BACKEND=none`, or any non-`piper` value), the renderer falls back to Web Speech automatically.
+- `npm run dev` starts the full stack (TypeScript sidecar + Electron/Vite). Use `npm run dev:frontend` / `npm run dev:backend` to run each layer independently.
 - TypeScript is strict; avoid `any`.
 - Shared IPC/WebSocket types live in `src/shared/types.ts` and schemas in `src/shared/schemas.ts`.
 - CSS should use Tailwind utility classes only; no per-component CSS files.
@@ -32,13 +32,14 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`. If either conflicts
 ## Useful Commands
 
 - `npm run setup` — **First-time setup.** Chains `setup:env` + `setup:litert-cpp` + `check:env` (seeds `.env`, downloads bridge + model + Piper, validates `.env`).
-- `npm run dev` — **Primary.** Full stack: C++ backend proxy + Electron/Vite (run `npm run setup` first).
-- `npm run dev:backend` — Backend proxy only (run in one terminal while `dev:frontend` runs in another).
+- `npm run dev` — **Primary.** Full stack: TypeScript sidecar + Electron/Vite (run `npm run setup` first).
+- `npm run dev:backend` — TypeScript sidecar only (run in one terminal while `dev:frontend` runs in another).
 - `npm run dev:frontend` — Electron + Vite only (use when backend is already running).
 - `npm run dev:mock` — Mock backend + Electron/Vite (UI development, no model needed).
 - `npm run test` — Vitest suite.
 - `npm run check:windows` or `bash scripts/setup-check.sh` — environment check.
 - `npm run benchmark:litert-cpp` — LiteRT-CPP benchmark.
 - `npm run benchmark:litert-py` — Python LiteRT benchmark (deprecated comparison only).
+- `npm run benchmark:sweep` — auto-sweep `LITERT_BACKEND` (CPU/GPU): spawns the sidecar per config, benchmarks, tears down.
 
 Benchmark outputs go under `results/`; commit `results/.gitkeep` only, not generated JSON/CSV files.

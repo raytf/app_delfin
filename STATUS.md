@@ -1,6 +1,6 @@
 # Delfin — Implementation Status
 
-> Last updated: 2026-05-12 (Bridge `done` event simplified; bridge-minimal design documented; 8 placeholder components confirmed as orphaned stubs; settingsStore corrected to ✅; bridge version tracking added; memory-wiki-spec rewritten as v2 on Node + bridge stack — Gate 1 awaiting approval, original v1 spec archived.)
+> Last updated: 2026-05-14 (Backend refactor merge: the Node proxy `scripts/litert-cpp-proxy.mjs` was replaced by the TypeScript sidecar `sidecar/src/`; the C++ bridge moved to top-level `litert-cpp-bridge/`; the Python sidecar relocated to `sidecar-old/`. Prior 2026-05-12 update: bridge `done` event simplified, bridge-minimal design documented, bridge version tracking added, memory-wiki-spec rewritten as v2.)
 > Legend: ✅ Implemented · ⚠️ Placeholder (file exists, no real logic) · ❌ Not started
 > Note: `docs/README.md` uses a separate **lifecycle** scale (🟢 Active · 🚧 In Progress · ✅ Complete · 📦 Archived) for spec documents — these describe Gate 1→5 progress, not implementation completion.
 >
@@ -17,12 +17,12 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | File / Item                                                                  | Status | Notes                                                                                                                   |
 | ---------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Electron + Vite + React + TypeScript scaffold                                | ✅     | `electron.vite.config.ts`, `package.json` (v0.0.1; versioned via `npm version`, see AGENTS.md §Versioning)              |
-| `.env.example` + dotenv loading                                              | ✅     | Shared env contract for Electron, sidecar, voice/TTS settings, and LiteRT C++ bridge paths. LiteRT C++ proxy comments now document the repo-local `piper-tts` runtime path (`bin/piper/venv`) and automatic setup behavior. |
+| `.env.example` + dotenv loading                                              | ✅     | Shared env contract for Electron, sidecar, voice/TTS settings, and LiteRT C++ bridge paths. LiteRT C++ bridge comments now document the repo-local `piper-tts` runtime path (`bin/piper/venv`) and automatic setup behavior. |
 | `src/shared/types.ts`                                                        | ✅     | IPC, WebSocket, session history, overlay, and audio-bearing turn types                                                  |
 | `src/shared/schemas.ts`                                                      | ✅     | Zod validation for WS and session prompt contracts                                                                      |
 | `src/shared/constants.ts`                                                    | ✅     | Presets, sidebar constants, `VOICE_TURN_TEXT`                                                                           |
 | `scripts/mock-sidecar.js`                                                    | ✅     | Mock sidecar for Electron/UI work                                                                                       |
-| `scripts/run-sidecar.mjs`                                                    | ✅     | Helper script used by `npm run dev:sidecar` / `dev`                                                                     |
+| `scripts/run-sidecar.mjs`                                                    | ⚠️     | Orphaned — no npm script references it after the backend refactor. Spawns the deprecated Python sidecar (`sidecar-old/`) via uvicorn; superseded by `npm run dev:sidecar-old` |
 | `scripts/init-env.mjs`, `scripts/setup-sidecar.mjs`, `scripts/check-env.mjs` | ✅     | One-command setup and env validation                                                                                    |
 | `scripts/download-models.mjs`                                                | ✅     | Atomic Kokoro/model download flow with temp `.part` files, retry/resume support, byte-count validation when available, and shared use by LiteRT C++ setup. |
 | `scripts/download-models.test.mjs`                                           | ✅     | Vitest coverage for safe model download behavior                                                                        |
@@ -32,31 +32,49 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | `README.md`                                                                  | ✅     | User-facing setup guide. LiteRT C++ setup/docs now describe one-shot native Windows provisioning, bridge artifact/source fallback order, repo-local pinned `piper-tts`, automatic Piper voice provisioning, and browser-speech fallback. |
 | `docs/README.md`                                                             | ✅     | Documentation index now includes a dedicated setup & validation guides section for macOS, Linux / WSL2, and Windows. |
 
-> Backend research scripts (benchmark harness, llamafile setup/runner, LiteRT C++ proxy and native bridge) used to live in this section. They have moved to [§Backend (`docs/features/backend/`)](#backend-docsfeaturesbackend) below.
+> Backend research scripts (benchmark harness, llamafile setup/runner, LiteRT C++ bridge) used to live in this section. They have moved to [§Backend (`docs/features/backend/`)](#backend-docsfeaturesbackend) below.
 
 ---
 
-## Sidecar (Python LiteRT-LM)
+## Sidecar (TypeScript — current backend)
 
-| File / Item                                                   | Status | Notes                                                                                 |
-| ------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
-| `sidecar/server.py` — FastAPI app + lifespan                  | ✅     | Loads the engine on startup and pre-warms it                                          |
-| `sidecar/server.py` — `GET /health` endpoint                  | ✅     | Returns `model_loaded`, backend, model file, and vision token budget                  |
-| `sidecar/server.py` — `WS /ws` endpoint                       | ✅     | Single-consumer queue pattern with per-connection state                               |
-| `sidecar/server.py` — interrupt handling                      | ✅     | `{"type":"interrupt"}` sets an `asyncio.Event` for the active turn                    |
-| `sidecar/server.py` — multimodal request assembly             | ✅     | Accepts image, text, and optional base64 WAV audio blobs                              |
-| `sidecar/server.py` — token streaming                         | ✅     | Streams Gemma 4 text tokens directly back to Electron                                 |
-| `sidecar/server.py` — sentence-level TTS streaming            | ✅     | Sends `audio_start` / `audio_chunk` / `audio_end` before `done` when TTS is available |
-| `sidecar/inference/engine.py` — model load + GPU→CPU fallback | ✅     | Uses Hugging Face download and LiteRT-LM backend fallback                             |
-| `sidecar/inference/engine.py` — audio backend behavior        | ✅     | Audio backend remains pinned to CPU in both load paths                                |
-| `sidecar/inference/engine.py` — `pre_warm()`                  | ✅     | Throwaway prompt on startup                                                           |
-| `sidecar/inference/preprocess.py` — `resize_image_blob()`     | ✅     | In-memory base64 → PIL → resized JPEG, no temp files                                  |
-| `sidecar/prompts/lecture_slide.py`                            | ✅     | Lecture-slide preset prompt                                                           |
-| `sidecar/prompts/generic_screen.py`                           | ✅     | Generic-screen preset prompt                                                          |
-| `sidecar/prompts/presets.py`                                  | ✅     | `preset_id → system prompt` registry                                                  |
-| `sidecar/tts.py`                                              | ✅     | Kokoro ONNX, MLX-on-Apple-Silicon, and renderer-fallback TTS pipeline                 |
-| `sidecar/tests/test_tts.py`                                   | ✅     | Covers sentence splitting and fallback TTS behavior                                   |
-| Conversation history trimming                                 | ❌     | Not implemented (still a nice-to-have)                                                |
+The primary inference backend application layer, started by `npm run dev:backend` (`tsx watch sidecar/src/index.ts`). Replaces the former Node proxy `scripts/litert-cpp-proxy.mjs`. Express HTTP + WebSocket server on port 8321; spawns the `delfin_litert_bridge` C++ binary and Piper TTS as subprocesses.
+
+| File / Item                                                            | Status | Notes                                                                                 |
+| ---------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
+| `sidecar/src/index.ts`                                                 | ✅     | Process entry: dependency wiring; Express HTTP (`/health`, `/sessions`) + WebSocket (`/ws`) server on port 8321 |
+| `sidecar/src/config/` — `config-service.ts`, `validation/env.ts`       | ✅     | Zod-validated env config: `SIDECAR_PORT`, `LITERT_CPP_BIN` / `LITERT_CPP_MODEL`, `TTS_BACKEND` (`piper`\|`none`), `TTS_SOFT_MIN/MAX_CHARS`, `PIPER_*` |
+| `sidecar/src/app/turn/` — turn controller + service + WS streamer      | ✅     | WebSocket turn handling: streams `token` / `audio_*` / `done` / `error`, interrupt forwarding, preset resolution. Vitest: `turn-controller.test.ts`, `turn-service-impl.test.ts` |
+| `sidecar/src/app/session/` — session controllers + domain + repository | ✅     | REST `/sessions` CRUD; file-backed persistence (`file-session-repository.ts`)         |
+| `sidecar/src/external/inference-engine/litert-cpp-inference-engine.ts` | ✅     | Spawns `delfin_litert_bridge`; JSONL/stdio protocol; per-session KV-cache, vision, audio input, interrupt, `reset_session` |
+| `sidecar/src/external/tts/piper-tts-engine.ts`                         | ✅     | Spawns Piper for sentence-level TTS; emits `audio_start` / `audio_chunk` / `audio_end` before `done` |
+| `sidecar/src/shared/` — abstractions, constants, exceptions, middleware | ✅     | DI abstractions, `constants/preset-prompts.ts` registry (replaces `scripts/litert-cpp-presets.mjs`), HTTP exception handling |
+| Conversation history trimming                                          | ❌     | Not implemented (still a nice-to-have)                                                |
+
+---
+
+## Sidecar — deprecated Python LiteRT-LM (`sidecar-old/`)
+
+> **Deprecated.** Superseded by the TypeScript sidecar above. Relocated from `sidecar/` to `sidecar-old/` during the backend refactor; retained for developer reference. Run via `npm run dev:sidecar-old`.
+
+| File / Item                                                       | Status | Notes                                                                                 |
+| ----------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
+| `sidecar-old/server.py` — FastAPI app + lifespan                  | ✅     | Loads the engine on startup and pre-warms it                                          |
+| `sidecar-old/server.py` — `GET /health` endpoint                  | ✅     | Returns `model_loaded`, backend, model file, and vision token budget                  |
+| `sidecar-old/server.py` — `WS /ws` endpoint                       | ✅     | Single-consumer queue pattern with per-connection state                               |
+| `sidecar-old/server.py` — interrupt handling                      | ✅     | `{"type":"interrupt"}` sets an `asyncio.Event` for the active turn                    |
+| `sidecar-old/server.py` — multimodal request assembly             | ✅     | Accepts image, text, and optional base64 WAV audio blobs                              |
+| `sidecar-old/server.py` — token streaming                         | ✅     | Streams Gemma 4 text tokens directly back to Electron                                 |
+| `sidecar-old/server.py` — sentence-level TTS streaming            | ✅     | Sends `audio_start` / `audio_chunk` / `audio_end` before `done` when TTS is available |
+| `sidecar-old/inference/engine.py` — model load + GPU→CPU fallback | ✅     | Uses Hugging Face download and LiteRT-LM backend fallback                             |
+| `sidecar-old/inference/engine.py` — audio backend behavior        | ✅     | Audio backend remains pinned to CPU in both load paths                                |
+| `sidecar-old/inference/engine.py` — `pre_warm()`                  | ✅     | Throwaway prompt on startup                                                           |
+| `sidecar-old/inference/preprocess.py` — `resize_image_blob()`     | ✅     | In-memory base64 → PIL → resized JPEG, no temp files                                  |
+| `sidecar-old/prompts/lecture_slide.py`                            | ✅     | Lecture-slide preset prompt                                                           |
+| `sidecar-old/prompts/generic_screen.py`                           | ✅     | Generic-screen preset prompt                                                          |
+| `sidecar-old/prompts/presets.py`                                  | ✅     | `preset_id → system prompt` registry                                                  |
+| `sidecar-old/tts.py`                                              | ✅     | Kokoro ONNX, MLX-on-Apple-Silicon, and renderer-fallback TTS pipeline                 |
+| `sidecar-old/tests/test_tts.py`                                   | ✅     | Covers sentence splitting and fallback TTS behavior                                   |
 
 ---
 
@@ -75,7 +93,7 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 | `src/main/index.ts`                                                | ✅     | App startup, env validation, COOP/COEP, microphone permissions, and window lifecycle |
 | `src/main/capture/autoRefresh.ts`                                  | ⚠️     | Placeholder — auto-refresh diffing not implemented yet                               |
 | `src/main/sidecar/healthCheck.ts`                                  | ✅     | `/health` polling implemented; forwards healthy status to renderer via `sidecar:status` |
-| `src/main/sidecar/backendProcess.ts`                                | ✅     | Logic to spawn `litert-cpp-proxy.mjs` in packaged or explicit dev mode                |
+| `src/main/sidecar/backendProcess.ts`                                | ✅     | Logic to spawn the TypeScript sidecar (`sidecar/src/`) in packaged or explicit dev mode |
 | `src/main/sidecar/assetManager.ts`                                  | ✅     | Manages `manifest.json`; downloads `litert-cpp-model` from HuggingFace, `piper-bin` (standalone binary from GitHub releases, platform-specific zip/tar.gz extraction), and `piper-voice` (ONNX + config from HuggingFace); migrates existing manifests to add new Piper entries |
 | `src/main/ipc/modelHandlers.ts`                                     | ✅     | IPC handlers for model status and first-run asset downloads; emits `MODELS_STATUS` immediately on download start so renderer shows loading state |
 | `src/renderer/features/setup/SetupScreen.tsx`                       | ✅     | First-run download progress UI; disabled button with inline "Downloading..." label; human-friendly asset names for all three asset IDs |
@@ -156,15 +174,15 @@ The current shipping app. Originally tracked as Phases 0–6; preserved here as 
 
 | Item                                                                               | Status | Notes                                                                                                |
 | ---------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
-| `sidecar/tts.py` — Kokoro/MLX/fallback pipeline                                    | ✅     | Cross-platform server-side speech with renderer fallback                                             |
-| `.env.example` — TTS and voice settings                                            | ✅     | Documents `VOICE_ENABLED`, `TTS_ENABLED`, `TTS_BACKEND`, Kokoro settings, `LITERT_AUDIO_BACKEND`, LiteRT C++ proxy Piper env vars, soft partial TTS flush tuning, the repo-local Piper runtime path, and voice helper commands |
+| `sidecar-old/tts.py` — Kokoro/MLX/fallback pipeline                                | ✅     | Cross-platform server-side speech with renderer fallback (deprecated Python path)                    |
+| `.env.example` — TTS and voice settings                                            | ✅     | Documents `VOICE_ENABLED`, `TTS_ENABLED`, `TTS_BACKEND`, Kokoro settings, `LITERT_AUDIO_BACKEND`, LiteRT C++ sidecar Piper env vars, soft partial TTS flush tuning, the repo-local Piper runtime path, and voice helper commands |
 | `scripts/piper-voice.mjs`                                                          | ✅     | Piper helper now manages both the repo-local pinned `piper-tts` runtime bootstrap (`bin/piper/venv`) and official `rhasspy/piper-voices` downloads, repairs missing runtime companion packages (`pathvalidate`), and preserves `.env` wiring/sample-rate detection. |
-| `scripts/piper-voice.test.mjs`                                                     | ✅     | Vitest coverage for runtime bootstrap/reuse/repair, path parsing, local voice listing, `.env` switching, mocked downloads, and proxy sample-rate fallback |
-| `sidecar/server.py` — sentence queue → `audio_start` / `audio_chunk` / `audio_end` | ✅     | Streams sentence-level PCM before `done`                                                             |
+| `scripts/piper-voice.test.mjs`                                                     | ✅     | Vitest coverage for runtime bootstrap/reuse/repair, path parsing, local voice listing, `.env` switching, mocked downloads, and sidecar sample-rate fallback |
+| `sidecar-old/server.py` — sentence queue → `audio_start` / `audio_chunk` / `audio_end` | ✅ | Streams sentence-level PCM before `done` (deprecated Python path)                                    |
 | Sidecar audio metadata                                                             | ✅     | Emits `sample_rate`, `index`, and `tts_time` metadata                                                |
 | `src/renderer/App.tsx` — streamed playback                                         | ✅     | Decodes PCM chunks, schedules playback, and tracks assistant speaking state                          |
 | Barge-in behavior                                                                  | ✅     | Active speech playback can be interrupted by a new user voice turn                                   |
-| Web Speech fallback                                                                | ✅     | Renderer fallback when no server audio arrives; still covers disabled/misconfigured Piper or other proxy paths without `audio_*` events |
+| Web Speech fallback                                                                | ✅     | Renderer fallback when no server audio arrives; still covers disabled/misconfigured Piper or other sidecar paths without `audio_*` events |
 
 ### Voice UI + tests
 
@@ -206,26 +224,25 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 
 | File / Item                                | Status | Notes                                                                                               |
 | ------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------- |
-| `scripts/run-benchmark.mjs`                | ✅     | Node wrapper that runs benchmark/run.py using the sidecar venv Python                               |
+| `scripts/run-benchmark.mjs`                | ✅     | Node wrapper that runs benchmark/run.py in a dedicated, auto-bootstrapped `scripts/benchmark/.venv` (independent of `sidecar-old/`); loads `.env` for backend tagging |
+| `scripts/benchmark-sweep.mjs`              | ✅     | Auto-sweep orchestrator: spawns the TS sidecar once per `LITERT_BACKEND` value, health-gates it, runs run-benchmark.mjs, tears it down between configs (`npm run benchmark:sweep`) |
 | `scripts/benchmark/run.py`                 | ✅     | CLI benchmark entry point — `--backend litert\|litert-cpp\|llamafile`, all scenarios, JSON+CSV output |
 | `scripts/benchmark/backends/litert.py`     | ✅     | LiteRT adapter over WebSocket                                                                        |
-| `scripts/benchmark/backends/litert_cpp.py` | ✅     | LiteRT C++ proxy adapter over the same Delfin WebSocket sidecar protocol                             |
+| `scripts/benchmark/backends/litert_cpp.py` | ✅     | LiteRT C++ adapter over the Delfin WebSocket sidecar protocol (drives the TypeScript sidecar)        |
 | `scripts/benchmark/backends/llamafile.py`  | ✅     | llamafile adapter over OpenAI-compatible REST (streaming SSE)                                       |
 | `scripts/benchmark/backends/memory.py`     | ✅     | Background RSS poller using psutil                                                                   |
 | `scripts/benchmark/scenarios.py`           | ✅     | S1 (text), S2 (vision), S3 (multi-turn) scenario definitions                                         |
 | `scripts/benchmark/reporter.py`            | ✅     | JSON + CSV result writer with mean±std stats                                                         |
 | `scripts/benchmark/sysinfo.py`             | ✅     | Platform/CPU/RAM/GPU detection                                                                       |
-| `scripts/benchmark/SETUP.md`               | ✅     | Setup and usage guide for LiteRT, LiteRT C++ proxy research, and llamafile examples                 |
+| `scripts/benchmark/SETUP.md`               | ✅     | Setup and usage guide for LiteRT, LiteRT C++ bridge, and llamafile examples                          |
 
-### LiteRT-LM C++ bridge & proxy
+### LiteRT-LM C++ bridge
 
 | File / Item                                                                | Status | Notes                                                                                                                                                                                                                                                                                                                            |
 | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/litert-cpp-presets.mjs`                                           | ✅     | JS preset registry used by the LiteRT C++ proxy; mirrors the current Python preset text                                                                                                                                                                                                                                          |
-| `scripts/litert-cpp-proxy.mjs`                                             | ✅     | Delfin WebSocket proxy + health endpoint, validated against native `delfin_litert_bridge.exe`; text + vision turns stream successfully and optional Piper-backed `audio_*` playback now works on completed sentences plus conservative long partial chunks before `done`, with sample-rate fallback from `PIPER_CONFIG` and a default Piper runtime path under `bin/piper/venv`.                                                          |
-| `scripts/litert-cpp-proxy.test.mjs`                                        | ✅     | Vitest coverage for health, token streaming/history, Piper audio ordering, early sentence-level audio, early long-partial audio, fallback behavior, sample-rate fallback, and interrupt forwarding; mock bridges updated to minimal `done` shape                                                                                                          |
-| `native/litert-cpp-bridge/`                                                | ✅     | Thin inference kernel: model load, token streaming, per-session KV-cache (`g_sessions`), interrupt, `reset_session`. `done` event carries only `{"type","done","requestId"}` — no text echo (proxy uses its own `streamedText`). All application-layer concerns live in the Node.js proxy. Windows binary runtime-validated (S1/S2/S3, KV-cache Turn 2+ ~647 ms). macOS/Linux pending M4. |
-| `native/litert-cpp-bridge/README.md`                                       | ✅     | Documents artifact-first setup for Windows x64 / macOS arm64 / Linux x64 plus backend-developer source-build opt-in via `--source-build`. |
+| `scripts/litert-cpp-proxy.mjs` / `.test.mjs` / `litert-cpp-presets.mjs`     | ❌ Removed | Replaced by the TypeScript sidecar — see [§Sidecar (TypeScript — current backend)](#sidecar-typescript--current-backend). The JS proxy, its Vitest suite, and the JS preset registry were deleted; presets now live in `sidecar/src/shared/constants/preset-prompts.ts`. |
+| `litert-cpp-bridge/`                                                       | ✅     | Structured C++ JSONL inference kernel (`main.cc`, `app.*`, `protocol/`, `engine/`, `conversation_registry/`, `turn_runner/`): model load, token streaming, per-session KV-cache, interrupt, `reset_session`. `done` event carries only `{"type","done","requestId"}` — no text echo (the sidecar uses its own `streamedText`). All application-layer concerns live in the TypeScript sidecar. Windows binary runtime-validated (S1/S2/S3, KV-cache Turn 2+ ~647 ms). macOS/Linux pending M4. |
+| `litert-cpp-bridge/README.md`                                              | ✅     | Documents the bridge layout, JSONL protocol, validation status, and build entry points. |
 | `bin/delfin_litert_bridge` / `bin/delfin_litert_bridge.exe` (+ `libGemmaModelConstraintProvider.dll` on Windows) | ✅     | Gitignored local runtime artifacts from Bazel output. Windows variant only produced via `--native-windows` or CI.                                                                                                                                            |
 | `scripts/build-litert-cpp-bridge.mjs`                                      | ✅     | Copies the Delfin bridge source/BUILD target into a pinned LiteRT-LM checkout and invokes Bazel. Desktop builds pass `--repo_env=ANDROID_NDK_HOME=` so ambient Android SDK/NDK installs on Windows CI do not trigger `@androidndk` registration. |
 | `scripts/build-litert-cpp-bridge.test.mjs`                                 | ✅     | Vitest coverage for CLI/env parsing, BUILD target merge behavior, and the Android NDK repo-env guard used by desktop bridge builds. |
@@ -263,7 +280,7 @@ The hackathon-era "Phase 6 — Polish + Stretch Goals" table is no longer tracke
 | GitHub Actions matrix builds                          | ⚠️     | `.github/workflows/build-litert-cpp-bridge.yml` produces native bridge binaries (windows-x64, macos-arm64, linux-x64). `dist.yml` spec updated 2026-05-06 to download prebuilt bridge artifacts for all 3 platforms. Full `dist.yml` packaging matrix still pending approval — tracked in `distribution-cicd-spec.md`. |
 | `.github/workflows/build-litert-cpp-bridge.yml`       | ✅     | Matrix workflow building `delfin_litert_bridge` per platform against the `LITERT_LM_REF` pin in `scripts/setup-litert-cpp.mjs` (currently `v0.10.2`). Uploads workflow artifacts and attaches archives to GitHub Releases. |
 | Code signing (Windows Authenticode, macOS notarization) | ❌    | Not started                                                                                 |
-| TTS backend strategy for packaged builds              | ✅     | **Resolved 2026-05-08**: Standalone Piper binary downloaded at first run on all three platforms; no Python required on user machine. `LITERT_CPP_TTS_BACKEND=piper` set by `backendProcess.ts` when downloaded assets are present; falls back to `none` (Web Speech in renderer) if missing. |
+| TTS backend strategy for packaged builds              | ✅     | **Resolved 2026-05-08**: Standalone Piper binary downloaded at first run on all three platforms; no Python required on user machine. `TTS_BACKEND=piper` set by `backendProcess.ts` when downloaded assets are present; falls back to `none` (Web Speech in renderer) if missing. |
 
 ---
 
@@ -297,9 +314,9 @@ All three feature specs are ✅ Complete. The implementation files (`VoiceWavefo
 
 | File                                                       | Status | Notes                                                                                                                                                                                    |
 | ---------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/explanations/sidecar-flow.md`                        | ✅     | Refreshed 2026-04-22: removed Phase 1 stubs + respond_to_user tool section; added preprocess layer, message-ordering section, TTS flow                                                   |
+| `docs/explanations/sidecar-flow.md`                        | ✅     | Refreshed 2026-04-22; rewritten 2026-05-14 for the TypeScript sidecar (`sidecar/src/`) + `litert-cpp-bridge/`; deprecated Python path retargeted to `sidecar-old/`                        |
 | `docs/explanations/session-overlay-state-machine.md`       | ✅     | Refreshed 2026-04-22: fixed window dimensions (380×64 / 460×115 / 460×360); corrected resize-in-place vs destroy+recreate; window is always frameless                                    |
-| `docs/explanations/electron-ipc-and-ws-message-flow.md`    | ✅     | Refreshed 2026-04-22: updated beginPromptSubmission/submitSessionPrompt signatures; added recordUserPrompt persistence step; corrected audio_start shape                                 |
+| `docs/explanations/electron-ipc-and-ws-message-flow.md`    | ✅     | Refreshed 2026-04-22; 2026-05-14: backend process relabelled from the Node proxy to the TypeScript sidecar (`sidecar/src/`)                                                              |
 | `docs/explanations/react-zustand-state-flow.md`            | ✅     | Refreshed 2026-04-22: settingsStore is not a stub; added minimizedResponseMessageId + sessionStartTime fields; expanded IPC cleanup channel list                                         |
-| `docs/explanations/voice-audio-pipeline.md`                | ✅     | Refreshed 2026-04-22/2026-05-12: screenshot taken in main process not renderer; updated submitSessionPrompt shape; corrected barge-in (mute + threshold + grace); C++ proxy as primary backend; sentence_count optional in audio_start (Python sidecar omits it; C++ proxy may include it) |
+| `docs/explanations/voice-audio-pipeline.md`                | ✅     | Refreshed 2026-04-22/2026-05-12/2026-05-14: screenshot taken in main process not renderer; updated submitSessionPrompt shape; corrected barge-in (mute + threshold + grace); TypeScript sidecar + C++ bridge as primary backend; `TTS_BACKEND` (`piper`\|`none`) controls sidecar TTS; sentence_count optional in audio_start |
 | `docs/explanations/screen-capture-and-window-filtering.md` | ✅     | No changes needed — consistent with current captureService implementation                                                                                                                |

@@ -16,8 +16,10 @@ from pathlib import Path
 class Reporter:
     """Accumulates scenario results and writes JSON + CSV output files.
 
-    The CSV is written in append mode so you can run litert and llamafile
-    benchmarks separately and get a single file for side-by-side comparison.
+    The CSV is written in append mode and every row is tagged with the device
+    label, hardware, and backend config, so runs from different backends and
+    different machines land in one file for side-by-side / cross-device
+    comparison.
     """
 
     def __init__(
@@ -27,12 +29,16 @@ class Reporter:
         model_name: str,
         runs_per_scenario: int,
         sysinfo: dict,
+        device_label: str = "",
+        litert_backend: str = "",
     ) -> None:
         self.output_dir = Path(output_dir)
         self.backend = backend
         self.model_name = model_name
         self.runs_per_scenario = runs_per_scenario
         self.sysinfo = sysinfo
+        self.device_label = device_label
+        self.litert_backend = litert_backend
         self.timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self._scenarios: dict[str, dict] = {}
 
@@ -89,7 +95,9 @@ class Reporter:
         # JSON
         output = {
             "meta": {
+                "device_label": self.device_label,
                 "backend": self.backend,
+                "litert_backend": self.litert_backend,
                 "model": self.model_name,
                 "runs_per_scenario": self.runs_per_scenario,
                 "warmup_excluded_from_stats": True,
@@ -106,7 +114,8 @@ class Reporter:
             writer = csv.writer(f)
             if write_header:
                 writer.writerow([
-                    "backend", "platform", "model", "scenario",
+                    "device_label", "backend", "litert_backend", "platform",
+                    "cpu", "ram_gb", "gpu", "model", "scenario",
                     "ttft_ms_mean", "ttft_ms_std",
                     "throughput_tok_s_mean", "throughput_tok_s_std",
                     "total_turn_ms_mean", "total_turn_ms_std",
@@ -117,8 +126,13 @@ class Reporter:
             for sid, data in self._scenarios.items():
                 s = data["stats"]
                 writer.writerow([
+                    self.device_label,
                     self.backend,
+                    self.litert_backend,
                     self.sysinfo.get("platform", "?"),
+                    self.sysinfo.get("cpu", "?"),
+                    self.sysinfo.get("ram_total_gb", "?"),
+                    self.sysinfo.get("gpu", ""),
                     self.model_name,
                     sid,
                     _fmt(s, "ttft_ms", "mean"),

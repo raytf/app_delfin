@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { BRIDGE_VERSION_FILE, LITERT_LM_REF, MODEL_REVISION, bridgePlatformLabel, defaultBridgeArtifactName, parseArgs, resolveBridgePlan, usage } from './setup-litert-cpp.mjs'
+import {
+  BRIDGE_COMMIT_FILE,
+  BRIDGE_VERSION_FILE,
+  LITERT_LM_REF,
+  MODEL_REVISION,
+  bridgePlatformLabel,
+  defaultBridgeArtifactName,
+  isBridgeSourceCurrent,
+  parseArgs,
+  resolveBridgePlan,
+  usage,
+} from './setup-litert-cpp.mjs'
 
 describe('setup-litert-cpp parseArgs', () => {
   it('defaults nativeWindows to false', () => {
@@ -66,6 +77,10 @@ describe('setup-litert-cpp version pins', () => {
   it('exports BRIDGE_VERSION_FILE under bin/', () => {
     expect(BRIDGE_VERSION_FILE).toMatch(/[/\\]bin[/\\]bridge\.version$/)
   })
+
+  it('exports BRIDGE_COMMIT_FILE under bin/', () => {
+    expect(BRIDGE_COMMIT_FILE).toMatch(/[/\\]bin[/\\]bridge\.commit$/)
+  })
 })
 
 describe('setup-litert-cpp bridge planning', () => {
@@ -73,16 +88,36 @@ describe('setup-litert-cpp bridge planning', () => {
     expect(resolveBridgePlan(parseArgs([]), 'win32', false, 'x64')).toMatchObject({ source: 'artifact' })
   })
 
-  it('reuses existing bridge files when version matches', () => {
-    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', LITERT_LM_REF)).toMatchObject({ source: 'existing' })
+  it('reuses existing bridge files when the ref matches and the source is unchanged', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', LITERT_LM_REF, true)).toMatchObject({ source: 'existing' })
+  })
+
+  it('reuses existing bridge files when source-currency is unknown (falls back to the ref check)', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', LITERT_LM_REF, null)).toMatchObject({ source: 'existing' })
+  })
+
+  it('re-downloads when the bridge source moved even though the ref matches', () => {
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', LITERT_LM_REF, false)).toMatchObject({
+      source: 'artifact',
+      stale: true,
+      staleReason: 'source',
+    })
   })
 
   it('re-downloads when the installed bridge version is stale', () => {
-    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', 'v0.10.0')).toMatchObject({ source: 'artifact', stale: true })
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', 'v0.10.0')).toMatchObject({
+      source: 'artifact',
+      stale: true,
+      staleReason: 'ref',
+    })
   })
 
   it('re-downloads when no version file is present alongside the bridge binary', () => {
-    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', null)).toMatchObject({ source: 'artifact', stale: true })
+    expect(resolveBridgePlan(parseArgs([]), 'win32', true, 'x64', null)).toMatchObject({
+      source: 'artifact',
+      stale: true,
+      staleReason: 'ref',
+    })
   })
 
   it('uses CI artifacts by default on Linux and macOS when bridge files are missing', () => {
@@ -110,6 +145,17 @@ describe('setup-litert-cpp bridge planning', () => {
       source: 'skip',
       needsLiteRtLm: false,
     })
+  })
+})
+
+describe('setup-litert-cpp isBridgeSourceCurrent', () => {
+  it('returns null when no build commit is recorded', () => {
+    expect(isBridgeSourceCurrent(null)).toBeNull()
+    expect(isBridgeSourceCurrent('')).toBeNull()
+  })
+
+  it('returns null for a non-commit-looking value without shelling out to git', () => {
+    expect(isBridgeSourceCurrent('not-a-sha')).toBeNull()
   })
 })
 
