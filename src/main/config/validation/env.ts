@@ -18,8 +18,10 @@ const httpUrlSchema = z
 
 const runtimeEnvSchema = z.object({
   ELECTRON_RENDERER_URL: z.string().trim().optional(),
-  SIDECAR_WS_URL: wsUrlSchema,
-  SIDECAR_URL: httpUrlSchema,
+  // Sensible localhost defaults so a .env missing these keys does not hard-crash
+  // the main process — .env.example sets them to exactly these values.
+  SIDECAR_WS_URL: wsUrlSchema.default("ws://localhost:8321/ws"),
+  SIDECAR_URL: httpUrlSchema.default("http://localhost:8321"),
 });
 
 const featureEnvSchema = z.object({
