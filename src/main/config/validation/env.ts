@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-const wsUrlSchema = z
-  .string()
-  .trim()
-  .refine(
-    (value) => value.startsWith("ws://") || value.startsWith("wss://"),
-    'expected a WebSocket URL starting with "ws://" or "wss://"',
-  );
-
 const httpUrlSchema = z
   .string()
   .trim()
@@ -18,9 +10,10 @@ const httpUrlSchema = z
 
 const runtimeEnvSchema = z.object({
   ELECTRON_RENDERER_URL: z.string().trim().optional(),
-  // Sensible localhost defaults so a .env missing these keys does not hard-crash
-  // the main process — .env.example sets them to exactly these values.
-  SIDECAR_WS_URL: wsUrlSchema.default("ws://localhost:8321/ws"),
+  // Single source of truth for the sidecar location. The WebSocket endpoint
+  // (ws://…/ws) is derived from this in config-service. Defaults to the
+  // localhost value so a .env missing the key does not hard-crash the main
+  // process.
   SIDECAR_URL: httpUrlSchema.default("http://localhost:8321"),
 });
 

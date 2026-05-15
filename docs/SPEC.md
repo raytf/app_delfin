@@ -128,7 +128,9 @@ SIDECAR_HOST=0.0.0.0
 SIDECAR_PORT=8321
 
 # === Electron ===
-SIDECAR_WS_URL=ws://localhost:8321/ws
+# Single source of truth for the sidecar location; the WebSocket endpoint
+# (ws://…/ws) is derived from this by the Electron main config service.
+SIDECAR_URL=http://localhost:8321
 
 # === Inference ===
 # Dev default: litert (Python sidecar). M5a will flip to litert-cpp on all platforms.

@@ -149,7 +149,7 @@ npm run check:windows              # full env check (Windows)
 | `LITERT_CPP_TTS_BACKEND` | `piper` | Set to `none` to disable Piper and use Web Speech fallback |
 | `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
 | `PIPER_MODEL` | _(set by setup)_ | Managed by `npm run voice:use`; written automatically by `npm run setup` |
-| `SIDECAR_WS_URL` | `ws://localhost:8321/ws` | _Deprecated Python path._ Replace `localhost` with WSL2 IP if needed |
+| `SIDECAR_URL` | `http://localhost:8321` | Sidecar base URL; the WebSocket endpoint is derived from it. On WSL2, replace `localhost` with the WSL2 IP |
 
 See [`.env.example`](.env.example) for the full reference.
 

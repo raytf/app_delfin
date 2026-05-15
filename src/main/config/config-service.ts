@@ -18,6 +18,18 @@ type ElectronFeatureConfig = {
 
 type ElectronChildProcessConfig = ElectronChildProcessEnv;
 
+/**
+ * Derive the sidecar WebSocket endpoint from its HTTP base URL. SIDECAR_URL is
+ * the single source of truth for the sidecar location:
+ *   http://host:port[/...]  →  ws://host:port/ws
+ *   https://host:port[/...] →  wss://host:port/ws
+ */
+export function deriveSidecarWsUrl(httpUrl: string): string {
+  const url = new URL(httpUrl);
+  const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${url.host}/ws`;
+}
+
 export class ConfigService {
   private readonly envData: ElectronEnv;
 
@@ -27,12 +39,11 @@ export class ConfigService {
 
   get runtime(): ElectronRuntimeConfig {
     const electronRendererUrl = this.envData.ELECTRON_RENDERER_URL;
-    const sidecarWsUrl = this.envData.SIDECAR_WS_URL;
     const sidecarUrl = this.envData.SIDECAR_URL;
 
     return {
-      sidecarWsUrl,
       sidecarUrl,
+      sidecarWsUrl: deriveSidecarWsUrl(sidecarUrl),
       electronRendererUrl,
       isDev: Boolean(electronRendererUrl),
     };
