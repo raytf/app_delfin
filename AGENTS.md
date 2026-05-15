@@ -8,7 +8,7 @@
 
 A local, privacy-first AI desktop sidebar (Electron + React) that captures the foreground window, sends the screenshot to an on-device LLM (Gemma 4 via LiteRT-LM), and streams back a structured explanation. No cloud, no login, no API costs. Primary demo: **Lecture Slide Explainer**.
 
-Current app runtime is **Electron → Node WebSocket proxy (`litert-cpp-proxy.mjs`) → LiteRT-LM C++ bridge (`delfin_litert_bridge`)** on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar/server.py`) is **deprecated** — retained for developer reference only. The legacy llamafile / `llama-server` path is also **deprecated** — kept only for benchmark comparison under `scripts/benchmark/`.
+Current app runtime is **Electron → TypeScript sidecar (`sidecar/src/`) → LiteRT-LM C++ kernel (`delfin_litert_bridge`, built from `litert-cpp-bridge/`)** on all supported platforms (Windows x64, macOS arm64, Linux x64). The Python FastAPI sidecar (`sidecar-old/server.py`) is **deprecated** — retained for developer reference only. The legacy llamafile / `llama-server` path is also **deprecated** — kept only for benchmark comparison under `scripts/benchmark/`.
 
 ---
 
@@ -234,13 +234,13 @@ git push && git push --tags
 ## Development Commands
 
 ```bash
-# Start EVERYTHING — full stack (C++ backend proxy + Electron/Vite) — primary workflow
+# Start EVERYTHING — full stack (TypeScript sidecar + Electron/Vite) — primary workflow
 npm run dev
 
-# Frontend only (when running backend in a separate terminal)
+# Frontend only (when running the sidecar in a separate terminal)
 npm run dev:frontend
 
-# Backend only — LiteRT C++ proxy with Piper TTS (run `npm run setup` first)
+# Backend only — TypeScript sidecar with Piper TTS (run `npm run setup` first)
 npm run dev:backend
 
 # Mock backend + frontend (UI development, no model needed)

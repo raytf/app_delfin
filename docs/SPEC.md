@@ -133,8 +133,6 @@ SIDECAR_PORT=8321
 SIDECAR_URL=http://localhost:8321
 
 # === Inference ===
-# Dev default: litert (Python sidecar). M5a will flip to litert-cpp on all platforms.
-INFERENCE_BACKEND=litert
 LITERT_BACKEND=CPU
 LITERT_AUDIO_BACKEND=CPU
 VISION_TOKEN_BUDGET=280
@@ -143,29 +141,25 @@ MAX_IMAGE_WIDTH=512
 # === Voice input ===
 VOICE_ENABLED=true
 
-# === LiteRT-LM C++ bridge (primary backend) ===
+# === LiteRT-LM C++ bridge (the inference backend) ===
 # LITERT_CPP_BIN must point at delfin_litert_bridge[.exe] built from litert-cpp-bridge/
 LITERT_CPP_BIN=./bin/delfin_litert_bridge.exe
 LITERT_CPP_MODEL=./models/gemma-4-E2B-it.litertlm
-TTS_BACKEND=piper   # piper | none (none → renderer Web Speech fallback)
+
+# === TTS ===
+TTS_BACKEND=piper   # piper (default) | none (renderer Web Speech fallback)
+TTS_ENABLED=true    # renderer TTS playback on/off (read by the Electron main)
 TTS_SOFT_MIN_CHARS=80
 TTS_SOFT_MAX_CHARS=180
 PIPER_BIN=./bin/piper/venv/Scripts/piper.exe
 PIPER_MODEL=./models/piper/en_US-hfc_female-medium.onnx
 PIPER_CONFIG=./models/piper/en_US-hfc_female-medium.onnx.json
 PIPER_SAMPLE_RATE=22050  # optional; the sidecar reads audio.sample_rate from PIPER_CONFIG when absent
-
-# === TTS (deprecated Python sidecar path only) ===
-# NOTE: TTS_BACKEND is also read by the TypeScript sidecar, where the only
-# valid values are `piper` | `none`. The kokoro|mlx|web-speech values below
-# apply ONLY to sidecar-old/ — see the variable-name overlap note below.
-TTS_ENABLED=true
-TTS_BACKEND=kokoro   # kokoro | mlx | web-speech
-KOKORO_VOICE=af_heart
-KOKORO_SPEED=1.1
+# Deprecated Python sidecar (sidecar-old/) only: TTS_BACKEND there also accepts
+# kokoro|mlx|web-speech, plus KOKORO_VOICE / KOKORO_SPEED.
 ```
 
-`npm run dev:backend` runs the TypeScript sidecar, which treats `TTS_BACKEND` as `piper` (enable Piper) or — for **any other value**, including the Python path's `kokoro` / `mlx` / `web-speech` — `none` (renderer Web Speech fallback). The `TTS_BACKEND` name is **shared** with the deprecated `sidecar-old/` Python path; the TypeScript sidecar tolerates the Python values (treating them as `none`) rather than failing, so one `.env` works for both. `TTS_ENABLED` applies only to the Python path. Piper sentences flush on punctuation boundaries; `TTS_SOFT_MIN_CHARS` / `TTS_SOFT_MAX_CHARS` allow soft partial flushes for long text without punctuation.
+`npm run dev:backend` runs the TypeScript sidecar. Its TTS backend is `TTS_BACKEND` — `piper` (the default; the sidecar emits `audio_*` events) or any other value (treated as `none`, leaving the renderer to fall back to browser Web Speech). The `TTS_BACKEND` name is **shared** with the deprecated `sidecar-old/` Python path, where it also takes `kokoro` / `mlx` / `web-speech`; the TypeScript sidecar tolerates those values (treating them as `none`) rather than failing, so one `.env` works for both. `TTS_ENABLED`, read by the Electron main process, toggles renderer TTS playback. Piper sentences flush on punctuation boundaries; `TTS_SOFT_MIN_CHARS` / `TTS_SOFT_MAX_CHARS` allow soft partial flushes for long text without punctuation.
 
 `npm run setup` is the canonical fresh-clone setup command for all platforms — it chains `setup:env` (seed `.env` from `.env.example`), `setup:litert-cpp` (download the CI-built bridge artifact or rebuild from source via `--source-build`, provision the Gemma 4 model, bootstrap the repo-local Piper runtime, install the default voice, patch `.env`), and `check:env` (validate `.env` keys). `LITERT_CPP_BRIDGE_REPO` overrides the GitHub repo for artifact lookup. Voice management: `npm run voice:list`, `voice:use -- <voice-name>`, `voice:install -- <hf-path> --use`. If Piper is disabled, misconfigured, or omitted, the renderer falls back to Web Speech after `done`.
 

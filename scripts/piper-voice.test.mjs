@@ -203,7 +203,7 @@ describe("piper voice helper", () => {
     expect(commands[0][1]).toEqual(expect.arrayContaining(["pathvalidate>=3,<4"]));
   });
 
-  it("lets the proxy infer PIPER_SAMPLE_RATE from PIPER_CONFIG when env is unset", async () => {
+  it("lets the sidecar infer PIPER_SAMPLE_RATE from PIPER_CONFIG when env is unset", async () => {
     const { modelsDir } = await createTempRoot();
     const configPath = join(modelsDir, "voice.onnx.json");
     await writeFile(configPath, piperConfig(16000));

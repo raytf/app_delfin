@@ -44,7 +44,7 @@ export function connectToSidecar(wsUrl: string): void {
   socket = new WebSocket(wsUrl);
 
   socket.on("open", () => {
-    console.log(`Connected to FastAPI sidecar WebSocket at ${wsUrl}`);
+    console.log(`Connected to sidecar WebSocket at ${wsUrl}`);
   });
 
   socket.on("message", (data) => {

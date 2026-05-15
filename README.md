@@ -15,7 +15,7 @@ git clone https://github.com/raytf/app_delfin.git
 cd app_delfin
 npm install
 npm run setup   # seeds .env, downloads bridge artifact + Gemma 4 model, bootstraps Piper TTS, validates .env
-npm run dev     # full stack: C++ backend proxy + Electron/Vite
+npm run dev     # full stack: TypeScript sidecar + Electron/Vite
 ```
 
 **Prerequisites:** [Node.js 20+](https://nodejs.org/), [Python 3.12+](https://www.python.org/downloads/) (dev mode: repo-local Piper TTS), [GitHub CLI](https://cli.github.com/) + `gh auth login`. Windows has extra optional requirements for source builds — see [Windows setup](#windows-x64) below.
@@ -116,9 +116,9 @@ Full guide: [Windows](docs/guides/testing-guide-windows.md)
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | **Primary.** Full stack — C++ backend proxy + Electron/Vite; run `npm run setup` first |
+| `npm run dev` | **Primary.** Full stack — TypeScript sidecar + Electron/Vite; run `npm run setup` first |
 | `npm run dev:frontend` | Electron + Vite only — use when `dev:backend` is already running in another terminal |
-| `npm run dev:backend` | C++ backend proxy only (port 8321) |
+| `npm run dev:backend` | TypeScript sidecar only (port 8321) |
 | `npm run dev:mock` | Mock sidecar + Electron (UI dev, no inference needed) |
 
 ### Piper voice management (dev only)
@@ -146,8 +146,8 @@ npm run check:windows              # full env check (Windows)
 | `LITERT_BACKEND` | `CPU` | Set to `GPU` (OpenCL on Linux, Metal on macOS) |
 | `MODEL_REPO` | `litert-community/gemma-4-E2B-it-litert-lm` | Switch to the E4B variant on 32 GB machines |
 | `VOICE_ENABLED` | `true` | Disable always-on VAD for text-only prompts |
-| `LITERT_CPP_TTS_BACKEND` | `piper` | Set to `none` to disable Piper and use Web Speech fallback |
-| `LITERT_CPP_TTS_SOFT_MIN_CHARS` / `MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
+| `TTS_BACKEND` | `piper` | Sidecar TTS; set to `none` to disable Piper and use the Web Speech fallback |
+| `TTS_SOFT_MIN_CHARS` / `TTS_SOFT_MAX_CHARS` | `80` / `180` | Tune Piper partial flushes for long text without punctuation |
 | `PIPER_MODEL` | _(set by setup)_ | Managed by `npm run voice:use`; written automatically by `npm run setup` |
 | `SIDECAR_URL` | `http://localhost:8321` | Sidecar base URL; the WebSocket endpoint is derived from it. On WSL2, replace `localhost` with the WSL2 IP |
 
