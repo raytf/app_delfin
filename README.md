@@ -2,7 +2,7 @@
 
 A live, voice-first study assistant that understands your screen — fully local, private, no API costs. Delfin captures the foreground window, sends the screenshot plus optional voice input to **Gemma 4**, and streams explanations back in an Electron sidebar.
 
-**GitHub:** [github.com/raytf/app_delfin](https://github.com/raytf/app_delfin)
+**GitHub:** [github.com/delfin-project/delfin](https://github.com/delfin-project/delfin)
 
 ---
 
@@ -11,8 +11,8 @@ A live, voice-first study assistant that understands your screen — fully local
 The same five commands work on macOS (arm64), Linux (x64), and Windows (x64):
 
 ```bash
-git clone https://github.com/raytf/app_delfin.git
-cd app_delfin
+git clone https://github.com/delfin-project/delfin.git
+cd delfin
 npm install
 npm run setup   # seeds .env, downloads bridge artifact + Gemma 4 model, bootstraps Piper TTS, validates .env
 npm run dev     # full stack: TypeScript sidecar + Electron/Vite
@@ -45,8 +45,8 @@ brew install gh && gh auth login        # macOS
 ```
 
 ```bash
-git clone https://github.com/raytf/app_delfin.git
-cd app_delfin && npm install
+git clone https://github.com/delfin-project/delfin.git
+cd delfin && npm install
 npm run setup
 npm run dev
 ```
@@ -62,8 +62,8 @@ Full guides: [macOS](docs/guides/testing-guide-macos.md) · [Linux / WSL2](docs/
 **Prerequisites:** [Node.js 20+](https://nodejs.org/), Python 3.12+ (dev mode: Piper TTS), [GitHub CLI](https://cli.github.com/) (`winget install --id GitHub.cli -e`, then `gh auth login`)
 
 ```powershell
-git clone https://github.com/raytf/app_delfin.git
-cd app_delfin && npm install
+git clone https://github.com/delfin-project/delfin.git
+cd delfin && npm install
 npm run setup
 npm run dev
 ```

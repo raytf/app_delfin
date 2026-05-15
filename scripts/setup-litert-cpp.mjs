@@ -308,10 +308,10 @@ backend developers can force a local source build with --source-build.
        gh auth login
        # Clone Delfin under your WSL2 home (NOT under /mnt/c — Bazel is
        # unusably slow on the cross-filesystem boundary).
-       cd ~ && git clone <delfin repo> app_delfin
-       cd ~/app_delfin && npm install && npm run setup:litert-cpp
+       cd ~ && git clone https://github.com/delfin-project/delfin.git
+       cd ~/delfin && npm install && npm run setup:litert-cpp
   3. In a second terminal on the Windows host:
-       cd C:\\path\\to\\app_delfin && npm install && npm run dev
+       cd C:\\path\\to\\delfin && npm install && npm run dev
        # Electron connects to ws://localhost:8321 forwarded by WSL2.
 
 To build a fully native Windows .exe locally instead, rerun this script

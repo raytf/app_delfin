@@ -31,8 +31,8 @@ Use this only when you need to rebuild the bridge locally with Bazel + MSVC inst
 ### Terminal 1 — WSL2 Ubuntu (sidecar)
 
 ```bash
-git clone https://github.com/raytf/app_delfin.git
-cd app_delfin
+git clone https://github.com/delfin-project/delfin.git
+cd delfin
 npm install
 npm run setup
 npm run dev:sidecar
@@ -41,7 +41,7 @@ npm run dev:sidecar
 ### Terminal 2 — Windows PowerShell (Electron)
 
 ```powershell
-cd C:\path\to\app_delfin
+cd C:\path\to\delfin
 npm install
 npm run dev
 ```
@@ -62,7 +62,7 @@ If Windows cannot reach `localhost:8321`, find the WSL2 IP with `hostname -I` an
 ### Run setup
 
 ```powershell
-cd C:\path\to\app_delfin
+cd C:\path\to\delfin
 npm install
 npm run setup
 npm run check:windows
@@ -81,7 +81,7 @@ What this does:
 ### Optional bridge-only smoke test
 
 ```powershell
-cd C:\path\to\app_delfin
+cd C:\path\to\delfin
 npm install
 npm run download:bridge:windows
 npm run test:bridge:windows -- --SkipBenchmark

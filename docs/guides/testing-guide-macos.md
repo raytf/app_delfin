@@ -39,7 +39,7 @@ brew install bazelisk git-lfs
 Clone it somewhere like your home directory:
 
 ```bash
-# ⚠️  Run this from your home directory (or any path outside app_delfin/)
+# ⚠️  Run this from your home directory (or any path outside delfin/)
 cd ~
 git clone https://github.com/google-ai-edge/LiteRT-LM.git
 # Result: ~/LiteRT-LM   ← default location used by --source-build
@@ -59,10 +59,10 @@ git clone https://github.com/google-ai-edge/LiteRT-LM.git ~/projects/LiteRT-LM
 
 ## Step 2 — Pull the branch and set up Delfin
 
-Run these from inside the `app_delfin/` directory:
+Run these from inside the `delfin/` directory:
 
 ```bash
-cd /path/to/app_delfin   # wherever you cloned Delfin
+cd /path/to/delfin   # wherever you cloned Delfin
 git pull
 git checkout research/distribution-and-native-backend
 npm install
@@ -75,7 +75,7 @@ npm install
 This single command seeds `.env`, downloads the CI bridge artifact, downloads the model, configures voice/TTS (Piper), and validates env keys:
 
 ```bash
-# Run from inside app_delfin/
+# Run from inside delfin/
 npm run setup
 ```
 
