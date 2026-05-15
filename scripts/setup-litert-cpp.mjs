@@ -719,20 +719,7 @@ async function stepModel(opts, env) {
     return
   }
 
-  // Prefer copying from the deprecated Python sidecar directory if it's there.
-  const sidecarPath = join(rootDir, 'sidecar-old', modelFile)
-  if (existsSync(sidecarPath)) {
-    if (opts.dryRun) {
-      console.log(`[setup-litert-cpp] [dry-run] Would copy model from sidecar-old/ → ${destPath}`)
-      return
-    }
-    mkdirSync(destDir, { recursive: true })
-    copyFileSync(sidecarPath, destPath)
-    console.log(`[setup-litert-cpp] ✅ Model copied from sidecar-old/:\n   ${destPath}`)
-    return
-  }
-
-  // Fall back to downloading from HuggingFace.
+  // Download from HuggingFace.
   const modelRevision = process.env.MODEL_REVISION ?? MODEL_REVISION
   const url = `${HF_BASE}/${modelRepo}/resolve/${modelRevision}/${modelFile}`
   console.log(`[setup-litert-cpp] Model revision: ${modelRevision}`)
