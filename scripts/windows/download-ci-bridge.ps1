@@ -31,14 +31,25 @@ Then restart PowerShell and authenticate:
 '@
   }
 
+  # headSha is recorded as bin/bridge.commit so `npm run setup:litert-cpp` can
+  # detect a stale bridge when the Delfin bridge source moves.
+  $headSha = $null
   if ([string]::IsNullOrWhiteSpace($RunId)) {
-    $listArgs = Get-GhArgs @('run', 'list', '--workflow', 'build-litert-cpp-bridge.yml', '--status', 'success', '--limit', '1', '--json', 'databaseId,displayTitle,headBranch,updatedAt') $Repo
+    $listArgs = Get-GhArgs @('run', 'list', '--workflow', 'build-litert-cpp-bridge.yml', '--status', 'success', '--limit', '1', '--json', 'databaseId,displayTitle,headBranch,headSha,updatedAt') $Repo
     $runs = @((& gh @listArgs) | ConvertFrom-Json)
     if ($runs.Count -lt 1) {
       throw 'No successful build-litert-cpp-bridge workflow runs found.'
     }
     $RunId = [string]$runs[0].databaseId
+    $headSha = [string]$runs[0].headSha
     Write-Host "Using latest successful run $RunId ($($runs[0].headBranch), $($runs[0].updatedAt))" -ForegroundColor Cyan
+  } else {
+    $viewArgs = Get-GhArgs @('run', 'view', $RunId, '--json', 'headSha') $Repo
+    try {
+      $headSha = [string]((& gh @viewArgs | ConvertFrom-Json).headSha)
+    } catch {
+      Write-Warning "Could not resolve headSha for run ${RunId}; bridge.commit will not be recorded."
+    }
   }
 
   Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
@@ -58,6 +69,20 @@ Then restart PowerShell and authenticate:
     Copy-Item -Force $dll.FullName (Join-Path $destDir $dll.Name)
   } else {
     Write-Warning 'libGemmaModelConstraintProvider.dll was not present in the downloaded artifact.'
+  }
+
+  # Record provenance so `npm run setup:litert-cpp` can detect a stale bridge.
+  try {
+    $litertRef = & node --input-type=module -e "import('./scripts/setup-litert-cpp.mjs').then(m => process.stdout.write(m.LITERT_LM_REF))"
+    if ($litertRef) {
+      Set-Content -Path (Join-Path $destDir 'bridge.version') -Value $litertRef -Encoding ascii
+    }
+  } catch {
+    Write-Warning 'Could not resolve LITERT_LM_REF; bridge.version not written.'
+  }
+  if ($headSha) {
+    Set-Content -Path (Join-Path $destDir 'bridge.commit') -Value $headSha -Encoding ascii
+    Write-Host "Recorded bridge.commit = $headSha" -ForegroundColor DarkGray
   }
 
   Write-Host "✅ Windows bridge artifact staged to $destDir" -ForegroundColor Green
